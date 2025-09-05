@@ -2,7 +2,7 @@
     "VCAP_SERVICES": {
         "xsuaa": [
             {
-                "name": "mcp-uaa",
+                "name": "sap-mcp-xsuaa",
                 "label": "xsuaa",
                 "tags": [
                     "xsuaa"
@@ -14,7 +14,7 @@
         ],
         "destination": [
             {
-                "name": "mcp-dest",
+                "name": "sap-mcp-destination",
                 "label": "destination",
                 "tags": [
                     "destination"
@@ -26,7 +26,7 @@
         ],
         "connectivity": [
             {
-                "name": "mcp-conn",
+                "name": "sap-mcp-connectivity",
                 "label": "connectivity",
                 "tags": [
                     "connectivity"
