@@ -28,7 +28,15 @@ After configuration, start the server with:
 npm run start:http
 ```
 
-## Notes
+
+## ⚙️ Environment Variable: Disable ReadEntity Tool Registration
+
+To disable registration of the ReadEntity tool for all entities in all services, set the following in your `.env` file:
+
+```env
+DISABLE_READ_ENTITY_TOOL=true
+```
+This will prevent registration of the ReadEntity tool for all entities and services.
 
 - The XSUAA configuration is present for future authentication support, but is not currently used.
 - You can combine these environment variables with any service discovery configuration described in `SERVICE_DISCOVERY_CONFIG.md`.

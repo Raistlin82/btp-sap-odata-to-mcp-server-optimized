@@ -41,7 +41,6 @@ modules:
       - name: sap-mcp-destination
       - name: sap-mcp-connectivity
       - name: sap-mcp-xsuaa
-      - name: sap-mcp-logging
 
 resources:
   # Destination Service
@@ -49,12 +48,14 @@ resources:
     type: org.cloudfoundry.managed-service
     parameters:
       service: destination
+      service-name: sap-mcp-destination-${space}
       service-plan: lite
 
   # Connectivity Service
   - name: sap-mcp-connectivity
     type: org.cloudfoundry.managed-service
     parameters:
+      service-name: sap-mcp-connectivity-${space}
       service: connectivity
       service-plan: lite
 
@@ -62,13 +63,10 @@ resources:
   - name: sap-mcp-xsuaa
     type: org.cloudfoundry.managed-service
     parameters:
+      service-name: sap-mcp-xsuaa-${space}
       service: xsuaa
       service-plan: application
       path: ./xs-security.json
-
-  # Application Logging Service
-  - name: sap-mcp-logging
-    type: org.cloudfoundry.managed-service
-    parameters:
-      service: application-logs
-      service-plan: lite
+      config:
+        xsappname: btp-sap-odata-to-mcp-server-${space}
+        tenant-mode: dedicated
