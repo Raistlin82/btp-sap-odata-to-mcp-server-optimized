@@ -1,8 +1,66 @@
 {
   "description": "BTP SAP OData MCP Server Security Configuration",
   "scopes": [
+    {
+      "name": "$XSAPPNAME.read",
+      "description": "Read access to SAP OData services via MCP"
+    },
+    {
+      "name": "$XSAPPNAME.write",
+      "description": "Write access to SAP OData entities (Create/Update)"
+    },
+    {
+      "name": "$XSAPPNAME.delete",
+      "description": "Delete access to SAP OData entities"
+    },
+    {
+      "name": "$XSAPPNAME.admin",
+      "description": "Administrative access to MCP server configuration"
+    },
+    {
+      "name": "$XSAPPNAME.discover",
+      "description": "Service discovery and metadata access"
+    }
   ],
   "role-templates": [
+    {
+      "name": "MCPViewer",
+      "description": "Read-only access to MCP services and discovery",
+      "scope-references": [
+        "$XSAPPNAME.read",
+        "$XSAPPNAME.discover"
+      ]
+    },
+    {
+      "name": "MCPEditor",
+      "description": "Read and write access to MCP services",
+      "scope-references": [
+        "$XSAPPNAME.read",
+        "$XSAPPNAME.write",
+        "$XSAPPNAME.discover"
+      ]
+    },
+    {
+      "name": "MCPManager",
+      "description": "Full access including delete operations",
+      "scope-references": [
+        "$XSAPPNAME.read",
+        "$XSAPPNAME.write",
+        "$XSAPPNAME.delete",
+        "$XSAPPNAME.discover"
+      ]
+    },
+    {
+      "name": "MCPAdmin",
+      "description": "Full administrative access to MCP server",
+      "scope-references": [
+        "$XSAPPNAME.read",
+        "$XSAPPNAME.write",
+        "$XSAPPNAME.delete",
+        "$XSAPPNAME.admin",
+        "$XSAPPNAME.discover"
+      ]
+    }
   ],
   "oauth2-configuration": {
     "redirect-uris": [
