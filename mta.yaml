@@ -13,11 +13,11 @@ build-parameters:
         - npm i
 
 modules:
-  - name: sap-mcp-server-optimized
+  - name: sap-mcp-server
     type: nodejs
     path: ./
     parameters:
-      app-name: sap-mcp-server-optimized-${space}
+      app-name: sap-mcp-server-${space}
       memory: 512M
       disk-quota: 1G
       buildpack: nodejs_buildpack
@@ -38,28 +38,28 @@ modules:
         - .git/
         - tests/
     requires:
-      - name: sap-mcp-destination-optimized
-      - name: sap-mcp-connectivity-optimized
-      - name: sap-mcp-xsuaa-optimized
-      - name: sap-mcp-logging-optimized
+      - name: sap-mcp-destination
+      - name: sap-mcp-connectivity
+      - name: sap-mcp-xsuaa
+      - name: sap-mcp-logging
 
 resources:
   # Destination Service
-  - name: sap-mcp-destination-optimized
+  - name: sap-mcp-destination
     type: org.cloudfoundry.managed-service
     parameters:
       service: destination
       service-plan: lite
 
   # Connectivity Service
-  - name: sap-mcp-connectivity-optimized
+  - name: sap-mcp-connectivity
     type: org.cloudfoundry.managed-service
     parameters:
       service: connectivity
       service-plan: lite
 
   # XSUAA Service
-  - name: sap-mcp-xsuaa-optimized
+  - name: sap-mcp-xsuaa
     type: org.cloudfoundry.managed-service
     parameters:
       service: xsuaa
@@ -67,7 +67,7 @@ resources:
       path: ./xs-security.json
 
   # Application Logging Service
-  - name: sap-mcp-logging-optimized
+  - name: sap-mcp-logging
     type: org.cloudfoundry.managed-service
     parameters:
       service: application-logs
