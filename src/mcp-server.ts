@@ -1,4 +1,4 @@
-import { SAPToolRegistry } from './tools/sap-tool-registry.js';
+import { HierarchicalSAPToolRegistry } from './tools/hierarchical-tool-registry.js';
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -16,7 +16,7 @@ export class MCPServer {
     private sapClient: SAPClient;
     private logger: Logger;
     private discoveredServices: ODataService[] = [];
-    private toolRegistry: SAPToolRegistry;
+    private toolRegistry: HierarchicalSAPToolRegistry;
 
     constructor(discoveredServices: ODataService[]) {
         this.logger = new Logger('mcp-server');
@@ -32,13 +32,13 @@ export class MCPServer {
             this.logger.error('MCP Server Error:', error);
             ErrorHandler.handle(error);
         };
-        this.toolRegistry = new SAPToolRegistry(this.mcpServer, this.sapClient, this.logger, this.discoveredServices);
+        this.toolRegistry = new HierarchicalSAPToolRegistry(this.mcpServer, this.sapClient, this.logger, this.discoveredServices);
     }
 
     async initialize(): Promise<void> {
         try {
             this.toolRegistry.registerServiceMetadataResources();
-            await this.toolRegistry.registerServiceCRUDTools();
+            await this.toolRegistry.registerDiscoveryTools();
             this.logger.info('🔧 Registered MCP tools for SAP operations');
         } catch (error) {
             this.logger.error('❌ Failed to initialize server:', error);

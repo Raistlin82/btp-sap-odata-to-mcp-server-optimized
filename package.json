@@ -18,7 +18,7 @@
     "inspect:mcp": "npm run build && npx @modelcontextprotocol/inspector node dist/mcp-server.js",
     "inspect": "npx @modelcontextprotocol/inspector",
     "build:btp": "mbt build",
-    "deploy:btp": "cf deploy ./mta_archives/btp-sap-odata-to-mcp-server_1.0.0.mtar "
+    "deploy:btp": "cf deploy ./mta_archives/btp-sap-odata-to-mcp-server-optimized_1.0.0.mtar "
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.1",

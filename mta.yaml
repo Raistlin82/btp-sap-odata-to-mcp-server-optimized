@@ -1,5 +1,5 @@
 _schema-version: "3.3.0"
-ID: btp-sap-odata-to-mcp-server
+ID: btp-sap-odata-to-mcp-server-optimized
 description: "SAP OData to MCP Server Multi-target application"
 version: 1.0.0
 
