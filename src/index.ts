@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import 'dotenv/config';
+import { authMiddleware, requireRead, requireWrite, requireDelete, requireAdmin, optionalAuth, AuthenticatedRequest } from './middleware/auth.js';
 
 import { MCPServer, createMCPServer } from './mcp-server.js';
 import { Logger } from './utils/logger.js';
@@ -149,14 +150,21 @@ export function createApp(): express.Application {
     app.use(express.json({ limit: '10mb' }));
     app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-    // Request logging middleware
-    app.use((req, res, next) => {
+    // Request logging middleware with authentication info
+    app.use((req: AuthenticatedRequest, res, next) => {
         logger.debug(`📨 ${req.method} ${req.path}`, {
             sessionId: req.headers['mcp-session-id'],
-            userAgent: req.headers['user-agent']
+            userAgent: req.headers['user-agent'],
+            user: req.authInfo?.user || 'anonymous',
+            authenticated: req.authInfo?.isAuthenticated || false
         });
         next();
     });
+
+    // Apply authentication middleware to protected routes
+    // Health check and docs are public
+    app.use('/mcp', optionalAuth);  // MCP endpoints support both auth and non-auth
+    app.use('/config', authMiddleware, requireAdmin);  // Config endpoints require admin
 
     // Health check endpoint
     app.get('/health', (req, res) => {
