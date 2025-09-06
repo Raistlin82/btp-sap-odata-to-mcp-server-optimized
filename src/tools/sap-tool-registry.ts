@@ -5,6 +5,18 @@ import { ODataService, EntityType } from "../types/sap-types.js";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 
+/**
+ * To disable registration of specific entity tools, set the environment variable DISABLED_ENTITY_TOOLS
+ * in your .env file. Format: ServiceId.EntityName,ServiceId.EntityName
+ * Example: DISABLED_ENTITY_TOOLS=SALES_ORDER.OrderHeader,PRODUCT.ProductEntity
+ * This will prevent registration of the ReadEntity tool for those entities.
+ */
+
+// Utility to check if ReadEntity tool registration is globally disabled
+function isReadEntityToolDisabled(): boolean {
+    return process.env.DISABLE_READ_ENTITY_TOOL === "true";
+}
+
 export class SAPToolRegistry {
     private toolNameMapping = new Map<string, string>();
     private usedShortNames = new Set<string>();
@@ -79,11 +91,15 @@ export class SAPToolRegistry {
     }
 
     public async registerServiceCRUDTools(): Promise<void> {
+        const disableReadEntityTool = isReadEntityToolDisabled();
         for (const service of this.discoveredServices) {
             if (!service.metadata?.entityTypes) continue;
             for (const entityType of service.metadata.entityTypes) {
                 this.registerReadEntitySetTool(service, entityType);
-                this.registerReadEntityTool(service, entityType);
+                // Only registerReadEntityTool if not globally disabled
+                if (!disableReadEntityTool) {
+                    this.registerReadEntityTool(service, entityType);
+                }
                 if (entityType.creatable) this.registerCreateEntityTool(service, entityType);
                 if (entityType.updatable) this.registerUpdateEntityTool(service, entityType);
                 if (entityType.deletable) this.registerDeleteEntityTool(service, entityType);

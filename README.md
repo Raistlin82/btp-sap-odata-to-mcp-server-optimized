@@ -166,18 +166,6 @@ Examples:
 - ✅ **Session Management** for HTTP transport
 - ✅ **Error Handling** with proper error codes
 
-### **Protocol Version**
-
-2025-06-18
-
-### **Supported Capabilities**
-
-- ✅ **Tools** with `listChanged` notifications
-- ✅ **Resources** with `listChanged` notifications
-- ✅ **Logging** with level control
-- ✅ **Session Management** for HTTP transport
-- ✅ **Error Handling** with proper error codes
-
 ### **Transport Support**
 
 - ✅ **Streamable HTTP** (recommended)
@@ -252,6 +240,16 @@ GET /docs
 See the MCP server in action:
 
 ![MCP Demo](docs/img/MCP%20Demo.gif)
+
+
+## ⚙️ Environment Variable: Disable ReadEntity Tool Registration
+
+To disable registration of the ReadEntity tool for all entities in all services, set the following in your `.env` file:
+
+```env
+DISABLE_READ_ENTITY_TOOL=true
+```
+This will prevent registration of the ReadEntity tool for all entities and services.
 
 ## ⚡ Quick Start
 
