@@ -495,6 +495,7 @@
                     <td>
                         <button class="action-btn" onclick="editUser('${user.sessionId}')">Edit</button>
                         <button class="action-btn" onclick="viewSession('${user.sessionId}')">View</button>
+                        <button class="action-btn" onclick="deleteSession('${user.sessionId}')">Delete</button>
                     </td>
                 `;
                 
@@ -554,6 +555,35 @@ Type: ${user.sessionType}
             `;
             
             alert(details);
+        }
+
+        // Delete session
+        async function deleteSession(sessionId) {
+            const user = usersData.find(u => u.sessionId === sessionId);
+            if (!user) return;
+
+            if (confirm(`Are you sure you want to delete the session for ${user.user}?`)) {
+                try {
+                    const response = await fetch(`/auth/admin/users/delete`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ sessionId: sessionId })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        alert(`Session for ${user.user} deleted successfully`);
+                        loadUsers(); // Refresh the table
+                    } else {
+                        alert(`Error: ${data.message}`);
+                    }
+                } catch (error) {
+                    alert(`Error deleting session: ${error.message}`);
+                }
+            }
         }
 
         // Auto-refresh every 30 seconds
