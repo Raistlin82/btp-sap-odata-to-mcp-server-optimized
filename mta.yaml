@@ -41,6 +41,7 @@ modules:
       - name: sap-mcp-destination
       - name: sap-mcp-connectivity
       - name: sap-mcp-xsuaa
+      - name: sap-mcp-identity
 
 resources:
   # Destination Service
@@ -70,3 +71,11 @@ resources:
       config:
         xsappname: btp-sap-odata-to-mcp-server-${space}
         tenant-mode: dedicated
+
+  # Identity Authentication Service
+  - name: sap-mcp-identity
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service-name: sap-mcp-identity-${space}
+      service: identity
+      service-plan: application

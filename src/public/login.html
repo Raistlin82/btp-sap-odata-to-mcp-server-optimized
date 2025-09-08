@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAP MCP Server - Authentication</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            width: 100%;
+            max-width: 450px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo {
+            width: 60px;
+            height: 60px;
+            background: #0070f3;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            font-weight: bold;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus, input[type="password"]:focus {
+            outline: none;
+            border-color: #0070f3;
+            box-shadow: 0 0 0 3px rgba(0, 112, 243, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: #0070f3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-bottom: 10px;
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #e9ecef;
+        }
+
+        .auth-method-selection {
+            text-align: center;
+        }
+
+        .method-info {
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        .method-info small {
+            color: #666;
+            font-style: italic;
+        }
+
+        .btn:hover {
+            background: #0051a2;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ffffff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            color: #dc3545;
+            font-size: 14px;
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .success {
+            display: none;
+            text-align: center;
+        }
+
+        .success-icon {
+            width: 60px;
+            height: 60px;
+            background: #28a745;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            color: white;
+        }
+
+        .section {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .section h3 {
+            color: #495057;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .section p {
+            color: #6c757d;
+            font-size: 14px;
+            line-height: 1.4;
+            margin-bottom: 10px;
+        }
+
+        .download-btn, .copy-btn {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #28a745;
+            color: white;
+            text-decoration: none;
+            border-radius: 3px;
+            font-size: 14px;
+            margin-right: 10px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .download-btn:hover, .copy-btn:hover {
+            background: #1e7e34;
+        }
+
+        .config-text {
+            background: #f1f3f4;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+
+        .back-btn {
+            background: #6c757d;
+            margin-top: 15px;
+        }
+
+        .back-btn:hover {
+            background: #545b62;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Login Form -->
+        <div id="loginForm">
+            <div class="header">
+                <div class="logo">S</div>
+                <h1>SAP MCP Server</h1>
+                <p class="subtitle" id="subtitle">Choose your authentication method</p>
+            </div>
+
+            <!-- Authentication Method Selection -->
+            <div id="authMethodSelection" class="auth-method-selection">
+                <button type="button" class="btn" id="oauth2Btn">
+                    🔐 Sign In with SAP IAS (OAuth 2.0)
+                </button>
+                <button type="button" class="btn btn-secondary" id="legacyBtn">
+                    👤 Use Username/Password (Legacy)
+                </button>
+                <div class="method-info">
+                    <small>OAuth 2.0 flow is recommended for enhanced security</small>
+                </div>
+            </div>
+
+            <!-- Legacy Login Form -->
+            <div id="legacyForm" style="display: none;">
+
+                <form id="authForm">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required 
+                           placeholder="Enter your SAP username">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required 
+                           placeholder="Enter your password">
+                </div>
+
+                <button type="submit" class="btn" id="loginBtn">
+                    <span id="loginText">Sign In</span>
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        Authenticating...
+                    </div>
+                </button>
+
+                    <div id="errorMessage" class="error"></div>
+                </form>
+                
+                <button type="button" class="btn btn-secondary" id="backBtn">← Back to Methods</button>
+            </div>
+        </div>
+
+        <!-- Success State -->
+        <div id="successState" class="success">
+            <div class="success-icon">✓</div>
+            <h2>Authentication Successful!</h2>
+            <p>Your JWT token has been generated and stored securely.</p>
+
+            <div class="section">
+                <h3>🖥️ For Claude Desktop Users</h3>
+                <p>Download the configuration file and place it in your user directory:</p>
+                <button id="downloadConfig" class="download-btn">📥 Download Configuration</button>
+                <div class="config-text" id="configPreview"></div>
+            </div>
+
+            <div class="section">
+                <h3>🌐 For Claude Web Users</h3>
+                <p>You're all set! Your authentication is stored on the server. You can now use MCP tools directly in Claude.</p>
+            </div>
+
+            <div class="section">
+                <h3>⚙️ Manual Configuration</h3>
+                <p>If you prefer to set up environment variables manually:</p>
+                <button id="copyEnvVars" class="copy-btn">📋 Copy Environment Variables</button>
+                <div class="config-text" id="envVarsText"></div>
+            </div>
+
+            <button class="btn back-btn" onclick="location.reload()">🔄 Authenticate Another User</button>
+        </div>
+    </div>
+
+    <script>
+        let sessionId = null;
+        let tokenData = null;
+        let currentAuthMethod = 'selection';
+
+        // OAuth 2.0 Flow Functions
+        async function initiateOAuth2Flow() {
+            try {
+                setLoadingState('Redirecting to SAP IAS...');
+                
+                // Use the login page itself as redirect URI (common pattern for SAP IAS)
+                const redirectUri = `${window.location.protocol}//${window.location.host}/login`;
+                const state = generateRandomString(32);
+                
+                sessionStorage.setItem('oauth_state', state);
+                
+                const response = await fetch('/auth/auth-url?' + new URLSearchParams({
+                    redirect_uri: redirectUri,
+                    state: state
+                }));
+                
+                if (!response.ok) {
+                    throw new Error('Failed to generate authorization URL');
+                }
+                
+                const data = await response.json();
+                window.location.href = data.authorization_url;
+                
+            } catch (error) {
+                console.error('OAuth initiation error:', error);
+                showError('Failed to initiate OAuth flow: ' + error.message);
+                showAuthSelection();
+            }
+        }
+        
+        function generateRandomString(length) {
+            const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += charset.charAt(Math.floor(Math.random() * charset.length));
+            }
+            return result;
+        }
+
+        function showAuthSelection() {
+            document.getElementById('authMethodSelection').style.display = 'block';
+            document.getElementById('legacyForm').style.display = 'none';
+            document.getElementById('subtitle').textContent = 'Choose your authentication method';
+            currentAuthMethod = 'selection';
+        }
+
+        function showLegacyForm() {
+            document.getElementById('authMethodSelection').style.display = 'none';
+            document.getElementById('legacyForm').style.display = 'block';
+            document.getElementById('subtitle').textContent = 'Sign in with your credentials';
+            currentAuthMethod = 'legacy';
+        }
+
+        function setLoadingState(message) {
+            const loginForm = document.getElementById('loginForm');
+            loginForm.innerHTML = `
+                <div class="header">
+                    <div class="logo">S</div>
+                    <h1>SAP MCP Server</h1>
+                    <p class="subtitle">${message}</p>
+                </div>
+                <div style="text-align: center; padding: 20px;">
+                    <div class="loading" style="display: flex; justify-content: center;">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            if (errorDiv) {
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+            } else {
+                alert(message); // Fallback
+            }
+        }
+
+        // Event Listeners
+        document.getElementById('oauth2Btn').addEventListener('click', initiateOAuth2Flow);
+        document.getElementById('legacyBtn').addEventListener('click', showLegacyForm);
+        document.getElementById('backBtn').addEventListener('click', showAuthSelection);
+
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const loginText = document.getElementById('loginText');
+            const loading = document.getElementById('loading');
+            const errorMessage = document.getElementById('errorMessage');
+
+            // Show loading state
+            loginBtn.disabled = true;
+            loginText.style.display = 'none';
+            loading.style.display = 'flex';
+            errorMessage.style.display = 'none';
+
+            try {
+                const response = await fetch('/auth/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    sessionId = result.sessionId;
+                    tokenData = result;
+                    showSuccessState();
+                } else {
+                    throw new Error(result.message || 'Authentication failed');
+                }
+
+            } catch (error) {
+                console.error('Authentication error:', error);
+                errorMessage.textContent = error.message || 'Authentication failed. Please check your credentials.';
+                errorMessage.style.display = 'block';
+            } finally {
+                // Hide loading state
+                loginBtn.disabled = false;
+                loginText.style.display = 'inline';
+                loading.style.display = 'none';
+            }
+        });
+
+        function showSuccessState() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('successState').style.display = 'block';
+            
+            updateConfigurationDisplays();
+        }
+
+        function updateConfigurationDisplays() {
+            const serverUrl = window.location.origin;
+            
+            // Configuration for download
+            const config = {
+                sap_mcp_session_id: sessionId,
+                mcp_server_url: serverUrl,
+                user: tokenData.user,
+                expires_at: tokenData.expiresAt,
+                created_at: new Date().toISOString()
+            };
+
+            document.getElementById('configPreview').textContent = JSON.stringify(config, null, 2);
+
+            // Environment variables
+            const envVars = `export SAP_MCP_SESSION_ID="${sessionId}"
+export SAP_MCP_SERVER_URL="${serverUrl}"
+export SAP_MCP_USER="${tokenData.user}"`;
+
+            document.getElementById('envVarsText').textContent = envVars;
+
+            // Download button functionality
+            document.getElementById('downloadConfig').addEventListener('click', () => {
+                const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'mcp-sap-config.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+
+            // Copy environment variables
+            document.getElementById('copyEnvVars').addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(envVars);
+                    const btn = document.getElementById('copyEnvVars');
+                    const originalText = btn.textContent;
+                    btn.textContent = '✅ Copied!';
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                    }, 2000);
+                } catch (err) {
+                    console.error('Failed to copy:', err);
+                    // Fallback for browsers that don't support clipboard API
+                    const textArea = document.createElement('textarea');
+                    textArea.value = envVars;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                }
+            });
+        }
+
+        // Handle OAuth 2.0 callback
+        async function handleOAuth2Callback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const state = urlParams.get('state');
+            const error = urlParams.get('error');
+            const storedState = sessionStorage.getItem('oauth_state');
+
+            if (error) {
+                showError(`OAuth error: ${error}`);
+                showAuthSelection();
+                return false;
+            }
+
+            if (!code) {
+                return false; // Not an OAuth callback
+            }
+
+            // Validate state parameter
+            if (!state || state !== storedState) {
+                showError('OAuth state mismatch. Please try again.');
+                showAuthSelection();
+                return true; // Handled as error
+            }
+
+            try {
+                setLoadingState('Processing OAuth callback...');
+
+                // Exchange authorization code for tokens
+                const response = await fetch('/auth/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        grant_type: 'authorization_code',
+                        code: code,
+                        redirect_uri: `${window.location.protocol}//${window.location.host}/login`
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.session_id) {
+                    sessionId = result.session_id;
+                    tokenData = { sessionId: result.session_id, user: 'OAuth User' };
+                    
+                    // Clear OAuth parameters from URL
+                    sessionStorage.removeItem('oauth_state');
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    
+                    showSuccessState();
+                } else {
+                    throw new Error(result.error_description || result.message || 'OAuth token exchange failed');
+                }
+
+            } catch (error) {
+                console.error('OAuth callback error:', error);
+                showError('OAuth authentication failed: ' + error.message);
+                showAuthSelection();
+            }
+
+            return true; // OAuth callback handled
+        }
+
+        // Check URL parameters and existing authentication on page load
+        window.addEventListener('load', async () => {
+            // First check if this is an OAuth callback
+            if (await handleOAuth2Callback()) {
+                return; // OAuth callback was handled
+            }
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlSessionId = urlParams.get('session');
+            const success = urlParams.get('success');
+            const error = urlParams.get('error');
+
+            if (error) {
+                showError(decodeURIComponent(error));
+                showAuthSelection();
+            } else if (success && urlSessionId) {
+                // Legacy callback success
+                sessionId = urlSessionId;
+                tokenData = { sessionId: urlSessionId, user: 'OAuth User' };
+                showSuccessState();
+                // Clean up URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } else {
+                // Check for existing session
+                try {
+                    const response = await fetch('/auth/status');
+                    if (response.ok) {
+                        const status = await response.json();
+                        if (status.authenticated) {
+                            sessionId = status.sessionId;
+                            tokenData = status;
+                            showSuccessState();
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    // No existing session
+                }
+                
+                // Show authentication selection by default
+                showAuthSelection();
+            }
+        });
+    </script>
+</body>
+</html>
