@@ -41,7 +41,8 @@ export class AuthServer {
         contentSecurityPolicy: {
           directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts for login page
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-hashes'"], // Allow inline scripts and event handlers
+            scriptSrcAttr: ["'unsafe-inline'"], // Allow inline event handlers like onclick
             styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles
             imgSrc: ["'self'", "data:", "https:"],
             connectSrc: ["'self'", "https:"], // Allow HTTPS connections
@@ -948,6 +949,57 @@ export class AuthServer {
         res.status(500).json({
           error: 'Internal server error',
           message: 'Failed to update user role'
+        });
+      }
+    });
+
+    // Admin endpoint to delete user sessions
+    this.app.post('/admin/users/delete', async (req: Request, res: Response) => {
+      try {
+        // Simple admin authentication - check if global admin is authenticated
+        const globalAuth = await this.tokenStore.get('global_user_auth');
+        if (!globalAuth || globalAuth.user !== 'gabriele.rendina@lutech.it') {
+          return res.status(403).json({
+            error: 'Forbidden',
+            message: 'Admin privileges required to delete user sessions'
+          });
+        }
+
+        const { sessionId } = req.body;
+
+        const tokenData = await this.tokenStore.get(sessionId);
+        if (!tokenData) {
+          return res.status(404).json({
+            error: 'Session not found',
+            message: 'The specified session does not exist or has expired'
+          });
+        }
+
+        const success = await this.tokenStore.remove(sessionId);
+        
+        if (success) {
+          this.logger.info(`Admin ${globalAuth.user} deleted session for user ${tokenData.user}`);
+          
+          res.json({
+            success: true,
+            message: 'User session deleted successfully',
+            user: tokenData.user,
+            sessionId: sessionId,
+            deletedBy: globalAuth.user,
+            deletedAt: new Date().toISOString()
+          });
+        } else {
+          res.status(500).json({
+            error: 'Deletion failed',
+            message: 'Failed to delete user session'
+          });
+        }
+
+      } catch (error) {
+        this.logger.error('Admin session deletion failed:', error);
+        res.status(500).json({
+          error: 'Internal server error',
+          message: 'Failed to delete user session'
         });
       }
     });
