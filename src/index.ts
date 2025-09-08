@@ -15,6 +15,7 @@ import { SAPClient } from './services/sap-client.js';
 import { SAPDiscoveryService } from './services/sap-discovery.js';
 import { ODataService } from './types/sap-types.js';
 import { ServiceDiscoveryConfigService } from './services/service-discovery-config.js';
+import { AuthServer } from './services/auth-server.js';
 
 /**
  * Modern Express server hosting SAP MCP Server with session management
@@ -30,6 +31,13 @@ const sapClient = new SAPClient(destinationService, logger);
 const sapDiscoveryService = new SAPDiscoveryService(sapClient, logger, config);
 const serviceConfigService = new ServiceDiscoveryConfigService(config, logger);
 let discoveredServices: ODataService[] = [];
+
+// Initialize authentication server
+const authServer = new AuthServer({
+    port: parseInt(process.env.AUTH_PORT || '3001'),
+    corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000', 'http://127.0.0.1:3000']
+});
+const tokenStore = authServer.getTokenStore();
 
 // Session storage for HTTP transport
 const sessions: Map<string, {
@@ -78,8 +86,12 @@ async function getOrCreateSession(sessionId?: string): Promise<{
     logger.info(`🆕 Creating new MCP session: ${newSessionId}`);
 
     try {
-        // Create and initialize MCP server
-        const mcpServer = await createMCPServer(discoveredServices);
+        // Create and initialize MCP server with authentication
+        // Use the same URL as the main server when deployed (no separate auth port)
+        const authServerUrl = process.env.VCAP_APPLICATION ? 
+            `https://${JSON.parse(process.env.VCAP_APPLICATION).application_uris[0]}` :  // When deployed to CF
+            `http://localhost:${process.env.AUTH_PORT || '3001'}`;  // Local development
+        const mcpServer = await createMCPServer(discoveredServices, tokenStore, authServerUrl);
 
         // Create HTTP transport
         const transport = new StreamableHTTPServerTransport({
@@ -132,8 +144,10 @@ export function createApp(): express.Application {
             directives: {
                 defaultSrc: ["'self'"],
                 styleSrc: ["'self'", "'unsafe-inline'"],
-                scriptSrc: ["'self'"],
-                imgSrc: ["'self'", "data:", "https:"]
+                scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts for login page
+                imgSrc: ["'self'", "data:", "https:"],
+                connectSrc: ["'self'", "https:"], // Allow HTTPS connections
+                fontSrc: ["'self'", "https:", "data:"]
             }
         }
     }));
@@ -161,18 +175,46 @@ export function createApp(): express.Application {
         next();
     });
 
-    // Apply authentication middleware to protected routes
-    // Health check and docs are public
-    app.use('/mcp', optionalAuth);  // MCP endpoints support both auth and non-auth
+    // Apply authentication middleware to protected routes only
+    // Health check, docs, and MCP endpoints are public
     app.use('/config', authMiddleware, requireAdmin);  // Config endpoints require admin
 
-    // Health check endpoint
+    // Mount authentication server routes
+    const authApp = authServer.getApp();
+    logger.info(`🔐 Mounting auth server app at /auth`);
+    
+    if (!authApp) {
+        logger.error('❌ Auth server app is undefined! Authentication endpoints will not work.');
+    } else {
+        app.use('/auth', authApp);
+        logger.info('✅ Auth server successfully mounted at /auth');
+    }
+
+    // Add explicit login route that serves the login page
+    app.get('/login', (req, res) => {
+        res.redirect('/auth/');
+    });
+
+    // Simple test endpoint
+    app.get('/', (req, res) => {
+        res.json({
+            message: 'SAP MCP Server is running',
+            timestamp: new Date().toISOString(),
+            endpoints: ['/health', '/mcp', '/docs', '/login', '/auth/status']
+        });
+    });
+
+    // Health check endpoint (enhanced with auth server status)
     app.get('/health', (req, res) => {
         res.json({
             status: 'healthy',
             timestamp: new Date().toISOString(),
             activeSessions: sessions.size,
-            version: process.env.npm_package_version || '1.0.0'
+            version: process.env.npm_package_version || '1.0.0',
+            authServer: {
+                status: 'running',
+                port: process.env.AUTH_PORT || '3001'
+            }
         });
     });
 
@@ -200,9 +242,17 @@ export function createApp(): express.Application {
             ],
             endpoints: {
                 health: '/health',
-                mcp: '/mcp'
+                mcp: '/mcp',
+                auth: '/auth',
+                login: '/login'
             },
-            activeSessions: sessions.size
+            activeSessions: sessions.size,
+            authentication: {
+                enabled: true,
+                loginUrl: '/login',
+                required: 'Only for data operations (discovery is public)',
+                supportedMethods: ['IAS username/password', 'Session-based', 'Config file', 'Environment variables']
+            }
         });
     });
 
@@ -435,12 +485,28 @@ export async function startServer(port: number = 3000): Promise<void> {
     return new Promise((resolve, reject) => {
         try {
             const server = app.listen(port, async () => {
-                logger.info(`🚀 SAP MCP Server running at http://localhost:${port}`);
-                logger.info(`📊 Health check: http://localhost:${port}/health`);
-                logger.info(`📚 API docs: http://localhost:${port}/docs`);
-                logger.info(`🔧 MCP endpoint: http://localhost:${port}/mcp`);
+                // Determine the base URL for this deployment
+                const baseUrl = process.env.VCAP_APPLICATION ? 
+                    `https://${JSON.parse(process.env.VCAP_APPLICATION).application_uris[0]}` :
+                    `http://localhost:${port}`;
+                
+                logger.info(`🚀 SAP MCP Server running at ${baseUrl}`);
+                logger.info(`📊 Health check: ${baseUrl}/health`);
+                logger.info(`📚 API docs: ${baseUrl}/docs`);
+                logger.info(`🔧 MCP endpoint: ${baseUrl}/mcp`);
 
                 logger.info('🚀 Initializing Modern SAP MCP Server...');
+
+                // Start authentication server on separate port
+                try {
+                    const authPort = parseInt(process.env.AUTH_PORT || '3001');
+                    // Note: AuthServer will be available through the main app due to mounting
+                    logger.info(`🔐 Authentication server integrated at port ${port}`);
+                    logger.info(`📱 Login page: ${baseUrl}/login`);
+                } catch (error) {
+                    logger.warn('⚠️  Authentication server failed to start:', error);
+                    logger.info('🔄 Continuing with authentication disabled...');
+                }
 
                 // Initialize destination service
                 await destinationService.initialize();
@@ -450,6 +516,7 @@ export async function startServer(port: number = 3000): Promise<void> {
                 discoveredServices = await sapDiscoveryService.discoverAllServices();
 
                 logger.info(`✅ Discovered ${discoveredServices.length} OData services`);
+                logger.info(`🔧 Authentication: Discovery is public, data operations require authentication`);
                 resolve();
             });
 

@@ -10,6 +10,7 @@ import { Logger } from './utils/logger.js';
 import { Config } from './utils/config.js';
 import { ErrorHandler } from './utils/error-handler.js';
 import { ODataService } from './types/sap-types.js';
+import { TokenStore } from './services/token-store.js';
 
 export class MCPServer {
     private mcpServer: McpServer;
@@ -18,7 +19,11 @@ export class MCPServer {
     private discoveredServices: ODataService[] = [];
     private toolRegistry: HierarchicalSAPToolRegistry;
 
-    constructor(discoveredServices: ODataService[]) {
+    constructor(
+        discoveredServices: ODataService[], 
+        tokenStore?: TokenStore, 
+        authServerUrl?: string
+    ) {
         this.logger = new Logger('mcp-server');
         const config = new Config();
         const destinationService = new DestinationService(this.logger, config);
@@ -32,7 +37,14 @@ export class MCPServer {
             this.logger.error('MCP Server Error:', error);
             ErrorHandler.handle(error);
         };
-        this.toolRegistry = new HierarchicalSAPToolRegistry(this.mcpServer, this.sapClient, this.logger, this.discoveredServices);
+        this.toolRegistry = new HierarchicalSAPToolRegistry(
+            this.mcpServer, 
+            this.sapClient, 
+            this.logger, 
+            this.discoveredServices,
+            tokenStore,
+            authServerUrl
+        );
     }
 
     async initialize(): Promise<void> {
@@ -68,8 +80,12 @@ export class MCPServer {
     }
 }
 
-export async function createMCPServer(discoveredServices: ODataService[]): Promise<MCPServer> {
-    const server = new MCPServer(discoveredServices);
+export async function createMCPServer(
+    discoveredServices: ODataService[], 
+    tokenStore?: TokenStore, 
+    authServerUrl?: string
+): Promise<MCPServer> {
+    const server = new MCPServer(discoveredServices, tokenStore, authServerUrl);
     await server.initialize();
     return server;
 }

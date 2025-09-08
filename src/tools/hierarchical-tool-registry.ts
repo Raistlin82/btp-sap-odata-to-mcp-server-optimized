@@ -2,6 +2,8 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import { SAPClient } from "../services/sap-client.js";
 import { Logger } from "../utils/logger.js";
 import { ODataService, EntityType } from "../types/sap-types.js";
+import { MCPAuthManager } from "../middleware/mcp-auth.js";
+import { TokenStore } from "../services/token-store.js";
 import { z } from "zod";
 
 /**
@@ -18,14 +20,22 @@ import { z } from "zod";
  */
 export class HierarchicalSAPToolRegistry {
     private serviceCategories = new Map<string, string[]>();
+    private authManager?: MCPAuthManager;
 
     constructor(
         private mcpServer: McpServer,
         private sapClient: SAPClient,
         private logger: Logger,
-        private discoveredServices: ODataService[]
+        private discoveredServices: ODataService[],
+        tokenStore?: TokenStore,
+        authServerUrl?: string
     ) {
         this.categorizeServices();
+        
+        // Initialize authentication manager if token store is provided
+        if (tokenStore && authServerUrl) {
+            this.authManager = new MCPAuthManager(tokenStore, authServerUrl, this.logger);
+        }
     }
 
     /**
@@ -340,6 +350,7 @@ export class HierarchicalSAPToolRegistry {
             const serviceId = args.serviceId as string;
             const entityName = args.entityName as string;
 
+            // Schema access is public - no authentication required for discovery
             const service = this.discoveredServices.find(s => s.id === serviceId);
             if (!service) {
                 return {
@@ -418,6 +429,26 @@ export class HierarchicalSAPToolRegistry {
             const operation = args.operation as string;
             const parameters = args.parameters as Record<string, any> || {};
             const queryOptions = args.queryOptions as Record<string, any> || {};
+
+            // Check authentication for this tool
+            if (this.authManager) {
+                const authResult = await this.authManager.authenticateToolCall('execute-entity-operation', args);
+                
+                if (!authResult.authenticated) {
+                    return {
+                        content: [{
+                            type: "text" as const,
+                            text: JSON.stringify(this.authManager.formatAuthError(authResult), null, 2)
+                        }],
+                        isError: true
+                    };
+                }
+
+                // If authenticated, add the token to parameters for SAPClient
+                if (authResult.context?.token) {
+                    parameters._authToken = authResult.context.token;
+                }
+            }
 
             // Validate service
             const service = this.discoveredServices.find(s => s.id === serviceId);

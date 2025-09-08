@@ -10,7 +10,7 @@
     "npm": ">=8.0.0"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r src/public dist/",
     "build:watch": "tsc --watch",
     "start": "node dist/index.js",
     "start:http": "npm run build && node dist/index.js",
