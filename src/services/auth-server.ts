@@ -7,6 +7,8 @@ import { Logger } from '../utils/logger.js';
 import { IASAuthService, TokenData } from './ias-auth-service.js';
 import { TokenStore, StoredTokenData } from './token-store.js';
 import { authMiddleware, AuthenticatedRequest, requireAdmin } from '../middleware/auth.js';
+import xssec from '@sap/xssec';
+import xsenv from '@sap/xsenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -769,17 +771,76 @@ export class AuthServer {
       }
     });
 
-    // Admin dashboard page - requires admin role from XSUAA
-    this.app.get('/admin', authMiddleware, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
-      try {        
-        // Serve the admin dashboard
-        res.sendFile(path.join(__dirname, '../public/admin.html'));
+    // Admin dashboard page - with redirect for browser access
+    this.app.get('/admin', async (req: Request, res: Response) => {
+      try {
+        // Check for authentication first
+        const authHeader = req.headers.authorization;
+        
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          // For browser access, redirect to login instead of JSON error
+          return res.redirect(`/auth/?redirect=${encodeURIComponent('/auth/admin')}`);
+        }
+
+        // Validate JWT token and check admin scope
+        try {
+          const token = authHeader.substring(7);
+          
+          // Load XSUAA service credentials
+          const services = xsenv.getServices({ xsuaa: { label: 'xsuaa' } });
+          const xsuaaCredentials = services.xsuaa;
+          
+          // Validate the JWT token
+          const securityContext = await new Promise((resolve, reject) => {
+            xssec.createSecurityContext(token, xsuaaCredentials, (err: any, ctx: any) => {
+              if (err) {
+                reject(err);
+              } else {
+                resolve(ctx);
+              }
+            });
+          });
+
+          const authInfo = this.extractAuthInfo(securityContext as any);
+          
+          // Check for admin scope
+          const appName = process.env.VCAP_APPLICATION ? 
+            JSON.parse(process.env.VCAP_APPLICATION).name : 'btp-sap-odata-to-mcp-server';
+          const requiredScope = `${appName}.admin`;
+          
+          if (!authInfo.scopes.includes(requiredScope)) {
+            return res.status(403).send(`
+              <html>
+                <head><title>Access Denied</title></head>
+                <body>
+                  <h1>Access Denied</h1>
+                  <p>Admin privileges required. You need the MCPAdmin role collection.</p>
+                  <p><a href="/auth/">Back to Login</a></p>
+                </body>
+              </html>
+            `);
+          }
+
+          // User is authenticated and has admin scope - serve the admin dashboard
+          res.sendFile(path.join(__dirname, '../public/admin.html'));
+          
+        } catch (authError) {
+          this.logger.warn('Admin access: Invalid token', authError);
+          return res.redirect(`/auth/?redirect=${encodeURIComponent('/auth/admin')}`);
+        }
+
       } catch (error) {
         this.logger.error('Admin dashboard access failed:', error);
-        res.status(500).json({
-          error: 'Internal server error',
-          message: 'Failed to load admin dashboard'
-        });
+        res.status(500).send(`
+          <html>
+            <head><title>Error</title></head>
+            <body>
+              <h1>Internal Server Error</h1>
+              <p>Failed to load admin dashboard</p>
+              <p><a href="/auth/">Back to Login</a></p>
+            </body>
+          </html>
+        `);
       }
     });
 
@@ -933,6 +994,20 @@ export class AuthServer {
         resolve();
       }
     });
+  }
+
+  private extractAuthInfo(securityContext: any) {
+    const userInfo = securityContext.getTokenInfo();
+    const scopes = securityContext.getGrantedScopes();
+    
+    return {
+      user: userInfo.getGivenName() + ' ' + userInfo.getFamilyName() || userInfo.getLogonName(),
+      email: userInfo.getEmail(),
+      scopes: scopes,
+      tenant: userInfo.getIdentityZone(),
+      userId: userInfo.getLogonName(),
+      isAuthenticated: true
+    };
   }
 
   getTokenStore(): TokenStore {
