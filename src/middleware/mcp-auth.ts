@@ -43,7 +43,10 @@ export interface MCPAuthResult {
         description: string;
         benefits: string[];
       };
-      quick_start?: string;
+      quick_start?: string | {
+        browser: string;
+        curl: string;
+      };
     };
   };
 }
@@ -325,16 +328,17 @@ export class MCPAuthManager {
       authenticated: false,
       error: {
         code: 'AUTHENTICATION_REQUIRED',
-        message: 'Authentication required to use this tool. Execute these commands:',
+        message: 'Authentication required to use this tool. Choose one of these options:',
         authUrl: `${this.authServerUrl}/login`,
         instructions: {
-          step1: `curl -X POST "${baseUrl}/auth/login" -H "Content-Type: application/json" -d '{"username":"YOUR_SAP_USERNAME","password":"YOUR_SAP_PASSWORD"}'`,
-          step2: `# Authentication complete - server will remember your session automatically`,
-          step3: `# No client configuration needed - just use MCP tools normally`,
+          web_method: {
+            step1: `Open your browser and navigate to: ${baseUrl}/auth/`,
+            step2: `Complete the SAP IAS authentication in your browser`,
+            step3: `Authentication is automatically stored - return to using MCP tools normally`
+          },
           cli_method: {
-            description: 'One-time authentication - no client configuration required:',
-            step1: `# Authenticate once with your SAP credentials
-curl -X POST "${baseUrl}/auth/login" \\
+            description: 'Command-line authentication option:',
+            step1: `curl -X POST "${baseUrl}/auth/login" \\
   -H "Content-Type: application/json" \\
   -d '{"username":"YOUR_SAP_USERNAME","password":"YOUR_SAP_PASSWORD"}'`,
             step2: `# Server will automatically associate your authentication with this MCP session`,
@@ -351,7 +355,10 @@ curl -X POST "${baseUrl}/auth/login" \\
               '✓ Transparent token refresh and session management'
             ]
           },
-          quick_start: `curl -X POST "${baseUrl}/auth/login" -H "Content-Type: application/json" -d '{"username":"YOUR_SAP_USERNAME","password":"YOUR_SAP_PASSWORD"}'`
+          quick_start: {
+            browser: `Navigate to: ${baseUrl}/auth/`,
+            curl: `curl -X POST "${baseUrl}/auth/login" -H "Content-Type: application/json" -d '{"username":"YOUR_SAP_USERNAME","password":"YOUR_SAP_PASSWORD"}'`
+          }
         }
       }
     };
