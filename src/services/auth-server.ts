@@ -6,7 +6,7 @@ import helmet from 'helmet';
 import { Logger } from '../utils/logger.js';
 import { IASAuthService, TokenData } from './ias-auth-service.js';
 import { TokenStore, StoredTokenData } from './token-store.js';
-import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
+import { authMiddleware, AuthenticatedRequest, requireAdmin } from '../middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -769,16 +769,9 @@ export class AuthServer {
       }
     });
 
-    // Admin dashboard page
-    this.app.get('/admin', async (req: Request, res: Response) => {
-      try {
-        // Simple admin authentication - check if global admin is authenticated
-        const globalAuth = await this.tokenStore.get('global_user_auth');
-        if (!globalAuth || globalAuth.user !== 'gabriele.rendina@lutech.it') {
-          // Redirect to login instead of showing error
-          return res.redirect('/auth/?redirect=/auth/admin');
-        }
-        
+    // Admin dashboard page - requires admin role from XSUAA
+    this.app.get('/admin', authMiddleware, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+      try {        
         // Serve the admin dashboard
         res.sendFile(path.join(__dirname, '../public/admin.html'));
       } catch (error) {
@@ -791,16 +784,8 @@ export class AuthServer {
     });
 
     // Admin endpoint to view all authenticated users and their roles/scopes
-    this.app.get('/admin/users', async (req: Request, res: Response) => {
+    this.app.get('/admin/users', authMiddleware, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
       try {
-        // Simple admin authentication - check if global admin is authenticated
-        const globalAuth = await this.tokenStore.get('global_user_auth');
-        if (!globalAuth || globalAuth.user !== 'gabriele.rendina@lutech.it') {
-          return res.status(403).json({
-            error: 'Forbidden',
-            message: 'Admin privileges required. Please authenticate first with: curl -X POST "https://[server]/auth/login" -H "Content-Type: application/json" -d \'{"username":"gabriele.rendina@lutech.it","password":"YOUR_PASSWORD"}\''
-          });
-        }
 
         // Get all active sessions
         const allSessions = await this.tokenStore.getAllSessions();
@@ -817,13 +802,7 @@ export class AuthServer {
             role = 'viewer';
           }
 
-          // Special role assignment for specific users
-          if (tokenData.user === 'gabriele.rendina@lutech.it') {
-            role = 'admin';
-            if (!tokenData.scopes?.includes('admin')) {
-              tokenData.scopes = [...(tokenData.scopes || []), 'admin'];
-            }
-          }
+          // Role is determined purely by scopes from XSUAA token
 
           return {
             sessionId: tokenData.sessionId,
@@ -851,7 +830,7 @@ export class AuthServer {
 
         res.json({
           success: true,
-          requestedBy: globalAuth.user,
+          requestedBy: req.authInfo?.user || 'Unknown',
           requestedAt: new Date().toISOString(),
           summary: {
             totalUsers: users.length,
@@ -875,100 +854,11 @@ export class AuthServer {
       }
     });
 
-    // Admin endpoint to update user roles/scopes
-    this.app.put('/admin/users/:sessionId/role', async (req: Request, res: Response) => {
+    // Admin endpoint to delete user sessions - requires admin role from XSUAA
+    this.app.delete('/admin/users/:sessionId', authMiddleware, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
       try {
-        // Simple admin authentication - check if global admin is authenticated
-        const globalAuth = await this.tokenStore.get('global_user_auth');
-        if (!globalAuth || globalAuth.user !== 'gabriele.rendina@lutech.it') {
-          return res.status(403).json({
-            error: 'Forbidden',
-            message: 'Admin privileges required to modify user roles'
-          });
-        }
 
         const { sessionId } = req.params;
-        const { role, scopes } = req.body;
-
-        const tokenData = await this.tokenStore.get(sessionId);
-        if (!tokenData) {
-          return res.status(404).json({
-            error: 'Session not found',
-            message: 'The specified session does not exist or has expired'
-          });
-        }
-
-        // Map role to scopes if role is provided
-        let newScopes = scopes;
-        if (role && !scopes) {
-          switch (role) {
-            case 'admin':
-              newScopes = ['read', 'write', 'delete', 'admin'];
-              break;
-            case 'editor':
-              newScopes = ['read', 'write'];
-              break;
-            case 'viewer':
-              newScopes = ['read'];
-              break;
-            default:
-              return res.status(400).json({
-                error: 'Invalid role',
-                message: 'Valid roles are: admin, editor, viewer'
-              });
-          }
-        }
-
-        // Update the token with new scopes
-        const updatedTokenData = {
-          ...tokenData,
-          scopes: newScopes
-        };
-
-        const success = await this.tokenStore.update(sessionId, updatedTokenData);
-        
-        if (success) {
-          this.logger.info(`Admin ${globalAuth.user} updated user ${tokenData.user} role to ${role} with scopes: ${newScopes?.join(', ')}`);
-          
-          res.json({
-            success: true,
-            message: 'User role updated successfully',
-            user: tokenData.user,
-            sessionId: sessionId,
-            oldScopes: tokenData.scopes,
-            newScopes: newScopes,
-            updatedBy: globalAuth.user,
-            updatedAt: new Date().toISOString()
-          });
-        } else {
-          res.status(500).json({
-            error: 'Update failed',
-            message: 'Failed to update user role'
-          });
-        }
-
-      } catch (error) {
-        this.logger.error('Admin role update failed:', error);
-        res.status(500).json({
-          error: 'Internal server error',
-          message: 'Failed to update user role'
-        });
-      }
-    });
-
-    // Admin endpoint to delete user sessions
-    this.app.post('/admin/users/delete', async (req: Request, res: Response) => {
-      try {
-        // Simple admin authentication - check if global admin is authenticated
-        const globalAuth = await this.tokenStore.get('global_user_auth');
-        if (!globalAuth || globalAuth.user !== 'gabriele.rendina@lutech.it') {
-          return res.status(403).json({
-            error: 'Forbidden',
-            message: 'Admin privileges required to delete user sessions'
-          });
-        }
-
-        const { sessionId } = req.body;
 
         const tokenData = await this.tokenStore.get(sessionId);
         if (!tokenData) {
@@ -981,14 +871,14 @@ export class AuthServer {
         const success = await this.tokenStore.remove(sessionId);
         
         if (success) {
-          this.logger.info(`Admin ${globalAuth.user} deleted session for user ${tokenData.user}`);
+          this.logger.info(`Admin ${req.authInfo?.user} deleted session for user ${tokenData.user}`);
           
           res.json({
             success: true,
             message: 'User session deleted successfully',
             user: tokenData.user,
             sessionId: sessionId,
-            deletedBy: globalAuth.user,
+            deletedBy: req.authInfo?.user,
             deletedAt: new Date().toISOString()
           });
         } else {
