@@ -32,6 +32,99 @@ const sapDiscoveryService = new SAPDiscoveryService(sapClient, logger, config);
 const serviceConfigService = new ServiceDiscoveryConfigService(config, logger);
 let discoveredServices: ODataService[] = [];
 
+/**
+ * Reload OData service configuration and rediscover services
+ */
+async function reloadODataServices(): Promise<{ success: boolean; servicesCount: number; message: string }> {
+    try {
+        logger.info('🔄 Reloading OData configuration and rediscovering services...');
+        
+        // Reload configuration from CF services and environment
+        await config.reloadODataConfig();
+        
+        // Rediscover services with new configuration
+        const newServices = await sapDiscoveryService.discoverAllServices();
+        
+        // Update the global services list
+        discoveredServices = newServices;
+        
+        logger.info(`✅ Service rediscovery complete: ${newServices.length} services found`);
+        
+        return {
+            success: true,
+            servicesCount: newServices.length,
+            message: `Successfully rediscovered ${newServices.length} OData services with updated configuration`
+        };
+    } catch (error) {
+        logger.error('❌ Failed to reload OData services:', error);
+        return {
+            success: false,
+            servicesCount: 0,
+            message: `Failed to reload services: ${error}`
+        };
+    }
+}
+
+async function getODataConfigStatus(): Promise<{ 
+    config: Record<string, unknown>; 
+    servicesCount: number; 
+    discoveredServices: Array<{ id: string; name: string; url: string; entities: number }>;
+}> {
+    try {
+        // Get current configuration
+        const currentConfig = config.getServiceFilterConfig();
+        
+        // Get discovered services summary
+        const servicesSummary = discoveredServices.map(service => ({
+            id: service.id,
+            name: service.title || service.id,
+            url: service.url,
+            entities: service.entitySets ? service.entitySets.length : 0
+        }));
+
+        return {
+            config: {
+                ...currentConfig,
+                configurationSource: getConfigurationSource()
+            },
+            servicesCount: discoveredServices.length,
+            discoveredServices: servicesSummary
+        };
+    } catch (error) {
+        logger.error('❌ Failed to get OData config status:', error);
+        return {
+            config: { error: `Failed to get status: ${error}` },
+            servicesCount: 0,
+            discoveredServices: []
+        };
+    }
+}
+
+function getConfigurationSource(): string {
+    // Check if configuration is coming from CF services, environment, or .env
+    if (process.env.VCAP_SERVICES) {
+        try {
+            const vcapServices = JSON.parse(process.env.VCAP_SERVICES);
+            if (vcapServices['user-provided']) {
+                const odataConfig = vcapServices['user-provided'].find((service: any) => 
+                    service.name === 'odata-config' || service.name === 'mcp-odata-config'
+                );
+                if (odataConfig) {
+                    return `CF User-Provided Service: ${odataConfig.name}`;
+                }
+            }
+        } catch (error) {
+            // Fall through to environment check
+        }
+    }
+    
+    if (process.env.ODATA_SERVICE_PATTERNS) {
+        return 'CF Environment Variables';
+    }
+    
+    return 'Local .env File';
+}
+
 // Initialize authentication server with error handling
 let authServer: AuthServer;
 let tokenStore: any;
@@ -42,6 +135,11 @@ try {
         corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000', 'http://127.0.0.1:3000']
     });
     tokenStore = authServer.getTokenStore();
+    
+    // Set up OData callbacks for admin endpoints
+    authServer.setReloadCallback(reloadODataServices);
+    authServer.setStatusCallback(getODataConfigStatus);
+    
     logger.info('✅ Auth server initialized successfully');
 } catch (error) {
     logger.error('❌ Failed to initialize auth server:', error);

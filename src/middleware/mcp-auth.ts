@@ -319,10 +319,20 @@ export class MCPAuthManager {
     const requiredScope = this.getRequiredScope(toolName);
     const baseUrl = this.authServerUrl.replace('/auth', '');
     
-    // Get the client credentials from environment (same way IAS service does)
-    const clientId = process.env.SAP_IAS_CLIENT_ID || '955d133c-758b-42c7-b1a5-fa99cd5e6661';
-    const clientSecret = process.env.SAP_IAS_CLIENT_SECRET || 'y]cW]AMYnJlYc-ArV[9CJYABtBfBQK';
-    const iasUrl = process.env.SAP_IAS_URL || 'https://afhdupfoc.accounts.ondemand.com';
+    // Get the client credentials from environment variables (required)
+    const clientId = process.env.SAP_IAS_CLIENT_ID;
+    const clientSecret = process.env.SAP_IAS_CLIENT_SECRET;
+    const iasUrl = process.env.SAP_IAS_URL;
+
+    if (!clientId || !clientSecret || !iasUrl) {
+      return {
+        authenticated: false,
+        error: {
+          code: 'configuration_error',
+          message: 'Missing required SAP IAS configuration: SAP_IAS_CLIENT_ID, SAP_IAS_CLIENT_SECRET, and SAP_IAS_URL must be set'
+        }
+      };
+    }
     
     return {
       authenticated: false,

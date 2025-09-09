@@ -7,6 +7,15 @@ export class Config {
         this.loadConfiguration();
     }
 
+    /**
+     * Reload OData configuration from environment variables and CF services
+     * This allows runtime configuration changes without restart
+     */
+    async reloadODataConfig(): Promise<void> {
+        this.loadODataServiceConfig();
+        this.loadFromCFServices();
+    }
+
     private loadConfiguration(): void {
         // Load from environment variables
         this.config.set('sap.destinationName', process.env.SAP_DESTINATION_NAME || 'SAP_SYSTEM');
@@ -17,6 +26,9 @@ export class Config {
         
         // OData service discovery configuration
         this.loadODataServiceConfig();
+        
+        // Load configuration from CF services (user-provided services)
+        this.loadFromCFServices();
         
         // Load from VCAP services if available
         try {
@@ -69,6 +81,67 @@ export class Config {
         
         // Maximum services to discover (prevents overwhelming the system)
         this.config.set('odata.maxServices', parseInt(process.env.ODATA_MAX_SERVICES || '50'));
+    }
+
+    /**
+     * Load configuration from Cloud Foundry user-provided services
+     * Service name: 'odata-config' or 'mcp-odata-config'
+     */
+    private loadFromCFServices(): void {
+        try {
+            // Try to load from user-provided services
+            const services = xsenv.getServices({
+                odataConfig: { label: 'user-provided', name: 'odata-config' },
+                mcpConfig: { label: 'user-provided', name: 'mcp-odata-config' }
+            });
+
+            // Check for odata-config service first
+            let configService = services.odataConfig || services.mcpConfig;
+            
+            if (configService && (configService as any).credentials) {
+                const creds = (configService as any).credentials;
+                
+                // Override OData configuration if provided in the service
+                if (creds.ODATA_ALLOW_ALL !== undefined) {
+                    this.config.set('odata.allowAllServices', creds.ODATA_ALLOW_ALL === 'true' || creds.ODATA_ALLOW_ALL === '*');
+                }
+                
+                if (creds.ODATA_SERVICE_PATTERNS) {
+                    try {
+                        const patterns = typeof creds.ODATA_SERVICE_PATTERNS === 'string' 
+                            ? JSON.parse(creds.ODATA_SERVICE_PATTERNS)
+                            : creds.ODATA_SERVICE_PATTERNS;
+                        this.config.set('odata.servicePatterns', Array.isArray(patterns) ? patterns : [patterns]);
+                    } catch {
+                        this.config.set('odata.servicePatterns', creds.ODATA_SERVICE_PATTERNS.split(',').map((p: string) => p.trim()));
+                    }
+                }
+                
+                if (creds.ODATA_EXCLUSION_PATTERNS) {
+                    try {
+                        const patterns = typeof creds.ODATA_EXCLUSION_PATTERNS === 'string'
+                            ? JSON.parse(creds.ODATA_EXCLUSION_PATTERNS)
+                            : creds.ODATA_EXCLUSION_PATTERNS;
+                        this.config.set('odata.exclusionPatterns', Array.isArray(patterns) ? patterns : [patterns]);
+                    } catch {
+                        this.config.set('odata.exclusionPatterns', creds.ODATA_EXCLUSION_PATTERNS.split(',').map((p: string) => p.trim()));
+                    }
+                }
+                
+                if (creds.ODATA_DISCOVERY_MODE) {
+                    this.config.set('odata.discoveryMode', creds.ODATA_DISCOVERY_MODE);
+                }
+                
+                if (creds.ODATA_MAX_SERVICES) {
+                    this.config.set('odata.maxServices', parseInt(creds.ODATA_MAX_SERVICES));
+                }
+
+                console.log('✅ Loaded OData configuration from CF user-provided service');
+            }
+        } catch (error) {
+            // CF services not available or not configured - use environment variables
+            console.log('ℹ️  CF user-provided services not available, using environment variables');
+        }
     }
 
     get<T = string>(key: string, defaultValue?: T): T {

@@ -133,6 +133,49 @@
             cursor: not-allowed;
         }
 
+        .error-card {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            color: #721c24;
+        }
+
+        .error-card h3 {
+            margin-bottom: 10px;
+            color: #721c24;
+        }
+
+        .error-card ul {
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 4px;
+            padding: 10px;
+            margin: 15px 0;
+        }
+
+        .error-card code {
+            background: rgba(0, 0, 0, 0.1);
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+
+        .retry-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .retry-btn:hover {
+            background: #c82333;
+        }
+
         .loading {
             display: none;
             align-items: center;
@@ -274,8 +317,6 @@
                 <h3>👤 Your Session</h3>
                 <p><strong>User:</strong> <span id="userName">Loading...</span></p>
                 <p><strong>Session ID:</strong> <span id="sessionIdDisplay">Loading...</span></p>
-                <p><strong>Permissions:</strong> <span id="userScopes">Loading...</span></p>
-                <p><strong>Expires:</strong> <span id="sessionExpiry">Loading...</span></p>
             </div>
 
             <div id="adminSection" class="section" style="display: none;">
@@ -337,19 +378,20 @@
                     console.log('window.location.href set to:', iasAuthUrl);
                     
                 } catch (configError) {
-                    // Fallback: redirect without config (will fail gracefully)
-                    console.error('Could not load IAS config, attempting direct redirect:', configError);
-                    
-                    // Fallback direct redirect with known IAS endpoint
-                    const fallbackAuthUrl = 'https://afhdupfoc.accounts.ondemand.com/oauth2/authorize?' + new URLSearchParams({
-                        client_id: '955d133c-758b-42c7-b1a5-fa99cd5e6661',
-                        response_type: 'code', 
-                        redirect_uri: redirectUri,
-                        scope: 'openid profile email groups',
-                        state: state
-                    }).toString();
-                    
-                    window.location.href = fallbackAuthUrl;
+                    console.error('Could not load IAS configuration:', configError);
+                    document.getElementById('loginContainer').innerHTML = `
+                        <div class="error-card">
+                            <h3>🔧 Configuration Error</h3>
+                            <p>SAP Identity Authentication Service is not properly configured.</p>
+                            <p>Please ensure the following environment variables are set:</p>
+                            <ul style="text-align: left; margin: 1rem 0;">
+                                <li><code>SAP_IAS_URL</code> - Your SAP IAS tenant URL</li>
+                                <li><code>SAP_IAS_CLIENT_ID</code> - OAuth client ID</li>
+                                <li><code>SAP_IAS_CLIENT_SECRET</code> - OAuth client secret</li>
+                            </ul>
+                            <button onclick="location.reload()" class="retry-btn">🔄 Retry</button>
+                        </div>
+                    `;
                 }
                 
             } catch (error) {
@@ -420,14 +462,6 @@
                     // Update user information display
                     document.getElementById('userName').textContent = status.user || 'Unknown';
                     document.getElementById('sessionIdDisplay').textContent = sessionId || 'Unknown';
-                    document.getElementById('userScopes').textContent = status.scopes ? status.scopes.join(', ') : 'none';
-                    
-                    if (status.expiresAt) {
-                        const expiryDate = new Date(status.expiresAt);
-                        document.getElementById('sessionExpiry').textContent = expiryDate.toLocaleString();
-                    } else {
-                        document.getElementById('sessionExpiry').textContent = 'Unknown';
-                    }
                     
                     // Show admin sections if user has admin privileges
                     if (status.scopes && status.scopes.includes('admin')) {
@@ -438,16 +472,12 @@
                     // If status check fails, show generic info
                     document.getElementById('userName').textContent = 'Authenticated User';
                     document.getElementById('sessionIdDisplay').textContent = sessionId || 'Unknown';
-                    document.getElementById('userScopes').textContent = 'Unknown';
-                    document.getElementById('sessionExpiry').textContent = 'Check session status failed';
                 }
             } catch (error) {
                 console.log('Could not get session info:', error);
                 // Show what we know
                 document.getElementById('userName').textContent = 'Authenticated User';
                 document.getElementById('sessionIdDisplay').textContent = sessionId || 'Unknown';
-                document.getElementById('userScopes').textContent = 'Could not load';
-                document.getElementById('sessionExpiry').textContent = 'Could not load';
             }
 
             // Check for redirect parameter and redirect after successful authentication

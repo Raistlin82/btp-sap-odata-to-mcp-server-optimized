@@ -342,9 +342,33 @@
                 <div class="stat-value" id="adminUsers">-</div>
                 <div class="stat-label">Admin Users</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="globalSessions">-</div>
-                <div class="stat-label">Global Sessions</div>
+        </div>
+
+        <!-- OData Configuration Management -->
+        <div class="table-container" style="margin-bottom: 2rem;">
+            <div class="table-header">
+                <div class="table-title">🔧 OData Service Configuration</div>
+                <button class="refresh-btn" onclick="reloadODataConfig()" id="reloadBtn">
+                    <span>🔄</span>
+                    Reload Services
+                </button>
+            </div>
+            <div style="padding: 1.5rem; background: white; border-radius: 0 0 8px 8px; border: 1px solid #e3e6ea; border-top: none;">
+                <!-- Current Configuration Status -->
+                <div id="configStatus" style="margin-bottom: 1.5rem;">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Loading configuration status...
+                    </div>
+                </div>
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 1rem; font-size: 0.9rem; color: #856404;">
+                    <strong>💡 Configuration Methods:</strong><br>
+                    <div style="margin-top: 0.5rem; line-height: 1.6;">
+                        • <strong>CF Environment Variables:</strong> <code>cf set-env APP_NAME ODATA_SERVICE_PATTERNS "Z*,API*"</code><br>
+                        • <strong>User-Provided Service:</strong> <code>cf create-user-provided-service odata-config -p '{"ODATA_SERVICE_PATTERNS":"Z*","ODATA_ALLOW_ALL":"false"}'</code><br>
+                        • <strong>Apply Changes:</strong> Use the "Reload Services" button above (no restart required)
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -455,7 +479,6 @@
             document.getElementById('totalUsers').textContent = summary.totalUsers;
             document.getElementById('activeUsers').textContent = summary.activeUsers;
             document.getElementById('adminUsers').textContent = summary.adminUsers;
-            document.getElementById('globalSessions').textContent = summary.globalSessions;
         }
 
         // Update users table
@@ -563,11 +586,143 @@ Type: ${user.sessionType}
             }
         }
 
+        // Reload OData configuration and trigger service rediscovery
+        async function reloadODataConfig() {
+            const reloadBtn = document.getElementById('reloadBtn');
+            const originalText = reloadBtn.innerHTML;
+            
+            try {
+                // Update button to show loading state
+                reloadBtn.innerHTML = '<span>⏳</span> Reloading...';
+                reloadBtn.disabled = true;
+                
+                const authSessionId = getSessionId();
+                const response = await fetch(`/auth/admin/odata/reload?session=${encodeURIComponent(authSessionId)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    alert(`✅ OData Configuration Reload Successful!\n\n${result.message}\n\nServices Count: ${result.servicesCount || 'Unknown'}\n\nTriggered by: ${result.triggeredBy}\nTime: ${new Date(result.triggeredAt).toLocaleString()}`);
+                } else {
+                    alert(`❌ OData Reload Failed!\n\n${result.message || result.error}`);
+                }
+            } catch (error) {
+                alert(`❌ Error reloading OData configuration: ${error.message}`);
+            } finally {
+                // Restore button
+                reloadBtn.innerHTML = originalText;
+                reloadBtn.disabled = false;
+            }
+        }
+
+        // Load OData configuration status
+        async function loadConfigStatus() {
+            const statusDiv = document.getElementById('configStatus');
+            
+            try {
+                const authSessionId = getSessionId();
+                const response = await fetch(`/auth/admin/odata/status?session=${encodeURIComponent(authSessionId)}`);
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    const config = result.configuration.config;
+                    const servicesCount = result.configuration.servicesCount;
+                    const discoveredServices = result.configuration.discoveredServices;
+                    
+                    statusDiv.innerHTML = `
+                        <div class="info-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                            <div class="info-card" style="background: #f8f9fa; padding: 1rem; border-radius: 8px; border-left: 4px solid #007bff;">
+                                <div style="font-weight: 600; color: #495057; margin-bottom: 0.5rem;">📍 Configuration Source</div>
+                                <div style="color: #6c757d; font-size: 0.9rem;">${config.configurationSource || 'Unknown'}</div>
+                            </div>
+                            <div class="info-card" style="background: #f8f9fa; padding: 1rem; border-radius: 8px; border-left: 4px solid #28a745;">
+                                <div style="font-weight: 600; color: #495057; margin-bottom: 0.5rem;">📊 Services Discovered</div>
+                                <div style="color: #6c757d; font-size: 0.9rem; font-weight: 600;">${servicesCount} services</div>
+                            </div>
+                            <div class="info-card" style="background: #f8f9fa; padding: 1rem; border-radius: 8px; border-left: 4px solid #ffc107;">
+                                <div style="font-weight: 600; color: #495057; margin-bottom: 0.5rem;">🔄 Max Services</div>
+                                <div style="color: #6c757d; font-size: 0.9rem;">${config.maxServices || 'Not set'}</div>
+                            </div>
+                        </div>
+                        
+                        <div style="background: #e7f3ff; border: 1px solid #b8daff; border-radius: 6px; padding: 1rem; margin-bottom: 1rem;">
+                            <div style="font-weight: 600; color: #004085; margin-bottom: 0.5rem;">🔧 Current Configuration</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
+                                <div>
+                                    <strong>Service Patterns:</strong><br>
+                                    <code style="background: white; padding: 0.2rem 0.4rem; border-radius: 3px; display: inline-block; margin-top: 0.25rem;">
+                                        ${Array.isArray(config.servicePatterns) ? config.servicePatterns.join(', ') : (config.servicePatterns || 'Not set')}
+                                    </code>
+                                </div>
+                                <div>
+                                    <strong>Exclusion Patterns:</strong><br>
+                                    <code style="background: white; padding: 0.2rem 0.4rem; border-radius: 3px; display: inline-block; margin-top: 0.25rem;">
+                                        ${Array.isArray(config.exclusionPatterns) ? config.exclusionPatterns.join(', ') : (config.exclusionPatterns || 'None')}
+                                    </code>
+                                </div>
+                            </div>
+                            <div style="margin-top: 0.75rem; font-size: 0.9rem;">
+                                <strong>Allow All Services:</strong> 
+                                <span style="color: ${config.allowAllServices ? '#28a745' : '#dc3545'}; font-weight: 600;">
+                                    ${config.allowAllServices ? 'Yes' : 'No'}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        ${discoveredServices.length > 0 ? `
+                        <details style="border: 1px solid #dee2e6; border-radius: 6px; margin-bottom: 1rem;">
+                            <summary style="padding: 0.75rem; background: #f8f9fa; cursor: pointer; font-weight: 600;">
+                                📋 Discovered Services (${discoveredServices.length})
+                            </summary>
+                            <div style="padding: 1rem; max-height: 200px; overflow-y: auto;">
+                                ${discoveredServices.map(service => `
+                                    <div style="padding: 0.5rem; border-bottom: 1px solid #e9ecef; font-size: 0.9rem;">
+                                        <div style="font-weight: 600;">${service.name}</div>
+                                        <div style="color: #6c757d;">ID: ${service.id}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </details>
+                        ` : ''}
+                    `;
+                } else {
+                    statusDiv.innerHTML = `
+                        <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 6px; padding: 1rem; color: #721c24;">
+                            ❌ Failed to load configuration status: ${result.message || 'Unknown error'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 6px; padding: 1rem; color: #721c24;">
+                        ❌ Error loading configuration: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Enhanced reload function to also refresh status
+        const originalReloadODataConfig = reloadODataConfig;
+        reloadODataConfig = async function() {
+            await originalReloadODataConfig();
+            // Refresh status after reload
+            setTimeout(loadConfigStatus, 1000);
+        };
+
         // Auto-refresh every 30 seconds
         setInterval(loadUsers, 30000);
+        setInterval(loadConfigStatus, 60000); // Refresh config status every minute
 
         // Load initial data
-        document.addEventListener('DOMContentLoaded', loadUsers);
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUsers();
+            loadConfigStatus();
+        });
     </script>
 </body>
 </html>
