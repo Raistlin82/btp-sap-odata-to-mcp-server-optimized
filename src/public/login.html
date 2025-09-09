@@ -268,19 +268,27 @@
         <div id="successState" class="success">
             <div class="success-icon">✓</div>
             <h2>Authentication Successful!</h2>
-            <p>Your JWT token has been generated and stored securely.</p>
+            <p>Welcome back! Your session is active and ready to use.</p>
             
-            <div class="section">
-                <p>You're all set! Your authentication is stored on the server. You can now use MCP tools directly.</p>
+            <div id="userInfoSection" class="section">
+                <h3>👤 Your Session</h3>
+                <p><strong>User:</strong> <span id="userName">Loading...</span></p>
+                <p><strong>Session ID:</strong> <span id="sessionIdDisplay">Loading...</span></p>
+                <p><strong>Permissions:</strong> <span id="userScopes">Loading...</span></p>
+                <p><strong>Expires:</strong> <span id="sessionExpiry">Loading...</span></p>
             </div>
 
             <div id="adminSection" class="section" style="display: none;">
                 <h3>🔧 Administration</h3>
                 <p>You have admin privileges.</p>
-                <a href="/auth/admin" class="download-btn">🛠️ View Admin Dashboard</a>
+                <a href="javascript:openAdminDashboard()" class="download-btn">🛠️ View Admin Dashboard</a>
             </div>
 
-            <button class="btn back-btn" onclick="location.reload()">🔄 Authenticate Another User</button>
+            <div class="section">
+                <h3>📋 Quick Actions</h3>
+                <button class="btn" onclick="openAdminDashboard()" id="adminButton" style="display: none;">🛠️ Admin Dashboard</button>
+                <button class="btn back-btn" onclick="location.reload()">🔄 Logout & Re-authenticate</button>
+            </div>
         </div>
     </div>
 
@@ -403,7 +411,7 @@
         }
 
         async function updateSuccessDisplay() {
-            // Check if user has admin privileges
+            // Get user session information and update display
             try {
                 const response = await fetch('/auth/status', {
                     headers: {
@@ -413,12 +421,38 @@
                 
                 if (response.ok) {
                     const status = await response.json();
+                    
+                    // Update user information display
+                    document.getElementById('userName').textContent = status.user || 'Unknown';
+                    document.getElementById('sessionIdDisplay').textContent = sessionId || 'Unknown';
+                    document.getElementById('userScopes').textContent = status.scopes ? status.scopes.join(', ') : 'none';
+                    
+                    if (status.expiresAt) {
+                        const expiryDate = new Date(status.expiresAt);
+                        document.getElementById('sessionExpiry').textContent = expiryDate.toLocaleString();
+                    } else {
+                        document.getElementById('sessionExpiry').textContent = 'Unknown';
+                    }
+                    
+                    // Show admin sections if user has admin privileges
                     if (status.scopes && status.scopes.includes('admin')) {
                         document.getElementById('adminSection').style.display = 'block';
+                        document.getElementById('adminButton').style.display = 'inline-block';
                     }
+                } else {
+                    // If status check fails, show generic info
+                    document.getElementById('userName').textContent = 'Authenticated User';
+                    document.getElementById('sessionIdDisplay').textContent = sessionId || 'Unknown';
+                    document.getElementById('userScopes').textContent = 'Unknown';
+                    document.getElementById('sessionExpiry').textContent = 'Check session status failed';
                 }
             } catch (error) {
-                console.log('Could not check admin status:', error);
+                console.log('Could not get session info:', error);
+                // Show what we know
+                document.getElementById('userName').textContent = 'Authenticated User';
+                document.getElementById('sessionIdDisplay').textContent = sessionId || 'Unknown';
+                document.getElementById('userScopes').textContent = 'Could not load';
+                document.getElementById('sessionExpiry').textContent = 'Could not load';
             }
 
             // Check for redirect parameter and redirect after successful authentication
@@ -428,8 +462,14 @@
             if (redirectUrl) {
                 setTimeout(() => {
                     window.location.href = redirectUrl;
-                }, 2000); // Give user 2 seconds to see success message before redirecting
+                }, 3000); // Give user 3 seconds to see session info before redirecting
             }
+        }
+
+        function openAdminDashboard() {
+            // Open admin dashboard with session ID parameter
+            const adminUrl = `/auth/admin?session=${encodeURIComponent(sessionId)}`;
+            window.open(adminUrl, '_blank');
         }
 
         // Handle OAuth 2.0 callback

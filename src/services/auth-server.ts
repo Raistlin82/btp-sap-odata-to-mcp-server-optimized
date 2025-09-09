@@ -781,63 +781,98 @@ export class AuthServer {
       }
     });
 
-    // Admin dashboard page - with redirect for browser access
+    // Admin dashboard page - supports both browser sessions and API tokens
     this.app.get('/admin', async (req: Request, res: Response) => {
       try {
-        // Check for authentication first
-        const authHeader = req.headers.authorization;
-        
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-          // For browser access, redirect to login instead of JSON error
-          return res.redirect(`/auth/?redirect=${encodeURIComponent('/auth/admin')}`);
-        }
+        let isAuthenticated = false;
+        let hasAdminScope = false;
+        let userInfo = null;
 
-        // Validate JWT token and check admin scope
-        try {
-          const token = authHeader.substring(7);
-          
-          // Load XSUAA service credentials
-          const services = xsenv.getServices({ xsuaa: { label: 'xsuaa' } });
-          const xsuaaCredentials = services.xsuaa;
-          
-          // Validate the JWT token
-          const securityContext = await new Promise((resolve, reject) => {
-            xssec.createSecurityContext(token, xsuaaCredentials, (err: any, ctx: any) => {
-              if (err) {
-                reject(err);
-              } else {
-                resolve(ctx);
-              }
-            });
-          });
-
-          const authInfo = this.extractAuthInfo(securityContext as any);
-          
-          // Check for admin scope
-          const appName = process.env.VCAP_APPLICATION ? 
-            JSON.parse(process.env.VCAP_APPLICATION).name : 'btp-sap-odata-to-mcp-server';
-          const requiredScope = `${appName}.admin`;
-          
-          if (!authInfo.scopes.includes(requiredScope)) {
-            return res.status(403).send(`
-              <html>
-                <head><title>Access Denied</title></head>
-                <body>
-                  <h1>Access Denied</h1>
-                  <p>Admin privileges required. You need the MCPAdmin role collection.</p>
-                  <p><a href="/auth/">Back to Login</a></p>
-                </body>
-              </html>
-            `);
+        // Try session-based authentication first (for browsers)
+        const sessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+        if (sessionId) {
+          try {
+            const tokenData = await this.tokenStore.get(sessionId);
+            if (tokenData && Date.now() < tokenData.expiresAt) {
+              isAuthenticated = true;
+              hasAdminScope = tokenData.scopes?.includes('admin') || false;
+              userInfo = { user: tokenData.user, scopes: tokenData.scopes };
+              this.logger.debug(`Session auth for admin page: ${tokenData.user}, admin: ${hasAdminScope}`);
+            }
+          } catch (error) {
+            this.logger.debug('Session auth failed:', error);
           }
+        }
 
-          // User is authenticated and has admin scope - serve the admin dashboard
-          res.sendFile(path.join(__dirname, '../public/admin.html'));
-          
-        } catch (authError) {
-          this.logger.warn('Admin access: Invalid token', authError);
+        // Try global session if no specific session found
+        if (!isAuthenticated) {
+          try {
+            const globalAuth = await this.tokenStore.get('global_user_auth');
+            if (globalAuth && Date.now() < globalAuth.expiresAt) {
+              isAuthenticated = true;
+              hasAdminScope = globalAuth.scopes?.includes('admin') || false;
+              userInfo = { user: globalAuth.user, scopes: globalAuth.scopes };
+              this.logger.debug(`Global auth for admin page: ${globalAuth.user}, admin: ${hasAdminScope}`);
+            }
+          } catch (error) {
+            this.logger.debug('Global auth failed:', error);
+          }
+        }
+
+        // Try JWT token authentication (for API access)
+        if (!isAuthenticated) {
+          const authHeader = req.headers.authorization;
+          if (authHeader && authHeader.startsWith('Bearer ')) {
+            try {
+              const token = authHeader.substring(7);
+              const services = xsenv.getServices({ xsuaa: { label: 'xsuaa' } });
+              const xsuaaCredentials = services.xsuaa;
+              
+              const securityContext = await new Promise((resolve, reject) => {
+                xssec.createSecurityContext(token, xsuaaCredentials, (err: any, ctx: any) => {
+                  if (err) reject(err);
+                  else resolve(ctx);
+                });
+              });
+
+              const authInfo = this.extractAuthInfo(securityContext as any);
+              const appName = process.env.VCAP_APPLICATION ? 
+                JSON.parse(process.env.VCAP_APPLICATION).name : 'btp-sap-odata-to-mcp-server';
+              const requiredScope = `${appName}.admin`;
+              
+              isAuthenticated = true;
+              hasAdminScope = authInfo.scopes.includes(requiredScope);
+              userInfo = { user: authInfo.user, scopes: authInfo.scopes };
+              this.logger.debug(`JWT auth for admin page: ${authInfo.user}, admin: ${hasAdminScope}`);
+              
+            } catch (authError) {
+              this.logger.debug('JWT auth failed:', authError);
+            }
+          }
+        }
+
+        // Check authentication and authorization
+        if (!isAuthenticated) {
           return res.redirect(`/auth/?redirect=${encodeURIComponent('/auth/admin')}`);
         }
+
+        if (!hasAdminScope) {
+          return res.status(403).send(`
+            <html>
+              <head><title>Access Denied</title></head>
+              <body>
+                <h1>Access Denied</h1>
+                <p>Admin privileges required. You need the MCPAdmin role collection.</p>
+                <p>Current user: ${userInfo?.user}</p>
+                <p>Current scopes: ${userInfo?.scopes?.join(', ') || 'none'}</p>
+                <p><a href="/auth/">Back to Login</a></p>
+              </body>
+            </html>
+          `);
+        }
+
+        // User is authenticated and has admin scope - serve the admin dashboard
+        res.sendFile(path.join(__dirname, '../public/admin.html'));
 
       } catch (error) {
         this.logger.error('Admin dashboard access failed:', error);
