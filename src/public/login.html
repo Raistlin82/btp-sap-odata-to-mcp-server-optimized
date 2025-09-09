@@ -269,24 +269,15 @@
             <div class="success-icon">✓</div>
             <h2>Authentication Successful!</h2>
             <p>Your JWT token has been generated and stored securely.</p>
-
+            
             <div class="section">
-                <h3>🖥️ For Claude Desktop Users</h3>
-                <p>Download the configuration file and place it in your user directory:</p>
-                <button id="downloadConfig" class="download-btn">📥 Download Configuration</button>
-                <div class="config-text" id="configPreview"></div>
+                <p>You're all set! Your authentication is stored on the server. You can now use MCP tools directly.</p>
             </div>
 
-            <div class="section">
-                <h3>🌐 For Claude Web Users</h3>
-                <p>You're all set! Your authentication is stored on the server. You can now use MCP tools directly in Claude.</p>
-            </div>
-
-            <div class="section">
-                <h3>⚙️ Manual Configuration</h3>
-                <p>If you prefer to set up environment variables manually:</p>
-                <button id="copyEnvVars" class="copy-btn">📋 Copy Environment Variables</button>
-                <div class="config-text" id="envVarsText"></div>
+            <div id="adminSection" class="section" style="display: none;">
+                <h3>🔧 Administration</h3>
+                <p>You have admin privileges.</p>
+                <a href="/auth/admin" class="download-btn">🛠️ View Admin Dashboard</a>
             </div>
 
             <button class="btn back-btn" onclick="location.reload()">🔄 Authenticate Another User</button>
@@ -408,64 +399,27 @@
             document.getElementById('loginForm').style.display = 'none';
             document.getElementById('successState').style.display = 'block';
             
-            updateConfigurationDisplays();
+            updateSuccessDisplay();
         }
 
-        function updateConfigurationDisplays() {
-            const serverUrl = window.location.origin;
-            
-            // Configuration for download
-            const config = {
-                sap_mcp_session_id: sessionId,
-                mcp_server_url: serverUrl,
-                user: tokenData.user,
-                expires_at: tokenData.expiresAt,
-                created_at: new Date().toISOString()
-            };
-
-            document.getElementById('configPreview').textContent = JSON.stringify(config, null, 2);
-
-            // Environment variables
-            const envVars = `export SAP_MCP_SESSION_ID="${sessionId}"
-export SAP_MCP_SERVER_URL="${serverUrl}"
-export SAP_MCP_USER="${tokenData.user}"`;
-
-            document.getElementById('envVarsText').textContent = envVars;
-
-            // Download button functionality
-            document.getElementById('downloadConfig').addEventListener('click', () => {
-                const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'mcp-sap-config.json';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            });
-
-            // Copy environment variables
-            document.getElementById('copyEnvVars').addEventListener('click', async () => {
-                try {
-                    await navigator.clipboard.writeText(envVars);
-                    const btn = document.getElementById('copyEnvVars');
-                    const originalText = btn.textContent;
-                    btn.textContent = '✅ Copied!';
-                    setTimeout(() => {
-                        btn.textContent = originalText;
-                    }, 2000);
-                } catch (err) {
-                    console.error('Failed to copy:', err);
-                    // Fallback for browsers that don't support clipboard API
-                    const textArea = document.createElement('textarea');
-                    textArea.value = envVars;
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(textArea);
+        async function updateSuccessDisplay() {
+            // Check if user has admin privileges
+            try {
+                const response = await fetch('/auth/status', {
+                    headers: {
+                        'x-mcp-session-id': sessionId
+                    }
+                });
+                
+                if (response.ok) {
+                    const status = await response.json();
+                    if (status.scopes && status.scopes.includes('admin')) {
+                        document.getElementById('adminSection').style.display = 'block';
+                    }
                 }
-            });
+            } catch (error) {
+                console.log('Could not check admin status:', error);
+            }
         }
 
         // Handle OAuth 2.0 callback
