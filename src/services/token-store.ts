@@ -215,6 +215,26 @@ export class TokenStore {
   }
 
   /**
+   * Remove previous sessions for a user but keep global sessions
+   */
+  async removeUserSessions(username: string): Promise<number> {
+    const sessionIds = this.userSessions.get(username) || [];
+    let removedCount = 0;
+
+    for (const sessionId of sessionIds) {
+      // Don't remove global sessions
+      if (sessionId !== 'global_user_auth') {
+        if (await this.remove(sessionId)) {
+          removedCount++;
+        }
+      }
+    }
+
+    this.logger.info(`Cleaned up ${removedCount} previous sessions for user: ${username}`);
+    return removedCount;
+  }
+
+  /**
    * Check if a session exists and is valid
    */
   async exists(sessionId: string): Promise<boolean> {

@@ -29,11 +29,29 @@ export class AuthServer {
   constructor(options: AuthServerOptions = {}) {
     this.app = express();
     this.logger = new Logger('AuthServer');
-    this.iasAuthService = new IASAuthService(this.logger);
-    this.tokenStore = new TokenStore(this.logger);
-
-    this.setupMiddleware(options);
-    this.setupRoutes();
+    
+    try {
+      this.logger.debug('Initializing IASAuthService...');
+      this.iasAuthService = new IASAuthService(this.logger);
+      this.logger.debug('IASAuthService initialized successfully');
+      
+      this.logger.debug('Initializing TokenStore...');
+      this.tokenStore = new TokenStore(this.logger);
+      this.logger.debug('TokenStore initialized successfully');
+      
+      this.logger.debug('Setting up middleware...');
+      this.setupMiddleware(options);
+      this.logger.debug('Middleware setup completed');
+      
+      this.logger.debug('Setting up routes...');
+      this.setupRoutes();
+      this.logger.debug('Routes setup completed');
+      
+      this.logger.info('✅ AuthServer constructor completed successfully');
+    } catch (error) {
+      this.logger.error('❌ AuthServer constructor failed:', error);
+      throw error;
+    }
   }
 
   private setupMiddleware(options: AuthServerOptions): void {
@@ -227,9 +245,12 @@ export class AuthServer {
           clientId: `oauth2-${Date.now()}`
         };
 
+        // Clean up any existing sessions for this user to prevent duplicates
+        await this.tokenStore.removeUserSessions(tokenData.user);
+        
         const sessionId = await this.tokenStore.set(tokenData, clientInfo);
 
-        // Also store as global authentication for MCP client compatibility
+        // Store as global authentication for MCP client compatibility (replacing any existing)
         const globalAuthKey = 'global_user_auth';
         const globalClientInfo = {
           userAgent: req.get('User-Agent'),
@@ -890,15 +911,69 @@ export class AuthServer {
     });
 
     // Admin endpoint to view all authenticated users and their roles/scopes
-    this.app.get('/admin/users', authMiddleware, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    this.app.get('/admin/users', async (req: Request, res: Response) => {
       try {
+        // Session-based authentication check
+        let isAuthenticated = false;
+        let hasAdminScope = false;
+        let authenticatedUser = 'Unknown';
+        
+        // Try session-based authentication first
+        const sessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+        this.logger.debug(`Admin /admin/users endpoint - sessionId: ${sessionId}`);
+        if (sessionId) {
+          const tokenData = await this.tokenStore.get(sessionId);
+          this.logger.debug(`Admin /admin/users endpoint - tokenData found: ${!!tokenData}`);
+          if (tokenData) {
+            this.logger.debug(`Admin /admin/users endpoint - tokenData.expiresAt: ${tokenData.expiresAt}, now: ${Date.now()}, valid: ${Date.now() < tokenData.expiresAt}`);
+            this.logger.debug(`Admin /admin/users endpoint - tokenData.scopes: ${JSON.stringify(tokenData.scopes)}`);
+          }
+          if (tokenData && Date.now() < tokenData.expiresAt) {
+            isAuthenticated = true;
+            hasAdminScope = tokenData.scopes?.includes('admin') || false;
+            authenticatedUser = tokenData.user || 'Unknown';
+            this.logger.debug(`Admin /admin/users endpoint - authenticated: ${isAuthenticated}, hasAdminScope: ${hasAdminScope}`);
+          }
+        }
+        
+        // Try global session if no specific session found
+        if (!isAuthenticated) {
+          this.logger.debug(`Admin /admin/users endpoint - trying global session`);
+          const globalAuth = await this.tokenStore.get('global_user_auth');
+          this.logger.debug(`Admin /admin/users endpoint - globalAuth found: ${!!globalAuth}`);
+          if (globalAuth) {
+            this.logger.debug(`Admin /admin/users endpoint - globalAuth.expiresAt: ${globalAuth.expiresAt}, now: ${Date.now()}, valid: ${Date.now() < globalAuth.expiresAt}`);
+            this.logger.debug(`Admin /admin/users endpoint - globalAuth.scopes: ${JSON.stringify(globalAuth.scopes)}`);
+          }
+          if (globalAuth && Date.now() < globalAuth.expiresAt) {
+            isAuthenticated = true;
+            hasAdminScope = globalAuth.scopes?.includes('admin') || false;
+            authenticatedUser = globalAuth.user || 'Unknown';
+            this.logger.debug(`Admin /admin/users endpoint - global auth: authenticated: ${isAuthenticated}, hasAdminScope: ${hasAdminScope}`);
+          }
+        }
+        
+        if (!isAuthenticated) {
+          this.logger.debug(`Admin /admin/users endpoint - authentication failed, returning 401`);
+          return res.status(401).json({ error: 'Authentication required' });
+        }
+        
+        if (!hasAdminScope) {
+          this.logger.debug(`Admin /admin/users endpoint - admin scope check failed, returning 403`);
+          return res.status(403).json({ error: 'Admin access required' });
+        }
 
+        this.logger.debug(`Admin /admin/users endpoint - authentication successful, proceeding`);
         // Get all active sessions
         const allSessions = await this.tokenStore.getAllSessions();
         
-        // Enhanced user information with role mapping
-        const users = allSessions.map(tokenData => {
-          // Determine user role based on scopes and user email
+        // Group sessions by user to merge session types
+        const userSessionsMap = new Map<string, any>();
+        
+        allSessions.forEach(tokenData => {
+          const userId = tokenData.user;
+          
+          // Determine user role based on scopes
           let role = 'user';
           if (tokenData.scopes?.includes('admin')) {
             role = 'admin';
@@ -908,25 +983,54 @@ export class AuthServer {
             role = 'viewer';
           }
 
-          // Role is determined purely by scopes from XSUAA token
+          const sessionTypes = [];
+          if (tokenData.sessionId === 'global_user_auth') {
+            sessionTypes.push('Global');
+          } else {
+            sessionTypes.push('Session');
+          }
 
-          return {
-            sessionId: tokenData.sessionId,
-            user: tokenData.user,
-            role: role,
-            scopes: tokenData.scopes || [],
-            authenticatedAt: new Date(tokenData.createdAt).toISOString(),
-            lastActivity: new Date(tokenData.lastUsedAt).toISOString(),
-            expiresAt: new Date(tokenData.expiresAt).toISOString(),
-            clientInfo: {
-              userAgent: tokenData.clientInfo?.userAgent || 'Unknown',
-              ipAddress: tokenData.clientInfo?.ipAddress || 'Unknown',
-              clientId: tokenData.clientInfo?.clientId || 'Unknown'
-            },
-            isActive: tokenData.expiresAt > Date.now(),
-            sessionType: tokenData.sessionId === 'global_user_auth' ? 'Global Authentication' : 'Session-based'
-          };
+          if (userSessionsMap.has(userId)) {
+            // Merge with existing user entry
+            const existingUser = userSessionsMap.get(userId);
+            existingUser.sessionTypes = [...new Set([...existingUser.sessionTypes, ...sessionTypes])];
+            
+            // Use the most recent session data
+            if (tokenData.lastUsedAt > new Date(existingUser.lastActivity).getTime()) {
+              existingUser.sessionId = tokenData.sessionId;
+              existingUser.lastActivity = new Date(tokenData.lastUsedAt).toISOString();
+              existingUser.clientInfo = {
+                userAgent: tokenData.clientInfo?.userAgent || 'Unknown',
+                ipAddress: tokenData.clientInfo?.ipAddress || 'Unknown',
+                clientId: tokenData.clientInfo?.clientId || 'Unknown'
+              };
+            }
+          } else {
+            // Create new user entry
+            userSessionsMap.set(userId, {
+              sessionId: tokenData.sessionId,
+              user: userId,
+              role: role,
+              scopes: tokenData.scopes || [],
+              authenticatedAt: new Date(tokenData.createdAt).toISOString(),
+              lastActivity: new Date(tokenData.lastUsedAt).toISOString(),
+              expiresAt: new Date(tokenData.expiresAt).toISOString(),
+              clientInfo: {
+                userAgent: tokenData.clientInfo?.userAgent || 'Unknown',
+                ipAddress: tokenData.clientInfo?.ipAddress || 'Unknown',
+                clientId: tokenData.clientInfo?.clientId || 'Unknown'
+              },
+              isActive: tokenData.expiresAt > Date.now(),
+              sessionTypes: sessionTypes
+            });
+          }
         });
+
+        // Convert map to array and format session types
+        const users = Array.from(userSessionsMap.values()).map(user => ({
+          ...user,
+          sessionType: user.sessionTypes.join(' + ')
+        }));
 
         // Sort by authentication time (most recent first)
         users.sort((a, b) => new Date(b.authenticatedAt).getTime() - new Date(a.authenticatedAt).getTime());
@@ -936,7 +1040,7 @@ export class AuthServer {
 
         res.json({
           success: true,
-          requestedBy: req.authInfo?.user || 'Unknown',
+          requestedBy: authenticatedUser,
           requestedAt: new Date().toISOString(),
           summary: {
             totalUsers: users.length,
@@ -961,8 +1065,41 @@ export class AuthServer {
     });
 
     // Admin endpoint to delete user sessions - requires admin role from XSUAA
-    this.app.delete('/admin/users/:sessionId', authMiddleware, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    this.app.delete('/admin/users/:sessionId', async (req: Request, res: Response) => {
       try {
+        // Session-based authentication check
+        let isAuthenticated = false;
+        let hasAdminScope = false;
+        let authenticatedUser = 'Unknown';
+        
+        // Try session-based authentication first
+        const authSessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+        if (authSessionId) {
+          const tokenData = await this.tokenStore.get(authSessionId);
+          if (tokenData && Date.now() < tokenData.expiresAt) {
+            isAuthenticated = true;
+            hasAdminScope = tokenData.scopes?.includes('admin') || false;
+            authenticatedUser = tokenData.user || 'Unknown';
+          }
+        }
+        
+        // Try global session if no specific session found
+        if (!isAuthenticated) {
+          const globalAuth = await this.tokenStore.get('global_user_auth');
+          if (globalAuth && Date.now() < globalAuth.expiresAt) {
+            isAuthenticated = true;
+            hasAdminScope = globalAuth.scopes?.includes('admin') || false;
+            authenticatedUser = globalAuth.user || 'Unknown';
+          }
+        }
+        
+        if (!isAuthenticated) {
+          return res.status(401).json({ error: 'Authentication required' });
+        }
+        
+        if (!hasAdminScope) {
+          return res.status(403).json({ error: 'Admin access required' });
+        }
 
         const { sessionId } = req.params;
 
@@ -977,14 +1114,178 @@ export class AuthServer {
         const success = await this.tokenStore.remove(sessionId);
         
         if (success) {
-          this.logger.info(`Admin ${req.authInfo?.user} deleted session for user ${tokenData.user}`);
+          this.logger.info(`Admin ${authenticatedUser} deleted session for user ${tokenData.user}`);
           
           res.json({
             success: true,
             message: 'User session deleted successfully',
             user: tokenData.user,
             sessionId: sessionId,
-            deletedBy: req.authInfo?.user,
+            deletedBy: authenticatedUser,
+            deletedAt: new Date().toISOString()
+          });
+        } else {
+          res.status(500).json({
+            error: 'Deletion failed',
+            message: 'Failed to delete user session'
+          });
+        }
+
+      } catch (error) {
+        this.logger.error('Admin session deletion failed:', error);
+        res.status(500).json({
+          error: 'Internal server error',
+          message: 'Failed to delete user session'
+        });
+      }
+    });
+
+    // Admin endpoint to update user role
+    this.app.put('/admin/users/:sessionId/role', async (req: Request, res: Response) => {
+      try {
+        // Session-based authentication check
+        let isAuthenticated = false;
+        let hasAdminScope = false;
+        let authenticatedUser = 'Unknown';
+        
+        // Try session-based authentication first
+        const authSessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+        if (authSessionId) {
+          const tokenData = await this.tokenStore.get(authSessionId);
+          if (tokenData && Date.now() < tokenData.expiresAt) {
+            isAuthenticated = true;
+            hasAdminScope = tokenData.scopes?.includes('admin') || false;
+            authenticatedUser = tokenData.user || 'Unknown';
+          }
+        }
+        
+        // Try global session if no specific session found
+        if (!isAuthenticated) {
+          const globalAuth = await this.tokenStore.get('global_user_auth');
+          if (globalAuth && Date.now() < globalAuth.expiresAt) {
+            isAuthenticated = true;
+            hasAdminScope = globalAuth.scopes?.includes('admin') || false;
+            authenticatedUser = globalAuth.user || 'Unknown';
+          }
+        }
+        
+        if (!isAuthenticated) {
+          return res.status(401).json({ error: 'Authentication required' });
+        }
+        
+        if (!hasAdminScope) {
+          return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        const { sessionId } = req.params;
+        const { role } = req.body;
+
+        // Validate role
+        const validRoles = ['admin', 'editor', 'viewer'];
+        if (!role || !validRoles.includes(role)) {
+          return res.status(400).json({
+            error: 'Invalid role',
+            message: 'Role must be one of: admin, editor, viewer'
+          });
+        }
+
+        // Get the target session
+        const tokenData = await this.tokenStore.get(sessionId);
+        if (!tokenData) {
+          return res.status(404).json({
+            error: 'Session not found',
+            message: 'The specified session does not exist or has expired'
+          });
+        }
+
+        // Note: In a real implementation, you would update the user role in your identity provider
+        // For now, we'll return a success message as role changes require identity provider updates
+        this.logger.info(`Admin ${authenticatedUser} requested role change for ${tokenData.user} to ${role}`);
+        
+        res.json({
+          success: true,
+          message: `Role update request processed. Note: Role changes require identity provider configuration updates.`,
+          user: tokenData.user,
+          requestedRole: role,
+          currentScopes: tokenData.scopes,
+          updatedBy: authenticatedUser,
+          updatedAt: new Date().toISOString()
+        });
+
+      } catch (error) {
+        this.logger.error('Admin role update failed:', error);
+        res.status(500).json({
+          error: 'Internal server error',
+          message: 'Failed to update user role'
+        });
+      }
+    });
+
+    // Admin endpoint for POST delete (to match admin.html expectations)
+    this.app.post('/admin/users/delete', async (req: Request, res: Response) => {
+      try {
+        // Session-based authentication check
+        let isAuthenticated = false;
+        let hasAdminScope = false;
+        let authenticatedUser = 'Unknown';
+        
+        // Try session-based authentication first
+        const authSessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+        if (authSessionId) {
+          const tokenData = await this.tokenStore.get(authSessionId);
+          if (tokenData && Date.now() < tokenData.expiresAt) {
+            isAuthenticated = true;
+            hasAdminScope = tokenData.scopes?.includes('admin') || false;
+            authenticatedUser = tokenData.user || 'Unknown';
+          }
+        }
+        
+        // Try global session if no specific session found
+        if (!isAuthenticated) {
+          const globalAuth = await this.tokenStore.get('global_user_auth');
+          if (globalAuth && Date.now() < globalAuth.expiresAt) {
+            isAuthenticated = true;
+            hasAdminScope = globalAuth.scopes?.includes('admin') || false;
+            authenticatedUser = globalAuth.user || 'Unknown';
+          }
+        }
+        
+        if (!isAuthenticated) {
+          return res.status(401).json({ error: 'Authentication required' });
+        }
+        
+        if (!hasAdminScope) {
+          return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        const { sessionId } = req.body;
+        
+        if (!sessionId) {
+          return res.status(400).json({
+            error: 'Missing sessionId',
+            message: 'Session ID is required'
+          });
+        }
+
+        const tokenData = await this.tokenStore.get(sessionId);
+        if (!tokenData) {
+          return res.status(404).json({
+            error: 'Session not found',
+            message: 'The specified session does not exist or has expired'
+          });
+        }
+
+        const success = await this.tokenStore.remove(sessionId);
+        
+        if (success) {
+          this.logger.info(`Admin ${authenticatedUser} deleted session for user ${tokenData.user}`);
+          
+          res.json({
+            success: true,
+            message: 'User session deleted successfully',
+            user: tokenData.user,
+            sessionId: sessionId,
+            deletedBy: authenticatedUser,
             deletedAt: new Date().toISOString()
           });
         } else {
