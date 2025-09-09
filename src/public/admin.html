@@ -413,6 +413,12 @@
             }
         }
 
+        // Get session ID from URL parameters or localStorage
+        function getSessionId() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('session') || localStorage.getItem('mcp_session_id') || 'global_user_auth';
+        }
+
         // Load users data
         async function loadUsers() {
             try {
@@ -420,7 +426,8 @@
                 document.getElementById('errorState').style.display = 'none';
                 document.getElementById('usersTable').style.display = 'none';
 
-                const response = await fetch('/auth/admin/users');
+                const sessionId = getSessionId();
+                const response = await fetch(`/auth/admin/users?session=${encodeURIComponent(sessionId)}`);
                 const data = await response.json();
 
                 if (!response.ok) {
@@ -493,7 +500,6 @@
                         </span>
                     </td>
                     <td>
-                        <button class="action-btn" onclick="editUser('${user.sessionId}')">Edit</button>
                         <button class="action-btn" onclick="viewSession('${user.sessionId}')">View</button>
                         <button class="action-btn" onclick="deleteSession('${user.sessionId}')">Delete</button>
                     </td>
@@ -503,36 +509,6 @@
             });
         }
 
-        // Edit user role
-        async function editUser(sessionId) {
-            const user = usersData.find(u => u.sessionId === sessionId);
-            if (!user) return;
-
-            const newRole = prompt(`Edit role for ${user.user}:\n\nCurrent role: ${user.role}\n\nEnter new role (admin, editor, viewer):`, user.role);
-            
-            if (newRole && ['admin', 'editor', 'viewer'].includes(newRole.toLowerCase())) {
-                try {
-                    const response = await fetch(`/auth/admin/users/${sessionId}/role`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ role: newRole.toLowerCase() })
-                    });
-
-                    const data = await response.json();
-                    
-                    if (response.ok) {
-                        alert(`Role updated successfully for ${user.user}`);
-                        loadUsers(); // Refresh the table
-                    } else {
-                        alert(`Error: ${data.message}`);
-                    }
-                } catch (error) {
-                    alert(`Error updating role: ${error.message}`);
-                }
-            }
-        }
 
         // View session details
         function viewSession(sessionId) {
@@ -564,7 +540,8 @@ Type: ${user.sessionType}
 
             if (confirm(`Are you sure you want to delete the session for ${user.user}?`)) {
                 try {
-                    const response = await fetch(`/auth/admin/users/delete`, {
+                    const authSessionId = getSessionId();
+                    const response = await fetch(`/auth/admin/users/delete?session=${encodeURIComponent(authSessionId)}`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'

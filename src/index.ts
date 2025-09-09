@@ -32,12 +32,23 @@ const sapDiscoveryService = new SAPDiscoveryService(sapClient, logger, config);
 const serviceConfigService = new ServiceDiscoveryConfigService(config, logger);
 let discoveredServices: ODataService[] = [];
 
-// Initialize authentication server
-const authServer = new AuthServer({
-    port: parseInt(process.env.AUTH_PORT || '3001'),
-    corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000', 'http://127.0.0.1:3000']
-});
-const tokenStore = authServer.getTokenStore();
+// Initialize authentication server with error handling
+let authServer: AuthServer;
+let tokenStore: any;
+
+try {
+    authServer = new AuthServer({
+        port: parseInt(process.env.AUTH_PORT || '3001'),
+        corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000', 'http://127.0.0.1:3000']
+    });
+    tokenStore = authServer.getTokenStore();
+    logger.info('✅ Auth server initialized successfully');
+} catch (error) {
+    logger.error('❌ Failed to initialize auth server:', error);
+    // Create a stub so the rest of the app can continue
+    authServer = null as any;
+    tokenStore = null;
+}
 
 // Session storage for HTTP transport
 const sessions: Map<string, {
@@ -179,20 +190,31 @@ export function createApp(): express.Application {
     // Health check, docs, and MCP endpoints are public
     app.use('/config', authMiddleware, requireAdmin);  // Config endpoints require admin
 
-    // Mount authentication server routes
-    const authApp = authServer.getApp();
-    logger.info(`🔐 Mounting auth server app at /auth`);
-    
-    if (!authApp) {
-        logger.error('❌ Auth server app is undefined! Authentication endpoints will not work.');
+    // Mount authentication server routes with error handling
+    if (!authServer) {
+        logger.error('❌ Auth server not initialized! Authentication endpoints will not be available.');
     } else {
-        app.use('/auth', authApp);
-        logger.info('✅ Auth server successfully mounted at /auth');
+        try {
+            const authApp = authServer.getApp();
+            logger.info(`🔐 Mounting auth server app at /auth`);
+            
+            if (!authApp) {
+                logger.error('❌ Auth server app is undefined! Authentication endpoints will not work.');
+            } else {
+                app.use('/auth', authApp);
+                logger.info('✅ Auth server successfully mounted at /auth');
+            }
+        } catch (error) {
+            logger.error('❌ Failed to mount auth server:', error);
+            logger.error('❌ Authentication endpoints will not be available!');
+        }
     }
 
     // Add explicit login route that serves the login page
     app.get('/login', (req, res) => {
-        res.redirect('/auth/');
+        // Preserve query parameters in redirect
+        const queryString = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+        res.redirect('/auth/' + queryString);
     });
 
     // Simple test endpoint
