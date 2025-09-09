@@ -251,6 +251,205 @@ DISABLE_READ_ENTITY_TOOL=true
 ```
 This will prevent registration of the ReadEntity tool for all entities and services.
 
+## 🔧 **Dynamic OData Service Configuration**
+
+### **Overview**
+
+The MCP server supports dynamic OData service discovery configuration that can be updated without rebuilding or redeploying the application. This is achieved through Cloud Foundry environment variables and user-provided services.
+
+### **Configuration Methods**
+
+#### **Method 1: Cloud Foundry Environment Variables**
+
+Set environment variables directly on your CF application:
+
+```bash
+# Set service patterns to discover only custom Z services and API services
+cf set-env your-app-name ODATA_SERVICE_PATTERNS "Z*,*API*"
+
+# Exclude test and temporary services
+cf set-env your-app-name ODATA_EXCLUSION_PATTERNS "*_TEST*,*_TEMP*"
+
+# Set maximum services to discover
+cf set-env your-app-name ODATA_MAX_SERVICES "100"
+
+# Restart the application to apply changes
+cf restart your-app-name
+```
+
+#### **Method 2: User-Provided Services** (Recommended)
+
+Create a user-provided service for more complex configuration:
+
+```bash
+# Create user-provided service with JSON configuration
+cf create-user-provided-service odata-config -p '{
+  "ODATA_SERVICE_PATTERNS": ["Z*", "*API*", "C_*"],
+  "ODATA_EXCLUSION_PATTERNS": ["*_TEST*", "*_DEBUG*"],
+  "ODATA_ALLOW_ALL": "false",
+  "ODATA_MAX_SERVICES": "50",
+  "ODATA_DISCOVERY_MODE": "whitelist"
+}'
+
+# Bind the service to your application
+cf bind-service your-app-name odata-config
+
+# Restart to apply the binding
+cf restart your-app-name
+```
+
+#### **Method 3: Runtime Configuration Reload** (No Restart Required)
+
+Use the admin dashboard to reload configuration without restarting:
+
+1. **Access Admin Dashboard**: Navigate to `/admin` on your deployed application
+2. **Authenticate**: Use your SAP IAS credentials
+3. **OData Configuration Management**: Click "Reload Services" button
+4. **Verify**: Check the updated service count and patterns
+
+### **Configuration Parameters**
+
+| **Parameter** | **Description** | **Default** | **Example** |
+|---------------|----------------|-------------|-------------|
+| `ODATA_ALLOW_ALL` | Allow all services (`true`/`false`) | `false` | `false` |
+| `ODATA_SERVICE_PATTERNS` | Service inclusion patterns | `["*"]` | `["Z*", "*API*"]` |
+| `ODATA_EXCLUSION_PATTERNS` | Service exclusion patterns | `[]` | `["*_TEST*"]` |
+| `ODATA_MAX_SERVICES` | Maximum services to discover | `50` | `100` |
+| `ODATA_DISCOVERY_MODE` | Discovery mode | `whitelist` | `whitelist` |
+
+### **Pattern Syntax**
+
+#### **Glob Patterns** (Recommended)
+```bash
+Z*              # All services starting with 'Z'
+*API*           # All services containing 'API'
+API_*_SRV       # Services like 'API_SALES_SRV'
+```
+
+#### **Regex Patterns** (Advanced)
+```bash
+/^Z(BP|TRANSPORT|BC_UI_PARAM_E_CDS).*/    # Complex regex pattern
+/API_.*/                                  # Services starting with 'API_'
+```
+
+#### **JSON Array Format**
+```json
+["Z*", "*API*", "/^C_.*_CDS$/"]
+```
+
+### **Configuration Priority**
+
+Configuration is loaded in this priority order:
+
+1. **User-Provided Services** (`odata-config` or `mcp-odata-config`)
+2. **Cloud Foundry Environment Variables**  
+3. **Local `.env` File** (development only)
+
+### **Configuration Examples**
+
+#### **Example 1: Only Custom Z Services**
+```bash
+cf set-env my-mcp-server ODATA_SERVICE_PATTERNS "Z*"
+cf set-env my-mcp-server ODATA_EXCLUSION_PATTERNS "*_TEST*"
+```
+
+#### **Example 2: API and Customer Services**
+```bash
+cf create-user-provided-service odata-config -p '{
+  "ODATA_SERVICE_PATTERNS": ["*API*", "C_CUSTOMER*"],
+  "ODATA_MAX_SERVICES": "25"
+}'
+```
+
+#### **Example 3: All Services with Exclusions**
+```bash
+cf create-user-provided-service odata-config -p '{
+  "ODATA_ALLOW_ALL": "true",
+  "ODATA_EXCLUSION_PATTERNS": ["*_TEST*", "*_DEBUG*", "*_TEMP*"]
+}'
+```
+
+### **Managing Configuration Changes**
+
+#### **Option A: Environment Variables (Requires Restart)**
+```bash
+# Update configuration
+cf set-env my-app ODATA_SERVICE_PATTERNS "Z*,API_SALES*"
+
+# Apply changes
+cf restart my-app
+```
+
+#### **Option B: User-Provided Services (Requires Restart)**
+```bash
+# Update service configuration
+cf update-user-provided-service odata-config -p '{
+  "ODATA_SERVICE_PATTERNS": ["Z*", "API_SALES*"],
+  "ODATA_MAX_SERVICES": "75"
+}'
+
+# Apply changes
+cf restart my-app
+```
+
+#### **Option C: Runtime Reload (No Restart Required)** ⭐
+```bash
+# 1. Update CF configuration (environment variables or user-provided service)
+cf set-env my-app ODATA_SERVICE_PATTERNS "Z*,NEW_API*"
+
+# 2. Use admin dashboard to trigger reload (no restart needed)
+# Navigate to /admin → OData Configuration → Click "Reload Services"
+```
+
+### **Monitoring Configuration Changes**
+
+#### **Admin Dashboard**
+- **Real-time Service Count**: View current discovered services
+- **Configuration Display**: See active patterns and settings
+- **Reload History**: Track configuration reload attempts
+- **Service Details**: Browse discovered services by pattern
+
+#### **Application Logs**
+```bash
+# View configuration reload logs
+cf logs my-mcp-server --recent | grep "OData"
+
+# Expected output:
+# ✅ Loaded OData configuration from CF user-provided service
+# 🔄 Reloading OData configuration and rediscovering services...
+# ✅ Service rediscovery complete: 23 services found
+```
+
+### **Troubleshooting**
+
+#### **Service Not Discovered**
+```bash
+# Check current configuration
+cf env my-app | grep ODATA
+
+# Verify patterns match your services
+# Use admin dashboard to view discovered services
+# Check application logs for discovery errors
+```
+
+#### **Too Many Services**
+```bash
+# Reduce service count with more specific patterns
+cf set-env my-app ODATA_SERVICE_PATTERNS "Z_SPECIFIC*"
+cf set-env my-app ODATA_MAX_SERVICES "20"
+```
+
+#### **Configuration Not Applied**
+```bash
+# Ensure user-provided service is bound
+cf services | grep odata-config
+
+# Check if restart is needed
+cf restart my-app
+
+# Or use runtime reload via admin dashboard
+```
+
 ## ⚡ Quick Start
 
 - For local development and testing, see [LOCAL_RUN.md](./docs/LOCAL_RUN.md)

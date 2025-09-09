@@ -1304,6 +1304,109 @@ export class AuthServer {
       }
     });
 
+    // Admin endpoint to reload OData configuration and trigger rediscovery
+    this.app.post('/admin/odata/reload', async (req: Request, res: Response) => {
+      try {
+        // Session-based authentication check
+        let isAuthenticated = false;
+        let hasAdminScope = false;
+        let authenticatedUser = 'Unknown';
+        
+        // Try session-based authentication first
+        const authSessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+        if (authSessionId) {
+          const tokenData = await this.tokenStore.get(authSessionId);
+          if (tokenData && Date.now() < tokenData.expiresAt) {
+            isAuthenticated = true;
+            hasAdminScope = tokenData.scopes?.includes('admin') || false;
+            authenticatedUser = tokenData.user || 'Unknown';
+          }
+        }
+        
+        // Try global session if no specific session found
+        if (!isAuthenticated) {
+          const globalAuth = await this.tokenStore.get('global_user_auth');
+          if (globalAuth && Date.now() < globalAuth.expiresAt) {
+            isAuthenticated = true;
+            hasAdminScope = globalAuth.scopes?.includes('admin') || false;
+            authenticatedUser = globalAuth.user || 'Unknown';
+          }
+        }
+        
+        if (!isAuthenticated) {
+          return res.status(401).json({ error: 'Authentication required' });
+        }
+        
+        if (!hasAdminScope) {
+          return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        // Trigger OData configuration reload
+        const reloadResult = await this.reloadODataConfig();
+        
+        this.logger.info(`Admin ${authenticatedUser} triggered OData config reload`);
+        
+        // The actual rediscovery will be triggered by the main application
+        // This endpoint serves as a trigger mechanism
+        res.json({
+          success: reloadResult.success,
+          message: 'OData configuration reload initiated',
+          details: reloadResult.message,
+          triggeredBy: authenticatedUser,
+          triggeredAt: new Date().toISOString(),
+          note: 'Service rediscovery will begin shortly. Check logs for progress.'
+        });
+
+      } catch (error) {
+        this.logger.error('OData config reload failed:', error);
+        res.status(500).json({
+          error: 'Internal server error',
+          message: 'Failed to reload OData configuration'
+        });
+      }
+    });
+
+    // Admin endpoint to get current OData configuration status
+    this.app.get('/admin/odata/status', async (req: Request, res: Response) => {
+      try {
+        // Session-based authentication check (same as reload endpoint)
+        let isAuthenticated = false;
+        let hasAdminScope = false;
+        
+        const authSessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+        if (authSessionId) {
+          const tokenData = await this.tokenStore.get(authSessionId);
+          if (tokenData && Date.now() < tokenData.expiresAt) {
+            isAuthenticated = true;
+            hasAdminScope = tokenData.scopes?.includes('admin') || false;
+          }
+        }
+
+        if (!isAuthenticated) {
+          return res.status(401).json({
+            error: 'Authentication required',
+            message: 'Valid session required to access admin endpoints'
+          });
+        }
+
+        // Get current configuration from config and discovered services count
+        const configStatus = await this.getODataConfigStatus();
+        
+        res.json({
+          success: true,
+          timestamp: new Date().toISOString(),
+          configuration: configStatus
+        });
+
+      } catch (error) {
+        this.logger.error('Failed to get OData config status:', error);
+        res.status(500).json({
+          error: 'Internal server error',
+          message: 'Failed to retrieve OData configuration status'
+        });
+      }
+    });
+
     // Note: 404 handler removed - let the main application handle unknown routes
   }
 
@@ -1354,6 +1457,69 @@ export class AuthServer {
       userId: userInfo.getLogonName(),
       isAuthenticated: true
     };
+  }
+
+  /**
+   * Trigger OData service configuration reload and rediscovery
+   * This method will be set by the main application during initialization
+   */
+  private reloadODataCallback?: () => Promise<{ success: boolean; servicesCount: number; message: string }>;
+  private getODataStatusCallback?: () => Promise<{ 
+    config: Record<string, unknown>; 
+    servicesCount: number; 
+    discoveredServices: Array<{ id: string; name: string; url: string; entities: number }>;
+  }>;
+
+  setReloadCallback(callback: () => Promise<{ success: boolean; servicesCount: number; message: string }>) {
+    this.reloadODataCallback = callback;
+  }
+
+  setStatusCallback(callback: () => Promise<{ 
+    config: Record<string, unknown>; 
+    servicesCount: number; 
+    discoveredServices: Array<{ id: string; name: string; url: string; entities: number }>;
+  }>) {
+    this.getODataStatusCallback = callback;
+  }
+
+  async getODataConfigStatus(): Promise<{ 
+    config: Record<string, unknown>; 
+    servicesCount: number; 
+    discoveredServices: Array<{ id: string; name: string; url: string; entities: number }>;
+  }> {
+    if (this.getODataStatusCallback) {
+      return await this.getODataStatusCallback();
+    } else {
+      // Fallback if callback not set
+      return {
+        config: { error: 'Status callback not configured' },
+        servicesCount: 0,
+        discoveredServices: []
+      };
+    }
+  }
+
+  async reloadODataConfig(): Promise<{ success: boolean; message: string; servicesCount?: number }> {
+    try {
+      if (this.reloadODataCallback) {
+        const result = await this.reloadODataCallback();
+        return {
+          success: result.success,
+          message: result.message,
+          servicesCount: result.servicesCount
+        };
+      } else {
+        return {
+          success: false,
+          message: 'OData reload callback not set - rediscovery not available'
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to reload OData config: ${error}`
+      };
+    }
   }
 
   getTokenStore(): TokenStore {
