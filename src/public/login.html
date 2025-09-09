@@ -248,51 +248,20 @@
             <div class="header">
                 <div class="logo">S</div>
                 <h1>SAP MCP Server</h1>
-                <p class="subtitle" id="subtitle">Choose your authentication method</p>
+                <p class="subtitle" id="subtitle">Redirecting to SAP Identity Authentication Service...</p>
             </div>
 
-            <!-- Authentication Method Selection -->
-            <div id="authMethodSelection" class="auth-method-selection">
-                <button type="button" class="btn" id="oauth2Btn">
-                    🔐 Sign In with SAP IAS (OAuth 2.0)
-                </button>
-                <button type="button" class="btn btn-secondary" id="legacyBtn">
-                    👤 Use Username/Password (Legacy)
-                </button>
-                <div class="method-info">
-                    <small>OAuth 2.0 flow is recommended for enhanced security</small>
-                </div>
-            </div>
-
-            <!-- Legacy Login Form -->
-            <div id="legacyForm" style="display: none;">
-
-                <form id="authForm">
-                <div class="form-group">
-                    <label for="username">Username</label>
-                    <input type="text" id="username" name="username" required 
-                           placeholder="Enter your SAP username">
-                </div>
-
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required 
-                           placeholder="Enter your password">
-                </div>
-
-                <button type="submit" class="btn" id="loginBtn">
-                    <span id="loginText">Sign In</span>
-                    <div class="loading" id="loading">
+            <!-- Direct SAP IAS Redirect -->
+            <div id="iasRedirectMessage" class="auth-method-selection">
+                <div style="text-align: center; padding: 20px;">
+                    <div class="loading" style="display: flex; justify-content: center; margin-bottom: 20px;">
                         <div class="spinner"></div>
-                        Authenticating...
                     </div>
-                </button>
-
-                    <div id="errorMessage" class="error"></div>
-                </form>
-                
-                <button type="button" class="btn btn-secondary" id="backBtn">← Back to Methods</button>
+                    <p>Redirecting to SAP Identity Authentication Service...</p>
+                    <small>You will be redirected to the standard SAP login page in a moment.</small>
+                </div>
             </div>
+
         </div>
 
         <!-- Success State -->
@@ -329,33 +298,69 @@
         let tokenData = null;
         let currentAuthMethod = 'selection';
 
-        // OAuth 2.0 Flow Functions
+        // OAuth 2.0 Flow Functions - Direct redirect to SAP IAS
         async function initiateOAuth2Flow() {
+            console.log('initiateOAuth2Flow called!');
             try {
-                setLoadingState('Redirecting to SAP IAS...');
+                console.log('Setting loading state...');
+                setLoadingState('Redirecting to SAP IAS login page...');
                 
-                // Use the login page itself as redirect URI (common pattern for SAP IAS)
-                const redirectUri = `${window.location.protocol}//${window.location.host}/login`;
+                // Use proper callback endpoint (configured in IAS) - force HTTPS for Cloud Foundry
+                const protocol = window.location.host.includes('.cfapps.') || window.location.host.includes('.ondemand.com') ? 'https:' : window.location.protocol;
+                const redirectUri = `${protocol}//${window.location.host}/auth/callback`;
                 const state = generateRandomString(32);
                 
+                // Store state for validation when callback returns
                 sessionStorage.setItem('oauth_state', state);
+                sessionStorage.setItem('oauth_redirect_after_success', window.location.pathname);
                 
-                const response = await fetch('/auth/auth-url?' + new URLSearchParams({
-                    redirect_uri: redirectUri,
-                    state: state
-                }));
-                
-                if (!response.ok) {
-                    throw new Error('Failed to generate authorization URL');
+                // Get IAS configuration and redirect directly to SAP IAS (standard OAuth flow)
+                try {
+                    console.log('Fetching config from /auth/debug/config...');
+                    const configResponse = await fetch('/auth/debug/config');
+                    console.log('Config response status:', configResponse.status);
+                    const config = await configResponse.json();
+                    console.log('Config loaded:', config);
+                    
+                    if (!config.authorizationEndpoint || !config.clientId) {
+                        throw new Error('IAS configuration not available');
+                    }
+                    
+                    // Direct redirect to SAP IAS authorization endpoint (standard OAuth 2.0)
+                    const iasAuthUrl = config.authorizationEndpoint + '?' + new URLSearchParams({
+                        client_id: config.clientId,
+                        response_type: 'code',
+                        redirect_uri: redirectUri,
+                        scope: 'openid profile email groups',
+                        state: state
+                    }).toString();
+                    
+                    console.log('Redirecting to SAP IAS:', iasAuthUrl);
+                    console.log('About to set window.location.href...');
+                    
+                    // Redirect to standard SAP IAS login page
+                    window.location.href = iasAuthUrl;
+                    console.log('window.location.href set to:', iasAuthUrl);
+                    
+                } catch (configError) {
+                    // Fallback: redirect without config (will fail gracefully)
+                    console.error('Could not load IAS config, attempting direct redirect:', configError);
+                    
+                    // Fallback direct redirect with known IAS endpoint
+                    const fallbackAuthUrl = 'https://afhdupfoc.accounts.ondemand.com/oauth2/authorize?' + new URLSearchParams({
+                        client_id: '955d133c-758b-42c7-b1a5-fa99cd5e6661',
+                        response_type: 'code', 
+                        redirect_uri: redirectUri,
+                        scope: 'openid profile email groups',
+                        state: state
+                    }).toString();
+                    
+                    window.location.href = fallbackAuthUrl;
                 }
-                
-                const data = await response.json();
-                window.location.href = data.authorization_url;
                 
             } catch (error) {
                 console.error('OAuth initiation error:', error);
                 showError('Failed to initiate OAuth flow: ' + error.message);
-                showAuthSelection();
             }
         }
         
@@ -368,19 +373,7 @@
             return result;
         }
 
-        function showAuthSelection() {
-            document.getElementById('authMethodSelection').style.display = 'block';
-            document.getElementById('legacyForm').style.display = 'none';
-            document.getElementById('subtitle').textContent = 'Choose your authentication method';
-            currentAuthMethod = 'selection';
-        }
-
-        function showLegacyForm() {
-            document.getElementById('authMethodSelection').style.display = 'none';
-            document.getElementById('legacyForm').style.display = 'block';
-            document.getElementById('subtitle').textContent = 'Sign in with your credentials';
-            currentAuthMethod = 'legacy';
-        }
+        // Legacy functions removed - direct SAP IAS redirect only
 
         function setLoadingState(message) {
             const loginForm = document.getElementById('loginForm');
@@ -408,57 +401,8 @@
             }
         }
 
-        // Event Listeners
-        document.getElementById('oauth2Btn').addEventListener('click', initiateOAuth2Flow);
-        document.getElementById('legacyBtn').addEventListener('click', showLegacyForm);
-        document.getElementById('backBtn').addEventListener('click', showAuthSelection);
+        // Event Listeners (removed - automatic redirect now)
 
-        document.getElementById('authForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const loginBtn = document.getElementById('loginBtn');
-            const loginText = document.getElementById('loginText');
-            const loading = document.getElementById('loading');
-            const errorMessage = document.getElementById('errorMessage');
-
-            // Show loading state
-            loginBtn.disabled = true;
-            loginText.style.display = 'none';
-            loading.style.display = 'flex';
-            errorMessage.style.display = 'none';
-
-            try {
-                const response = await fetch('/auth/token', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ username, password })
-                });
-
-                const result = await response.json();
-
-                if (response.ok && result.success) {
-                    sessionId = result.sessionId;
-                    tokenData = result;
-                    showSuccessState();
-                } else {
-                    throw new Error(result.message || 'Authentication failed');
-                }
-
-            } catch (error) {
-                console.error('Authentication error:', error);
-                errorMessage.textContent = error.message || 'Authentication failed. Please check your credentials.';
-                errorMessage.style.display = 'block';
-            } finally {
-                // Hide loading state
-                loginBtn.disabled = false;
-                loginText.style.display = 'inline';
-                loading.style.display = 'none';
-            }
-        });
 
         function showSuccessState() {
             document.getElementById('loginForm').style.display = 'none';
@@ -534,7 +478,6 @@ export SAP_MCP_USER="${tokenData.user}"`;
 
             if (error) {
                 showError(`OAuth error: ${error}`);
-                showAuthSelection();
                 return false;
             }
 
@@ -545,14 +488,14 @@ export SAP_MCP_USER="${tokenData.user}"`;
             // Validate state parameter
             if (!state || state !== storedState) {
                 showError('OAuth state mismatch. Please try again.');
-                showAuthSelection();
                 return true; // Handled as error
             }
 
             try {
                 setLoadingState('Processing OAuth callback...');
 
-                // Exchange authorization code for tokens
+                // Exchange authorization code for tokens - force HTTPS for Cloud Foundry
+                const protocol = window.location.host.includes('.cfapps.') || window.location.host.includes('.ondemand.com') ? 'https:' : window.location.protocol;
                 const response = await fetch('/auth/token', {
                     method: 'POST',
                     headers: {
@@ -561,7 +504,7 @@ export SAP_MCP_USER="${tokenData.user}"`;
                     body: JSON.stringify({
                         grant_type: 'authorization_code',
                         code: code,
-                        redirect_uri: `${window.location.protocol}//${window.location.host}/login`
+                        redirect_uri: `${protocol}//${window.location.host}/auth/callback`
                     })
                 });
 
@@ -583,7 +526,6 @@ export SAP_MCP_USER="${tokenData.user}"`;
             } catch (error) {
                 console.error('OAuth callback error:', error);
                 showError('OAuth authentication failed: ' + error.message);
-                showAuthSelection();
             }
 
             return true; // OAuth callback handled
@@ -591,45 +533,55 @@ export SAP_MCP_USER="${tokenData.user}"`;
 
         // Check URL parameters and existing authentication on page load
         window.addEventListener('load', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlSessionId = urlParams.get('session');
+            const success = urlParams.get('success');
+            const error = urlParams.get('error');
+            const code = urlParams.get('code'); // OAuth authorization code
+            
+            console.log('Page load - URL params:', { success, error, code, session: urlSessionId });
+
             // First check if this is an OAuth callback
             if (await handleOAuth2Callback()) {
                 return; // OAuth callback was handled
             }
 
-            const urlParams = new URLSearchParams(window.location.search);
-            const urlSessionId = urlParams.get('session');
-            const success = urlParams.get('success');
-            const error = urlParams.get('error');
-
             if (error) {
                 showError(decodeURIComponent(error));
-                showAuthSelection();
+                return; // Stop here on error
             } else if (success && urlSessionId) {
-                // Legacy callback success
+                // Success callback from server
                 sessionId = urlSessionId;
                 tokenData = { sessionId: urlSessionId, user: 'OAuth User' };
                 showSuccessState();
                 // Clean up URL
                 window.history.replaceState({}, document.title, window.location.pathname);
-            } else {
-                // Check for existing session
-                try {
-                    const response = await fetch('/auth/status');
-                    if (response.ok) {
-                        const status = await response.json();
-                        if (status.authenticated) {
-                            sessionId = status.sessionId;
-                            tokenData = status;
-                            showSuccessState();
-                            return;
-                        }
+                return;
+            }
+            
+            // Check for existing session before redirecting
+            try {
+                const response = await fetch('/auth/status');
+                if (response.ok) {
+                    const status = await response.json();
+                    if (status.authenticated) {
+                        sessionId = status.sessionId;
+                        tokenData = status;
+                        showSuccessState();
+                        return;
                     }
-                } catch (error) {
-                    // No existing session
                 }
-                
-                // Show authentication selection by default
-                showAuthSelection();
+            } catch (error) {
+                // No existing session, continue to redirect
+            }
+            
+            // Only redirect if no callback parameters and no existing session
+            console.log('No session found, redirecting to SAP IAS...');
+            console.log('Calling initiateOAuth2Flow immediately...');
+            try {
+                await initiateOAuth2Flow();
+            } catch (error) {
+                console.error('Error in initiateOAuth2Flow:', error);
             }
         });
     </script>

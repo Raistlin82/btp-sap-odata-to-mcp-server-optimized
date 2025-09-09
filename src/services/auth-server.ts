@@ -208,8 +208,11 @@ export class AuthServer {
           });
         }
 
-        // Exchange code for tokens
-        const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`;
+        // Exchange code for tokens - force HTTPS for Cloud Foundry deployments
+        const protocol = req.get('host')?.includes('.cfapps.') || req.get('host')?.includes('.ondemand.com') ? 'https' : req.protocol;
+        const redirectUri = `${protocol}://${req.get('host')}/auth/callback`;
+        this.logger.debug(`Constructed redirect URI for token exchange: ${redirectUri}`);
+        this.logger.debug(`Request protocol: ${req.protocol}, forced protocol: ${protocol}, host: ${req.get('host')}`);
         const tokenData = await this.iasAuthService.exchangeCodeForTokens(
           code as string,
           redirectUri
