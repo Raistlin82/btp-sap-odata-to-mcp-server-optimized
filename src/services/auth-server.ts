@@ -229,7 +229,17 @@ export class AuthServer {
 
         const sessionId = await this.tokenStore.set(tokenData, clientInfo);
 
-        this.logger.info(`OAuth user authenticated successfully: ${tokenData.user}, session: ${sessionId}`);
+        // Also store as global authentication for MCP client compatibility
+        const globalAuthKey = 'global_user_auth';
+        const globalClientInfo = {
+          userAgent: req.get('User-Agent'),
+          ipAddress: req.ip,
+          clientId: 'browser-oauth-global',
+          authenticatedAt: Date.now()
+        };
+        await this.tokenStore.set(tokenData, globalClientInfo, globalAuthKey);
+
+        this.logger.info(`OAuth user authenticated successfully: ${tokenData.user}, session: ${sessionId}, global: ${globalAuthKey}`);
 
         // Redirect to success page with session ID
         res.redirect(`/login?session=${sessionId}&success=true`);
