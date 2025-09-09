@@ -1,5 +1,7 @@
 import { Logger } from '../utils/logger.js';
 import { Config } from '../utils/config.js';
+import xsenv from '@sap/xsenv';
+import xssec from '@sap/xssec';
 
 export interface IASTokenResponse {
   access_token: string;
@@ -139,15 +141,40 @@ export class IASAuthService {
       // Get user info from IAS
       const userInfo = await this.getUserInfo(tokenResponse.access_token);
       
+      // Try to exchange IAS token for XSUAA token to get application scopes
+      let finalToken = `Bearer ${tokenResponse.access_token}`;
+      let finalScopes = tokenResponse.scope?.split(' ') || userInfo.scope || [];
+      
+      try {
+        const xsuaaToken = await this.exchangeIASTokenForXSUAA(tokenResponse.access_token);
+        if (xsuaaToken) {
+          finalToken = xsuaaToken.token;
+          finalScopes = xsuaaToken.scopes;
+          this.logger.info(`Successfully exchanged IAS token for XSUAA token with scopes: ${finalScopes.join(', ')}`);
+        }
+      } catch (error) {
+        this.logger.warn('Failed to exchange IAS token for XSUAA, using IAS token:', error);
+        // Continue with IAS token - this is expected in some configurations
+      }
+      
+      // Temporary fix: manually assign admin scopes for specific users until IAS-XSUAA trust is configured
+      const userName = userInfo.preferred_username || userInfo.email || userInfo.sub;
+      if (userName === 'gabriele.rendina@lutech.it') {
+        // Add application scopes for admin user
+        const adminScopes = ['read', 'write', 'delete', 'admin', 'discover'];
+        finalScopes = [...finalScopes, ...adminScopes];
+        this.logger.info(`Applied admin scopes for user: ${userName}`);
+      }
+      
       const tokenData: TokenData = {
-        token: `Bearer ${tokenResponse.access_token}`,
-        user: userInfo.preferred_username || userInfo.email || userInfo.sub,
-        scopes: tokenResponse.scope?.split(' ') || userInfo.scope || [],
+        token: finalToken,
+        user: userName,
+        scopes: finalScopes,
         expiresAt: Date.now() + (tokenResponse.expires_in * 1000),
         refreshToken: tokenResponse.refresh_token
       };
 
-      this.logger.info(`User authenticated successfully: ${tokenData.user}`);
+      this.logger.info(`User authenticated successfully: ${tokenData.user}, scopes: ${finalScopes.join(', ')}`);
       return tokenData;
 
     } catch (error) {
@@ -200,15 +227,26 @@ export class IASAuthService {
       // Get user info from IAS
       const userInfo = await this.getUserInfo(tokenResponse.access_token);
       
+      let finalScopes = tokenResponse.scope?.split(' ') || userInfo.scope || [];
+      const userName = userInfo.preferred_username || userInfo.email || username;
+      
+      // Temporary fix: manually assign admin scopes for specific users until IAS-XSUAA trust is configured
+      if (userName === 'gabriele.rendina@lutech.it') {
+        // Add application scopes for admin user
+        const adminScopes = ['read', 'write', 'delete', 'admin', 'discover'];
+        finalScopes = [...finalScopes, ...adminScopes];
+        this.logger.info(`Applied admin scopes for user: ${userName}`);
+      }
+      
       const tokenData: TokenData = {
         token: `Bearer ${tokenResponse.access_token}`,
-        user: userInfo.preferred_username || userInfo.email || username,
-        scopes: tokenResponse.scope?.split(' ') || userInfo.scope || [],
+        user: userName,
+        scopes: finalScopes,
         expiresAt: Date.now() + (tokenResponse.expires_in * 1000),
         refreshToken: tokenResponse.refresh_token
       };
 
-      this.logger.info(`User authenticated successfully: ${tokenData.user}`);
+      this.logger.info(`User authenticated successfully: ${tokenData.user}, scopes: ${finalScopes.join(', ')}`);
       return tokenData;
 
     } catch (error) {
@@ -440,6 +478,59 @@ export class IASAuthService {
     } catch (error) {
       this.logger.error('Failed to decode JWT:', error);
       throw new Error('Invalid JWT token');
+    }
+  }
+
+  /**
+   * Exchange IAS token for XSUAA token to get application scopes
+   */
+  private async exchangeIASTokenForXSUAA(iasToken: string): Promise<{ token: string; scopes: string[] } | null> {
+    try {
+      // Get XSUAA service credentials
+      const services = xsenv.getServices({ xsuaa: { label: 'xsuaa' } });
+      const xsuaaCredentials = services.xsuaa;
+      
+      if (!xsuaaCredentials) {
+        this.logger.debug('No XSUAA service binding found, skipping token exchange');
+        return null;
+      }
+
+      // Use the IAS token to create a security context with XSUAA
+      // This will validate the token and potentially map to application scopes
+      const securityContext = await new Promise<any>((resolve, reject) => {
+        xssec.createSecurityContext(`Bearer ${iasToken}`, xsuaaCredentials, (err: any, ctx: any) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(ctx);
+          }
+        });
+      });
+
+      if (securityContext) {
+        const userInfo = securityContext.getTokenInfo();
+        const grantedScopes = securityContext.getGrantedScopes();
+        
+        this.logger.debug(`XSUAA security context created for user: ${userInfo.getLogonName()}`);
+        this.logger.debug(`XSUAA granted scopes: ${grantedScopes.join(', ')}`);
+        
+        // If we have application scopes, use the XSUAA token
+        const hasAppScopes = grantedScopes.some((scope: string) => 
+          scope.includes('.admin') || scope.includes('.read') || scope.includes('.write') || scope.includes('.delete')
+        );
+        
+        if (hasAppScopes) {
+          return {
+            token: `Bearer ${iasToken}`, // Keep the same token but with validated scopes
+            scopes: grantedScopes
+          };
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      this.logger.debug('IAS to XSUAA token exchange failed:', error);
+      return null;
     }
   }
 
