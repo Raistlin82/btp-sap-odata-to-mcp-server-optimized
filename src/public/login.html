@@ -420,6 +420,16 @@
             } catch (error) {
                 console.log('Could not check admin status:', error);
             }
+
+            // Check for redirect parameter and redirect after successful authentication
+            const urlParams = new URLSearchParams(window.location.search);
+            const redirectUrl = urlParams.get('redirect');
+            
+            if (redirectUrl) {
+                setTimeout(() => {
+                    window.location.href = redirectUrl;
+                }, 2000); // Give user 2 seconds to see success message before redirecting
+            }
         }
 
         // Handle OAuth 2.0 callback
