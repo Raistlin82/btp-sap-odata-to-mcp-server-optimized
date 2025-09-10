@@ -28,6 +28,11 @@ modules:
       timeout: 180
     properties:
       LOG_LEVEL: debug
+      # Dual Destination Configuration
+      SAP_DESTINATION_NAME: "SAP_SYSTEM"
+      SAP_DESTINATION_NAME_RT: "SAP_SYSTEM_RT"  
+      SAP_USE_SINGLE_DESTINATION: "false"
+      # OData Service Configuration: Using BTP environment variables instead of hardcoded values
       
     build-parameters:
       builder: custom
@@ -79,3 +84,4 @@ resources:
       service-name: sap-mcp-identity-${space}
       service: identity
       service-plan: application
+

@@ -34,9 +34,19 @@ export class TokenStore {
 
   /**
    * Store a new token with generated or custom session ID
+   * Implements single active session per client logic
    */
   async set(tokenData: TokenData, clientInfo?: any, customSessionId?: string): Promise<string> {
     const sessionId = customSessionId || randomUUID();
+    
+    // SINGLE SESSION PER CLIENT: Remove previous sessions for this user+client combination
+    if (clientInfo?.clientId) {
+      await this.removePreviousClientSessions(tokenData.user, clientInfo.clientId);
+    } else {
+      // If no clientId, use userAgent as fallback identifier
+      const clientIdentifier = clientInfo?.userAgent || 'unknown';
+      await this.removePreviousClientSessions(tokenData.user, clientIdentifier);
+    }
     
     const storedTokenData: StoredTokenData = {
       ...tokenData,
@@ -52,12 +62,13 @@ export class TokenStore {
 
     this.tokens.set(sessionId, storedTokenData);
     
-    // Track sessions per user
+    // Track sessions per user (can be multiple for different clients)
     const userSessions = this.userSessions.get(tokenData.user) || [];
     userSessions.push(sessionId);
     this.userSessions.set(tokenData.user, userSessions);
 
-    this.logger.info(`Token stored for user: ${tokenData.user}, session: ${sessionId}`);
+    const clientId = clientInfo?.clientId || clientInfo?.userAgent || 'unknown';
+    this.logger.info(`New session created for user: ${tokenData.user}, client: ${clientId}, session: ${sessionId}`);
     
     // TODO: In production, also store in Redis/database
     // await this.storeInRedis(sessionId, storedTokenData);
@@ -231,6 +242,49 @@ export class TokenStore {
     }
 
     this.logger.info(`Cleaned up ${removedCount} previous sessions for user: ${username}`);
+    return removedCount;
+  }
+
+  /**
+   * Remove ALL sessions for a user (for single session logic)
+   */
+  async removeAllUserSessions(username: string): Promise<number> {
+    const sessionIds = this.userSessions.get(username) || [];
+    let removedCount = 0;
+
+    for (const sessionId of sessionIds) {
+      if (await this.remove(sessionId)) {
+        removedCount++;
+      }
+    }
+
+    if (removedCount > 0) {
+      this.logger.info(`Removed ${removedCount} existing sessions for user: ${username} (single session policy)`);
+    }
+    return removedCount;
+  }
+
+  /**
+   * Remove previous sessions for the same user+client combination
+   */
+  async removePreviousClientSessions(username: string, clientIdentifier: string): Promise<number> {
+    const sessionIds = this.userSessions.get(username) || [];
+    let removedCount = 0;
+
+    for (const sessionId of sessionIds) {
+      const tokenData = this.tokens.get(sessionId);
+      if (tokenData && 
+          (tokenData.clientInfo?.clientId === clientIdentifier || 
+           tokenData.clientInfo?.userAgent === clientIdentifier)) {
+        if (await this.remove(sessionId)) {
+          removedCount++;
+        }
+      }
+    }
+
+    if (removedCount > 0) {
+      this.logger.info(`Removed ${removedCount} previous sessions for user: ${username}, client: ${clientIdentifier}`);
+    }
     return removedCount;
   }
 

@@ -91,7 +91,10 @@ export class SAPDiscoveryService {
 
     private async discoverV4Services(): Promise<ODataService[]> {
         try {
-            const destination = await this.sapClient.getDestination();
+            const destination = await this.sapClient.getDestination({
+                type: 'design-time',
+                operation: 'discovery'
+            });
 
             const response = await executeHttpRequest(destination, {
                 method: 'GET',
@@ -111,7 +114,10 @@ export class SAPDiscoveryService {
 
     private async discoverV2Services(): Promise<ODataService[]> {
         try {
-            const destination = await this.sapClient.getDestination();
+            const destination = await this.sapClient.getDestination({
+                type: 'design-time',
+                operation: 'discovery'
+            });
 
             const response = await executeHttpRequest(destination, {
                 method: 'GET',
@@ -195,7 +201,10 @@ export class SAPDiscoveryService {
 
     private async getServiceMetadata(service: ODataService): Promise<ServiceMetadata> {
         try {
-            const destination = await this.sapClient.getDestination();
+            const destination = await this.sapClient.getDestination({
+                type: 'design-time',
+                operation: 'discovery'
+            });
 
             const response = await executeHttpRequest(destination, {
                 method: 'GET',

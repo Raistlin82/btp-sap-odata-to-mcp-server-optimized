@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { homedir } from 'os';
 import path from 'path';
 import { Logger } from '../utils/logger.js';
-import { TokenStore, StoredTokenData } from '../services/token-store.js';
+import { TokenStore } from '../services/token-store.js';
 
 export interface MCPAuthContext {
   sessionId?: string;
@@ -83,8 +83,36 @@ export class MCPAuthManager {
       };
     }
 
-    // Try multiple authentication methods in order of preference
-    let authResult = await this.trySessionAuth(args, clientInfo);
+    // For runtime operations (execute-entity-operation), ALWAYS require explicit Session ID
+    if (this.isRuntimeOperation(toolName)) {
+      const sessionId = (args.parameters?.session_id || args.parameters?.auth_session_id) || args?.session_id || args?.auth_session_id;
+      if (!sessionId) {
+        this.logger.warn(`Runtime operation ${toolName} attempted without Session ID`);
+        return {
+          authenticated: false,
+          error: {
+            code: 'SESSION_ID_REQUIRED',
+            message: 'Runtime operations require explicit Session ID. Please provide session_id parameter.',
+            authUrl: `${this.authServerUrl.replace('/auth', '')}/auth/`,
+            instructions: {
+              step1: `1. Authenticate at: ${this.authServerUrl.replace('/auth', '')}/auth/`,
+              step2: `2. Copy your Session ID from the success page`,
+              step3: `3. Include "session_id": "YOUR_SESSION_ID" in your MCP tool parameters`
+            }
+          }
+        };
+      }
+      
+      // Only try session auth for runtime operations
+      const authResult = await this.trySessionAuth(args, clientInfo);
+      if (!authResult.authenticated) {
+        return this.getAuthInstructions();
+      }
+      return authResult;
+    }
+
+    // For non-runtime operations, use fallback methods including clientId lookup
+    let authResult = await this.trySessionAuthWithFallbacks(args, clientInfo);
     
     if (!authResult.authenticated) {
       authResult = await this.tryGlobalAuth();
@@ -100,17 +128,17 @@ export class MCPAuthManager {
 
     // If still not authenticated, return authentication instructions
     if (!authResult.authenticated) {
-      return this.getAuthInstructions(toolName);
+      return this.getAuthInstructions();
     }
 
     // Check authorization (scopes)
-    const requiredScope = this.getRequiredScope(toolName);
+    const requiredScope = this.getRequiredScope(toolName, args);
     if (requiredScope && !this.hasRequiredScope(authResult.context?.scopes || [], requiredScope)) {
       return {
         authenticated: false,
         error: {
           code: 'INSUFFICIENT_PERMISSIONS',
-          message: 'Insufficient permissions for this operation',
+          message: `Insufficient permissions for ${requiredScope} operations`,
           instructions: {
             step1: `Visit: ${this.authServerUrl}/login`,
             step2: `Request access to scope: ${requiredScope}`,
@@ -124,12 +152,12 @@ export class MCPAuthManager {
   }
 
   /**
-   * Method 1: Try session-based authentication (for web clients)
+   * Method 1: Try session-based authentication with fallbacks (for non-runtime operations)
    */
-  private async trySessionAuth(args: any, clientInfo?: any): Promise<MCPAuthResult> {
+  private async trySessionAuthWithFallbacks(args: any, clientInfo?: any): Promise<MCPAuthResult> {
     try {
-      // Check for session ID in tool arguments
-      const sessionId = args?.session_id || args?.auth_session_id;
+      // Check for session ID in tool arguments first
+      const sessionId = (args.parameters?.session_id || args.parameters?.auth_session_id) || args?.session_id || args?.auth_session_id;
       
       if (sessionId) {
         const tokenData = await this.tokenStore.get(sessionId);
@@ -167,6 +195,59 @@ export class MCPAuthManager {
       }
 
     } catch (error) {
+      this.logger.debug('Session authentication with fallbacks failed:', error);
+    }
+
+    return { authenticated: false };
+  }
+
+  /**
+   * Method 1b: Try session-based authentication (strict - for runtime operations)
+   */
+  private async trySessionAuth(args: any, clientInfo?: any): Promise<MCPAuthResult> {
+    try {
+      // Check for session ID in tool arguments
+      const sessionId = (args.parameters?.session_id || args.parameters?.auth_session_id) || args?.session_id || args?.auth_session_id;
+      
+      if (sessionId) {
+        const tokenData = await this.tokenStore.get(sessionId);
+        if (tokenData) {
+          return {
+            authenticated: true,
+            context: {
+              sessionId: tokenData.sessionId,
+              token: tokenData.token,
+              user: tokenData.user,
+              scopes: tokenData.scopes,
+              isAuthenticated: true,
+              clientInfo
+            }
+          };
+        } else {
+          // Session ID provided but invalid/expired
+          this.logger.warn(`Invalid or expired Session ID provided: ${sessionId}`);
+          return {
+            authenticated: false,
+            error: {
+              code: 'SESSION_EXPIRED',
+              message: 'Session ID is invalid or expired. Please re-authenticate.',
+              authUrl: `${this.authServerUrl.replace('/auth', '')}/auth/`,
+              instructions: {
+                step1: `1. Your session has expired or is invalid`,
+                step2: `2. Re-authenticate at: ${this.authServerUrl.replace('/auth', '')}/auth/`,
+                step3: `3. Use the new Session ID provided after authentication`
+              }
+            }
+          };
+        }
+      }
+
+      // For explicit Session ID requirement, don't use fallback methods
+      // This ensures runtime operations always require explicit Session ID
+      this.logger.debug('No Session ID provided in tool arguments');
+      return { authenticated: false };
+
+    } catch (error) {
       this.logger.debug('Session authentication failed:', error);
     }
 
@@ -174,45 +255,11 @@ export class MCPAuthManager {
   }
 
   /**
-   * Method 2: Try global authentication (server-side stored credentials)
+   * Method 2: Try global authentication - DISABLED to force explicit Session ID usage
    */
   private async tryGlobalAuth(): Promise<MCPAuthResult> {
-    try {
-      const globalAuthKey = 'global_user_auth';
-      const tokenData = await this.tokenStore.get(globalAuthKey);
-      
-      if (!tokenData) {
-        this.logger.debug('No global authentication found');
-        return { authenticated: false };
-      }
-
-      // Check if token is still valid
-      if (Date.now() > tokenData.expiresAt) {
-        this.logger.debug('Global auth token expired, removing');
-        await this.tokenStore.remove(globalAuthKey);
-        return { authenticated: false };
-      }
-
-      // Update last used time
-      await this.tokenStore.updateLastUsed(globalAuthKey);
-
-      this.logger.info(`Global authentication found for user: ${tokenData.user}`);
-      
-      return {
-        authenticated: true,
-        context: {
-          isAuthenticated: true,
-          user: tokenData.user,
-          scopes: tokenData.scopes || [],
-          token: tokenData.token,
-          sessionId: globalAuthKey
-        }
-      };
-
-    } catch (error) {
-      this.logger.error('Global authentication error:', error);
-      return { authenticated: false };
-    }
+    // Global authentication is disabled to enforce explicit Session ID usage
+    return { authenticated: false };
   }
 
   /**
@@ -315,8 +362,7 @@ export class MCPAuthManager {
   /**
    * Get authentication instructions for unauthenticated requests
    */
-  private getAuthInstructions(toolName: string): MCPAuthResult {
-    const requiredScope = this.getRequiredScope(toolName);
+  private getAuthInstructions(): MCPAuthResult {
     const baseUrl = this.authServerUrl.replace('/auth', '');
     
     // Get the client credentials from environment variables (required)
@@ -337,41 +383,49 @@ export class MCPAuthManager {
     return {
       authenticated: false,
       error: {
-        code: 'AUTHENTICATION_REQUIRED',
-        message: 'Authentication required to use this tool. Choose one of these options:',
-        authUrl: `${this.authServerUrl}/login`,
+        code: 'SESSION_ID_REQUIRED',
+        message: 'Authentication required. Please provide your Session ID to use this tool.',
+        authUrl: `${baseUrl}/auth/`,
         instructions: {
+          step1: `1. Open your browser and navigate to: ${baseUrl}/auth/`,
+          step2: `2. Complete the SAP IAS authentication process`,
+          step3: `3. Copy the Session ID displayed on the success page`,
           web_method: {
-            step1: `Open your browser and navigate to: ${baseUrl}/auth/`,
-            step2: `Complete the SAP IAS authentication in your browser`,
-            step3: `Authentication is automatically stored - return to using MCP tools normally`
+            step1: `Open browser: ${baseUrl}/auth/`,
+            step2: `Complete SAP IAS authentication`,
+            step3: `Copy the Session ID from the success page and provide it in your next request`
           },
           cli_method: {
-            description: 'Command-line authentication option:',
-            step1: `curl -X POST "${baseUrl}/auth/login" \\
-  -H "Content-Type: application/json" \\
-  -d '{"username":"YOUR_SAP_USERNAME","password":"YOUR_SAP_PASSWORD"}'`,
-            step2: `# Server will automatically associate your authentication with this MCP session`,
-            step3: `# Continue using MCP tools - server handles authentication transparently`,
-            note: 'Server remembers your authentication automatically - no session IDs or client config needed'
+            description: 'For programmatic access, use the session_id parameter:',
+            step1: `1. First authenticate: curl -X POST "${baseUrl}/auth/login" -H "Content-Type: application/json" -d '{"username":"YOUR_USERNAME","password":"YOUR_PASSWORD"}'`,
+            step2: `2. The response will contain your Session ID`,
+            step3: `3. Use the Session ID in your MCP tool calls by adding "session_id": "YOUR_SESSION_ID" to the arguments`,
+            note: 'Each user can have only one active session. New authentication will invalidate previous sessions.'
           },
           server_managed: {
-            description: 'Transparent server-side authentication:',
+            description: 'Session-based authentication with Session ID:',
             benefits: [
-              '✓ Authenticate once, works everywhere (web, desktop, mobile)',
-              '✓ No client configuration or session IDs required',
-              '✓ Server automatically associates auth with your connection', 
-              '✓ Works seamlessly with Claude Desktop, web clients, etc.',
-              '✓ Transparent token refresh and session management'
+              '✓ Secure user-specific JWT token handling',
+              '✓ Proper Principal Propagation to SAP systems',
+              '✓ Single active session per user (automatic cleanup)',
+              '✓ Session expiration and renewal handling',
+              '✓ Works with Claude Desktop and all MCP clients'
             ]
           },
-          quick_start: {
-            browser: `Navigate to: ${baseUrl}/auth/`,
-            curl: `curl -X POST "${baseUrl}/auth/login" -H "Content-Type: application/json" -d '{"username":"YOUR_SAP_USERNAME","password":"YOUR_SAP_PASSWORD"}'`
-          }
+          quick_start: `To get your Session ID: Navigate to ${baseUrl}/auth/ → Authenticate → Copy Session ID → Use in MCP calls`
         }
       }
     };
+  }
+
+  /**
+   * Check if a tool is a runtime operation (requires explicit Session ID)
+   */
+  private isRuntimeOperation(toolName: string): boolean {
+    const runtimeTools = [
+      'execute-entity-operation'
+    ];
+    return runtimeTools.includes(toolName);
   }
 
   /**
@@ -403,7 +457,25 @@ export class MCPAuthManager {
   /**
    * Get required scope for a tool
    */
-  private getRequiredScope(toolName: string): string | null {
+  private getRequiredScope(toolName: string, args?: any): string | null {
+    // Special handling for execute-entity-operation - check operation parameter
+    if (toolName === 'execute-entity-operation' && args?.operation) {
+      const operation = args.operation as string;
+      switch (operation) {
+        case 'read':
+        case 'read-single':
+          return 'read';
+        case 'create':
+        case 'update':
+        case 'patch':
+          return 'write';
+        case 'delete':
+          return 'delete';
+        default:
+          return 'read'; // Default to read for unknown operations
+      }
+    }
+
     const scopeMapping: Record<string, string> = {
       // Read operations
       'sap_odata_read_entity': 'read',

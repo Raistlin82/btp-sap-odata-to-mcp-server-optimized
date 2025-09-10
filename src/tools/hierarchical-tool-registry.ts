@@ -4,6 +4,7 @@ import { Logger } from "../utils/logger.js";
 import { ODataService, EntityType } from "../types/sap-types.js";
 import { MCPAuthManager } from "../middleware/mcp-auth.js";
 import { TokenStore } from "../services/token-store.js";
+import { DestinationContext, OperationType } from "../types/destination-types.js";
 import { z } from "zod";
 
 /**
@@ -431,6 +432,7 @@ export class HierarchicalSAPToolRegistry {
             const queryOptions = args.queryOptions as Record<string, any> || {};
 
             // Check authentication for this tool
+            let userJWT: string | undefined;
             if (this.authManager) {
                 const authResult = await this.authManager.authenticateToolCall('execute-entity-operation', args);
                 
@@ -444,9 +446,13 @@ export class HierarchicalSAPToolRegistry {
                     };
                 }
 
-                // If authenticated, add the token to parameters for SAPClient
+                // Extract user JWT token for potential Principal Propagation
+                // The SAPClient/DestinationService will decide whether to use it based on destination config
                 if (authResult.context?.token) {
-                    parameters._authToken = authResult.context.token;
+                    userJWT = authResult.context.token;
+                    this.logger.info(`User authenticated - JWT available for Principal Propagation`);
+                } else {
+                    this.logger.debug(`User authenticated - no JWT token available (will use BasicAuth if configured in destination)`);
                 }
             }
 
@@ -478,19 +484,32 @@ export class HierarchicalSAPToolRegistry {
             let response;
             let operationDescription = "";
 
+            // Create destination context for the operation
+            const destinationContext: DestinationContext = {
+                type: operation === 'read' || operation === 'read-single' ? 'runtime' : 'runtime', // All CRUD operations use runtime
+                operation: operation as OperationType,
+                serviceId,
+                entityName
+            };
+
             switch (operation) {
                 case 'read':
                     operationDescription = `Reading ${entityName} entities`;
                     if (queryOptions.$top) operationDescription += ` (top ${queryOptions.$top})`;
                     if (queryOptions.$filter) operationDescription += ` with filter: ${queryOptions.$filter}`;
                     
-                    response = await this.sapClient.readEntitySet(service.url, entityType.entitySet!, queryOptions);
+                    // Use new context-aware approach for read operations
+                    const readUrl = this.buildReadUrl(service.url, entityType.entitySet!, queryOptions);
+                    response = await this.sapClient.executeCRUDOperation('read', readUrl, undefined, userJWT);
                     break;
 
                 case 'read-single':
                     const keyValue = this.buildKeyValue(entityType, parameters);
                     operationDescription = `Reading single ${entityName} with key: ${keyValue}`;
-                    response = await this.sapClient.readEntity(service.url, entityType.entitySet!, keyValue);
+                    
+                    // Use new context-aware approach
+                    const singleReadUrl = `${service.url}${entityType.entitySet!}(${keyValue})`;
+                    response = await this.sapClient.executeCRUDOperation('read', singleReadUrl, undefined, userJWT);
                     break;
 
                 case 'create':
@@ -498,7 +517,10 @@ export class HierarchicalSAPToolRegistry {
                         throw new Error(`Entity '${entityName}' does not support create operations`);
                     }
                     operationDescription = `Creating new ${entityName}`;
-                    response = await this.sapClient.createEntity(service.url, entityType.entitySet!, parameters);
+                    
+                    // Use new context-aware approach
+                    const createUrl = `${service.url}${entityType.entitySet!}`;
+                    response = await this.sapClient.executeCRUDOperation('create', createUrl, parameters, userJWT);
                     break;
 
                 case 'update':
@@ -509,7 +531,10 @@ export class HierarchicalSAPToolRegistry {
                     const updateData = { ...parameters };
                     entityType.keys.forEach(key => delete updateData[key]);
                     operationDescription = `Updating ${entityName} with key: ${updateKeyValue}`;
-                    response = await this.sapClient.updateEntity(service.url, entityType.entitySet!, updateKeyValue, updateData);
+                    
+                    // Use new context-aware approach
+                    const updateUrl = `${service.url}${entityType.entitySet!}(${updateKeyValue})`;
+                    response = await this.sapClient.executeCRUDOperation('update', updateUrl, updateData, userJWT);
                     break;
 
                 case 'delete':
@@ -518,7 +543,10 @@ export class HierarchicalSAPToolRegistry {
                     }
                     const deleteKeyValue = this.buildKeyValue(entityType, parameters);
                     operationDescription = `Deleting ${entityName} with key: ${deleteKeyValue}`;
-                    await this.sapClient.deleteEntity(service.url, entityType.entitySet!, deleteKeyValue);
+                    
+                    // Use new context-aware approach
+                    const deleteUrl = `${service.url}${entityType.entitySet!}(${deleteKeyValue})`;
+                    await this.sapClient.executeCRUDOperation('delete', deleteUrl, undefined, userJWT);
                     response = { data: { message: `Successfully deleted ${entityName} with key: ${deleteKeyValue}`, success: true } };
                     break;
 
@@ -570,6 +598,28 @@ export class HierarchicalSAPToolRegistry {
             return `${prop.name}='${parameters[prop.name]}'`;
         });
         return keyParts.join(',');
+    }
+
+    /**
+     * Build URL for read operations with query parameters
+     */
+    private buildReadUrl(serviceUrl: string, entitySet: string, queryOptions: Record<string, any>): string {
+        let url = `${serviceUrl}${entitySet}`;
+        
+        if (queryOptions) {
+            const params = new URLSearchParams();
+            Object.entries(queryOptions).forEach(([key, value]) => {
+                if (value !== undefined && value !== null) {
+                    params.set(key, String(value));
+                }
+            });
+            
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
+        }
+        
+        return url;
     }
 
     /**

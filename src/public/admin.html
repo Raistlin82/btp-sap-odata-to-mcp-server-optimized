@@ -372,6 +372,83 @@
             </div>
         </div>
 
+        <!-- Destination Status -->
+        <div class="table-container" style="margin-bottom: 2rem;">
+            <div class="table-header">
+                <div class="table-title">🔗 Destination Status</div>
+                <button class="refresh-btn" onclick="loadDestinationStatus()" id="destStatusBtn">
+                    <span>🔄</span>
+                    Check Status
+                </button>
+            </div>
+            
+            <div id="destinationStatusContent">
+                <div id="destinationLoadingState" style="display: flex; align-items: center; justify-content: center; padding: 2rem; color: #666;">
+                    <div>⏳ Loading destination status...</div>
+                </div>
+                
+                <div id="destinationStatusDisplay" style="display: none;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                        <!-- Design-Time Destination -->
+                        <div class="stat-card">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                <div id="designTimeStatusIcon">🔄</div>
+                                <strong>Design-Time Destination</strong>
+                            </div>
+                            <div style="font-size: 0.9rem; color: #666; margin-bottom: 0.25rem;">
+                                <strong>Name:</strong> <span id="designTimeName">-</span>
+                            </div>
+                            <div style="font-size: 0.9rem; color: #666; margin-bottom: 0.25rem;">
+                                <strong>Status:</strong> <span id="designTimeStatus">-</span>
+                            </div>
+                            <div id="designTimeError" style="font-size: 0.8rem; color: #c53030; margin-top: 0.5rem; display: none;"></div>
+                            <div style="font-size: 0.8rem; color: #666; margin-top: 0.5rem;">
+                                Used for: Service discovery, metadata
+                            </div>
+                        </div>
+                        
+                        <!-- Runtime Destination -->
+                        <div class="stat-card">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                <div id="runtimeStatusIcon">🔄</div>
+                                <strong>Runtime Destination</strong>
+                            </div>
+                            <div style="font-size: 0.9rem; color: #666; margin-bottom: 0.25rem;">
+                                <strong>Name:</strong> <span id="runtimeName">-</span>
+                            </div>
+                            <div style="font-size: 0.9rem; color: #666; margin-bottom: 0.25rem;">
+                                <strong>Status:</strong> <span id="runtimeStatus">-</span>
+                            </div>
+                            <div style="font-size: 0.9rem; color: #666; margin-bottom: 0.25rem;">
+                                <strong>Auth:</strong> <span id="runtimeAuthType">-</span>
+                            </div>
+                            <div id="runtimeHybrid" style="font-size: 0.8rem; color: #0070f2; margin-bottom: 0.25rem; display: none;">
+                                🔒 Hybrid: Principal Propagation + BasicAuth fallback
+                            </div>
+                            <div id="runtimeError" style="font-size: 0.8rem; color: #c53030; margin-top: 0.5rem; display: none;"></div>
+                            <div style="font-size: 0.8rem; color: #666; margin-top: 0.5rem;">
+                                Used for: CRUD operations, data access
+                            </div>
+                        </div>
+                        
+                        <!-- Configuration Info -->
+                        <div class="stat-card">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                <div>⚙️</div>
+                                <strong>Configuration</strong>
+                            </div>
+                            <div style="font-size: 0.9rem; color: #666; margin-bottom: 0.25rem;">
+                                <strong>Mode:</strong> <span id="configMode">-</span>
+                            </div>
+                            <div style="font-size: 0.8rem; color: #666; margin-top: 0.5rem;">
+                                <div id="configModeDescription">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Users Table -->
         <div class="table-container">
             <div class="table-header">
@@ -461,7 +538,9 @@
                 usersData = data.users;
                 updateStatistics(data.summary);
                 updateUsersTable(data.users);
-                document.getElementById('currentUser').textContent = data.requestedBy;
+                // Display user info with Session ID
+                const currentSessionId = getSessionId();
+                document.getElementById('currentUser').innerHTML = `${data.requestedBy}<br><small style="color: #666;">Session ID: <code style="background: #f0f0f0; padding: 2px 4px; border-radius: 3px; font-size: 0.8em;">${currentSessionId}</code></small>`;
 
                 document.getElementById('loadingState').style.display = 'none';
                 document.getElementById('usersTable').style.display = 'table';
@@ -706,22 +785,154 @@ Type: ${user.sessionType}
             }
         }
 
+        // Load destination status
+        async function loadDestinationStatus() {
+            const statusBtn = document.getElementById('destStatusBtn');
+            const loadingState = document.getElementById('destinationLoadingState');
+            const statusDisplay = document.getElementById('destinationStatusDisplay');
+            
+            try {
+                statusBtn.disabled = true;
+                loadingState.style.display = 'flex';
+                statusDisplay.style.display = 'none';
+                
+                const authSessionId = getSessionId();
+                const response = await fetch(`/auth/admin/destinations/status?session=${encodeURIComponent(authSessionId)}`);
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    updateDestinationStatusDisplay(result.destinations);
+                    loadingState.style.display = 'none';
+                    statusDisplay.style.display = 'block';
+                } else {
+                    throw new Error(result.message || 'Failed to load destination status');
+                }
+                
+            } catch (error) {
+                console.error('Failed to load destination status:', error);
+                loadingState.innerHTML = `<div style="color: #c53030;">❌ Failed to load destination status: ${error.message}</div>`;
+            } finally {
+                statusBtn.disabled = false;
+            }
+        }
+
+        // Update destination status display
+        function updateDestinationStatusDisplay(destinations) {
+            // Design-time destination
+            const designTimeIcon = document.getElementById('designTimeStatusIcon');
+            const designTimeName = document.getElementById('designTimeName');
+            const designTimeStatus = document.getElementById('designTimeStatus');
+            const designTimeError = document.getElementById('designTimeError');
+            
+            designTimeName.textContent = destinations.designTime.name;
+            
+            if (destinations.designTime.available) {
+                designTimeIcon.textContent = '✅';
+                designTimeStatus.textContent = 'Available';
+                designTimeStatus.style.color = '#38a169';
+                designTimeError.style.display = 'none';
+            } else {
+                designTimeIcon.textContent = '❌';
+                designTimeStatus.textContent = 'Not Available';
+                designTimeStatus.style.color = '#c53030';
+                if (destinations.designTime.error) {
+                    designTimeError.textContent = destinations.designTime.error;
+                    designTimeError.style.display = 'block';
+                } else {
+                    designTimeError.style.display = 'none';
+                }
+            }
+            
+            // Runtime destination
+            const runtimeIcon = document.getElementById('runtimeStatusIcon');
+            const runtimeName = document.getElementById('runtimeName');
+            const runtimeStatus = document.getElementById('runtimeStatus');
+            const runtimeAuthType = document.getElementById('runtimeAuthType');
+            const runtimeHybrid = document.getElementById('runtimeHybrid');
+            const runtimeError = document.getElementById('runtimeError');
+            
+            runtimeName.textContent = destinations.runtime.name;
+            
+            // Display authentication type
+            if (destinations.runtime.authType) {
+                runtimeAuthType.textContent = destinations.runtime.authType;
+                if (destinations.runtime.authType === 'PrincipalPropagation') {
+                    runtimeAuthType.style.color = '#0070f2';
+                } else {
+                    runtimeAuthType.style.color = '#666';
+                }
+            }
+            
+            // Show hybrid authentication indicator
+            if (destinations.runtime.hybrid) {
+                runtimeHybrid.style.display = 'block';
+            } else {
+                runtimeHybrid.style.display = 'none';
+            }
+            
+            if (destinations.runtime.available) {
+                runtimeIcon.textContent = '✅';
+                runtimeStatus.textContent = 'Available';
+                runtimeStatus.style.color = '#38a169';
+                runtimeError.style.display = 'none';
+            } else {
+                // Check if it's a Principal Propagation JWT requirement
+                const isPrincipalPropError = destinations.runtime.error && 
+                    (destinations.runtime.error.includes('user token') || 
+                     destinations.runtime.error.includes('PrincipalPropagation'));
+                
+                if (isPrincipalPropError) {
+                    runtimeIcon.textContent = '🔐';
+                    runtimeStatus.textContent = 'Requires User JWT';
+                    runtimeStatus.style.color = '#0070f2';
+                    runtimeError.innerHTML = '💡 Principal Propagation requires authenticated user context. Status check from admin dashboard is expected to fail.';
+                    runtimeError.style.color = '#0070f2';
+                    runtimeError.style.display = 'block';
+                } else {
+                    runtimeIcon.textContent = '❌';
+                    runtimeStatus.textContent = 'Not Available';
+                    runtimeStatus.style.color = '#c53030';
+                    if (destinations.runtime.error) {
+                        runtimeError.textContent = destinations.runtime.error;
+                        runtimeError.style.display = 'block';
+                    } else {
+                        runtimeError.style.display = 'none';
+                    }
+                }
+            }
+            
+            // Configuration
+            const configMode = document.getElementById('configMode');
+            const configModeDescription = document.getElementById('configModeDescription');
+            
+            if (destinations.config.useSingleDestination) {
+                configMode.textContent = 'Single Destination';
+                configModeDescription.textContent = 'Both operations use the same destination. Simpler setup, but may have different authentication requirements.';
+            } else {
+                configMode.textContent = 'Dual Destination';
+                configModeDescription.textContent = 'Separate destinations for discovery/metadata and runtime operations. Recommended for production environments.';
+            }
+        }
+
         // Enhanced reload function to also refresh status
         const originalReloadODataConfig = reloadODataConfig;
         reloadODataConfig = async function() {
             await originalReloadODataConfig();
             // Refresh status after reload
             setTimeout(loadConfigStatus, 1000);
+            setTimeout(loadDestinationStatus, 1500);
         };
 
         // Auto-refresh every 30 seconds
         setInterval(loadUsers, 30000);
         setInterval(loadConfigStatus, 60000); // Refresh config status every minute
+        setInterval(loadDestinationStatus, 120000); // Refresh destination status every 2 minutes
 
         // Load initial data
         document.addEventListener('DOMContentLoaded', function() {
             loadUsers();
             loadConfigStatus();
+            loadDestinationStatus();
         });
     </script>
 </body>
