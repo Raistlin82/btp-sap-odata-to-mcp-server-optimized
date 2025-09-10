@@ -3,10 +3,12 @@ import { HttpDestination } from '@sap-cloud-sdk/connectivity';
 import { DestinationService } from './destination-service.js';
 import { Logger } from '../utils/logger.js';
 import { Config } from '../utils/config.js';
+import { DestinationContext, OperationType, isRuntimeOperation } from '../types/destination-types.js';
 
 
 export class SAPClient {
-    private destination: HttpDestination | null = null;
+    private designTimeDestination: HttpDestination | null = null;
+    private runtimeDestination: HttpDestination | null = null;
     private config: Config;
 
     constructor(
@@ -16,33 +18,74 @@ export class SAPClient {
         this.config = new Config();
     }
 
-    async getDestination(): Promise<HttpDestination> {
-        if (!this.destination) {
-            this.destination = await this.destinationService.getSAPDestination();
+    /**
+     * Get destination based on operation context
+     */
+    async getDestination(context: DestinationContext): Promise<HttpDestination> {
+        const isRuntime = context.type === 'runtime' || isRuntimeOperation(context.operation!);
+        
+        if (isRuntime) {
+            if (!this.runtimeDestination) {
+                this.runtimeDestination = await this.destinationService.getRuntimeDestination(context);
+            }
+            return this.runtimeDestination;
+        } else {
+            if (!this.designTimeDestination) {
+                this.designTimeDestination = await this.destinationService.getDesignTimeDestination(context);
+            }
+            return this.designTimeDestination;
         }
-        return this.destination;
     }
 
+    /**
+     * Get destination with JWT token passed directly (thread-safe)
+     */
+    async getDestinationWithJWT(context: DestinationContext, jwt?: string): Promise<HttpDestination> {
+        // For thread-safety, always fetch fresh destination when JWT is involved
+        return await this.destinationService.getDestinationWithJWT(context, jwt);
+    }
+
+    /**
+     * Legacy method for backward compatibility
+     * @deprecated Use context-aware methods instead
+     */
+    async getDestination_legacy(): Promise<HttpDestination> {
+        return this.getDestination({ type: 'design-time', operation: 'discovery' });
+    }
+
+    /**
+     * Execute HTTP request with context-aware destination selection and JWT handling
+     */
     async executeRequest(options: {
         url: string;
         method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
         data?: unknown;
         headers?: Record<string, string>;
+        context?: DestinationContext;
+        operation?: OperationType;
+        jwt?: string; // JWT token for Principal Propagation
     }) {
-        const destination = await this.getDestination();
-        
-        const requestOptions = {
-            method: options.method,
-            url: options.url,
-            data: options.data,
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                ...options.headers
-            }
+        // Determine operation context
+        const context = options.context || {
+            type: this.getDestinationTypeForMethod(options.method),
+            operation: options.operation || this.getOperationForMethod(options.method)
         };
 
         try {
+            // Pass JWT directly to destination service - no global environment variables
+            const destination = await this.getDestinationWithJWT(context, options.jwt);
+        
+            const requestOptions = {
+                method: options.method,
+                url: options.url,
+                data: options.data,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...options.headers
+                }
+            };
+
             this.logger.debug(`Executing ${options.method} request to ${options.url}`);
             
             if (!destination.url) {
@@ -58,6 +101,7 @@ export class SAPClient {
             this.logger.error(`Request failed:`, error);
             throw this.handleError(error);
         }
+        // No cleanup needed - JWT passed directly without global variables
     }
 
     async readEntitySet(servicePath: string, entitySet: string, queryOptions?: {
@@ -125,6 +169,106 @@ export class SAPClient {
             method: 'DELETE',
             url
         });
+    }
+
+    /**
+     * Determine destination type based on HTTP method
+     */
+    private getDestinationTypeForMethod(method: string): 'design-time' | 'runtime' {
+        // GET methods for metadata/discovery use design-time
+        // All other methods (POST, PATCH, PUT, DELETE) use runtime
+        return method === 'GET' ? 'design-time' : 'runtime';
+    }
+
+    /**
+     * Determine operation type based on HTTP method
+     */
+    private getOperationForMethod(method: string): OperationType {
+        switch (method.toUpperCase()) {
+            case 'GET':
+                return 'read';
+            case 'POST':
+                return 'create';
+            case 'PATCH':
+            case 'PUT':
+                return 'update';
+            case 'DELETE':
+                return 'delete';
+            default:
+                return 'read';
+        }
+    }
+
+    /**
+     * Execute discovery operations (uses design-time destination)
+     */
+    async discoverServices(): Promise<any> {
+        return this.executeRequest({
+            url: '/sap/opu/odata/IWFND/CATALOGSERVICE/',
+            method: 'GET',
+            context: {
+                type: 'design-time',
+                operation: 'discovery'
+            }
+        });
+    }
+
+    /**
+     * Get metadata for a service (uses design-time destination)
+     */
+    async getMetadata(servicePath: string): Promise<any> {
+        return this.executeRequest({
+            url: `${servicePath}$metadata`,
+            method: 'GET',
+            context: {
+                type: 'design-time',
+                operation: 'metadata'
+            }
+        });
+    }
+
+    /**
+     * Execute CRUD operations (uses runtime destination with Principal Propagation support)
+     */
+    async executeCRUDOperation(operation: OperationType, url: string, data?: unknown, jwt?: string): Promise<any> {
+        const method = this.getHttpMethodForOperation(operation);
+        return this.executeRequest({
+            url,
+            method,
+            data,
+            jwt, // Forward JWT for Principal Propagation
+            context: {
+                type: 'runtime',
+                operation
+            }
+        });
+    }
+
+    /**
+     * Get HTTP method for CRUD operation
+     */
+    private getHttpMethodForOperation(operation: OperationType): 'GET' | 'POST' | 'PATCH' | 'DELETE' {
+        switch (operation) {
+            case 'read':
+                return 'GET';
+            case 'create':
+                return 'POST';
+            case 'update':
+                return 'PATCH';
+            case 'delete':
+                return 'DELETE';
+            default:
+                return 'GET';
+        }
+    }
+
+    /**
+     * Clear cached destinations (useful for configuration changes)
+     */
+    clearDestinationCache(): void {
+        this.designTimeDestination = null;
+        this.runtimeDestination = null;
+        this.logger.info('Destination cache cleared');
     }
 
     private handleError(error: unknown): Error {

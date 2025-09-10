@@ -47,6 +47,7 @@ export class AuthServer {
       this.setupRoutes();
       this.logger.debug('Routes setup completed');
       
+      
       this.logger.info('✅ AuthServer constructor completed successfully');
     } catch (error) {
       this.logger.error('❌ AuthServer constructor failed:', error);
@@ -1407,6 +1408,72 @@ export class AuthServer {
       }
     });
 
+    // Admin endpoint to get destination status
+    this.app.get('/admin/destinations/status', async (req: Request, res: Response) => {
+      try {
+        // Session-based authentication check (same as other admin endpoints)
+        let isAuthenticated = false;
+        let hasAdminScope = false;
+        
+        const authSessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+        if (authSessionId) {
+          const tokenData = await this.tokenStore.get(authSessionId);
+          if (tokenData && Date.now() < tokenData.expiresAt) {
+            isAuthenticated = true;
+            hasAdminScope = tokenData.scopes?.includes('admin') || false;
+          }
+        }
+
+        if (!isAuthenticated) {
+          return res.status(401).json({
+            error: 'Authentication required',
+            message: 'Valid session required to access admin endpoints'
+          });
+        }
+
+        // Get destination status from the callback if available
+        // Pass the authenticated user's JWT token for Principal Propagation testing
+        let userJWT = undefined;
+        
+        // Try to get JWT from session first
+        if (authSessionId) {
+          const tokenData = await this.tokenStore.get(authSessionId);
+          if (tokenData && tokenData.token) {
+            userJWT = tokenData.token;
+            this.logger.debug(`Using JWT from session ${authSessionId} for destination testing`);
+          } else {
+            this.logger.debug(`No JWT found in session ${authSessionId}, trying global session`);
+          }
+        }
+        
+        // If no JWT from session, try global session
+        if (!userJWT) {
+          const globalAuth = await this.tokenStore.get('global_user_auth');
+          if (globalAuth && globalAuth.token) {
+            userJWT = globalAuth.token;
+            this.logger.debug('Using JWT from global session for destination testing');
+          } else {
+            this.logger.warn('No JWT found in any session - Principal Propagation testing may fail');
+          }
+        }
+        
+        const destinationStatus = await this.getDestinationStatus(userJWT);
+        
+        res.json({
+          success: true,
+          timestamp: new Date().toISOString(),
+          destinations: destinationStatus
+        });
+
+      } catch (error) {
+        this.logger.error('Failed to get destination status:', error);
+        res.status(500).json({
+          error: 'Internal server error',
+          message: 'Failed to retrieve destination status'
+        });
+      }
+    });
+
     // Note: 404 handler removed - let the main application handle unknown routes
   }
 
@@ -1469,6 +1536,11 @@ export class AuthServer {
     servicesCount: number; 
     discoveredServices: Array<{ id: string; name: string; url: string; entities: number }>;
   }>;
+  private getDestinationStatusCallback?: (userJWT?: string) => Promise<{
+    designTime: { name: string; available: boolean; error?: string; authType?: string };
+    runtime: { name: string; available: boolean; error?: string; authType?: string; hybrid?: boolean };
+    config: { useSingleDestination: boolean; };
+  }>;
 
   setReloadCallback(callback: () => Promise<{ success: boolean; servicesCount: number; message: string }>) {
     this.reloadODataCallback = callback;
@@ -1480,6 +1552,14 @@ export class AuthServer {
     discoveredServices: Array<{ id: string; name: string; url: string; entities: number }>;
   }>) {
     this.getODataStatusCallback = callback;
+  }
+
+  setDestinationStatusCallback(callback: (userJWT?: string) => Promise<{
+    designTime: { name: string; available: boolean; error?: string; authType?: string };
+    runtime: { name: string; available: boolean; error?: string; authType?: string; hybrid?: boolean };
+    config: { useSingleDestination: boolean; };
+  }>) {
+    this.getDestinationStatusCallback = callback;
   }
 
   async getODataConfigStatus(): Promise<{ 
@@ -1495,6 +1575,23 @@ export class AuthServer {
         config: { error: 'Status callback not configured' },
         servicesCount: 0,
         discoveredServices: []
+      };
+    }
+  }
+
+  async getDestinationStatus(userJWT?: string): Promise<{
+    designTime: { name: string; available: boolean; error?: string; authType?: string };
+    runtime: { name: string; available: boolean; error?: string; authType?: string; hybrid?: boolean };
+    config: { useSingleDestination: boolean; };
+  }> {
+    if (this.getDestinationStatusCallback) {
+      return await this.getDestinationStatusCallback(userJWT);
+    } else {
+      // Fallback if callback not set
+      return {
+        designTime: { name: 'Not configured', available: false, error: 'Status callback not configured' },
+        runtime: { name: 'Not configured', available: false, error: 'Status callback not configured' },
+        config: { useSingleDestination: false }
       };
     }
   }
@@ -1529,4 +1626,5 @@ export class AuthServer {
   getApp(): express.Application {
     return this.app;
   }
+
 }

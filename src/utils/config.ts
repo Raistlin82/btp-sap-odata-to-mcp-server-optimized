@@ -1,4 +1,5 @@
 import xsenv from '@sap/xsenv';
+import { DestinationConfig, DestinationValidationResult, DestinationType } from '../types/destination-types.js';
 
 export class Config {
     private config: Map<string, unknown> = new Map();
@@ -18,7 +19,7 @@ export class Config {
 
     private loadConfiguration(): void {
         // Load from environment variables
-        this.config.set('sap.destinationName', process.env.SAP_DESTINATION_NAME || 'SAP_SYSTEM');
+        this.loadDestinationConfig();
         this.config.set('request.timeout', parseInt(process.env.REQUEST_TIMEOUT || '30000'));
         this.config.set('request.retries', parseInt(process.env.REQUEST_RETRIES || '3'));
         this.config.set('log.level', process.env.LOG_LEVEL || 'info');
@@ -84,8 +85,33 @@ export class Config {
     }
 
     /**
+     * Load destination configuration from environment variables
+     * Supports dual destination architecture with backward compatibility
+     */
+    private loadDestinationConfig(): void {
+        // Load destination configuration from environment variables
+        const designTimeDestination = process.env.SAP_DESTINATION_NAME || 'SAP_SYSTEM';
+        const runtimeDestination = process.env.SAP_DESTINATION_NAME_RT || 'SAP_SYSTEM_RT';
+        const useSingleDestination = process.env.SAP_USE_SINGLE_DESTINATION === 'true';
+
+        // Set configuration
+        this.config.set('sap.destinationName', designTimeDestination);
+        this.config.set('sap.destinationNameRT', runtimeDestination);
+        this.config.set('sap.useSingleDestination', useSingleDestination);
+
+        // Log configuration for debugging (only in development)
+        if (process.env.NODE_ENV === 'development' || process.env.LOG_LEVEL === 'debug') {
+            console.log('🔗 Destination Configuration:');
+            console.log(`  Design-Time: ${designTimeDestination}`);
+            console.log(`  Runtime: ${runtimeDestination}`);
+            console.log(`  Single Destination Mode: ${useSingleDestination}`);
+        }
+    }
+
+    /**
      * Load configuration from Cloud Foundry user-provided services
      * Service name: 'odata-config' or 'mcp-odata-config'
+     * Enhanced to support destination configuration
      */
     private loadFromCFServices(): void {
         try {
@@ -136,7 +162,20 @@ export class Config {
                     this.config.set('odata.maxServices', parseInt(creds.ODATA_MAX_SERVICES));
                 }
 
-                console.log('✅ Loaded OData configuration from CF user-provided service');
+                // Load destination configuration from CF service
+                if (creds.SAP_DESTINATION_NAME) {
+                    this.config.set('sap.destinationName', creds.SAP_DESTINATION_NAME);
+                }
+                
+                if (creds.SAP_DESTINATION_NAME_RT) {
+                    this.config.set('sap.destinationNameRT', creds.SAP_DESTINATION_NAME_RT);
+                }
+                
+                if (creds.SAP_USE_SINGLE_DESTINATION !== undefined) {
+                    this.config.set('sap.useSingleDestination', creds.SAP_USE_SINGLE_DESTINATION === 'true');
+                }
+
+                console.log('✅ Loaded OData and Destination configuration from CF user-provided service');
             }
         } catch (error) {
             // CF services not available or not configured - use environment variables
@@ -256,5 +295,106 @@ export class Config {
             exclusionPatterns: this.get('odata.exclusionPatterns', []),
             maxServices: this.get('odata.maxServices', 50)
         };
+    }
+
+    /**
+     * Get design-time destination name (for discovery and metadata)
+     */
+    getDesignTimeDestination(): string {
+        return this.get('sap.destinationName', 'SAP_SYSTEM') as string;
+    }
+
+    /**
+     * Get runtime destination name (for CRUD operations)
+     * Falls back to design-time destination if single destination mode is enabled
+     */
+    getRuntimeDestination(): string {
+        const useSingle = this.get('sap.useSingleDestination', false) as boolean;
+        if (useSingle) {
+            return this.getDesignTimeDestination();
+        }
+        return this.get('sap.destinationNameRT', 'SAP_SYSTEM_RT') as string;
+    }
+
+    /**
+     * Check if single destination mode is enabled
+     */
+    isDualDestinationMode(): boolean {
+        return !this.get('sap.useSingleDestination', false);
+    }
+
+    /**
+     * Get destination name based on type
+     */
+    getDestination(type: DestinationType): string {
+        return type === 'design-time' 
+            ? this.getDesignTimeDestination() 
+            : this.getRuntimeDestination();
+    }
+
+    /**
+     * Get complete destination configuration
+     */
+    getDestinationConfig(): DestinationConfig {
+        return {
+            designTimeDestination: this.getDesignTimeDestination(),
+            runtimeDestination: this.getRuntimeDestination(),
+            useSingleDestination: !this.isDualDestinationMode()
+        };
+    }
+
+    /**
+     * Validate destination configuration and provide corrections
+     */
+    validateDestinationConfig(): DestinationValidationResult {
+        const config = this.getDestinationConfig();
+        const errors: string[] = [];
+        const warnings: string[] = [];
+
+        // Required validations
+        if (!config.designTimeDestination) {
+            errors.push('Design-time destination is required');
+        }
+
+        // Logic validations
+        if (!config.useSingleDestination && !config.runtimeDestination) {
+            warnings.push('Runtime destination not specified, will fallback to single destination');
+            config.useSingleDestination = true;
+        }
+
+        // Duplicate validation
+        if (config.designTimeDestination === config.runtimeDestination && !config.useSingleDestination) {
+            warnings.push('Runtime destination same as design-time, single destination mode recommended');
+        }
+
+        return {
+            isValid: errors.length === 0,
+            errors,
+            warnings,
+            correctedConfig: config
+        };
+    }
+
+    /**
+     * Reload destination configuration (for runtime changes)
+     */
+    async reloadDestinationConfig(): Promise<void> {
+        this.loadDestinationConfig();
+        this.loadFromCFServices();
+        
+        // Validate the new configuration
+        const validation = this.validateDestinationConfig();
+        if (validation.warnings.length > 0) {
+            console.warn('⚠️ Destination configuration warnings:');
+            validation.warnings.forEach(warning => console.warn(`  - ${warning}`));
+        }
+        
+        if (!validation.isValid) {
+            console.error('❌ Destination configuration errors:');
+            validation.errors.forEach(error => console.error(`  - ${error}`));
+            throw new Error('Invalid destination configuration');
+        }
+
+        console.log('✅ Destination configuration reloaded successfully');
     }
 }

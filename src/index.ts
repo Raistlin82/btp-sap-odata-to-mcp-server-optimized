@@ -100,6 +100,123 @@ async function getODataConfigStatus(): Promise<{
     }
 }
 
+async function getDestinationStatus(userJWT?: string): Promise<{
+    designTime: { name: string; available: boolean; error?: string; authType?: string };
+    runtime: { name: string; available: boolean; error?: string; authType?: string; hybrid?: boolean };
+    config: { useSingleDestination: boolean; };
+}> {
+    try {
+        const destinationConfig = config.getDestinationConfig();
+        
+        // Test design-time destination
+        const designTimeTest = await destinationService.testDestination('design-time');
+        const designTimeResult = {
+            name: destinationConfig.designTimeDestination,
+            available: designTimeTest.available,
+            error: designTimeTest.error,
+            authType: 'BasicAuthentication' // Design-time typically uses basic auth
+        };
+
+        // Test runtime destination (may be same as design-time if single destination mode)
+        // Set JWT for runtime testing if available (strip Bearer prefix if present)
+        if (userJWT) {
+            const cleanJWT = userJWT.startsWith('Bearer ') ? userJWT.substring(7) : userJWT;
+            process.env.CURRENT_USER_JWT = cleanJWT;
+            logger.debug(`Set user JWT for Principal Propagation destination testing (length: ${cleanJWT.length})`);
+        } else {
+            logger.warn('No user JWT provided - Principal Propagation destinations may show as unavailable');
+        }
+        
+        const runtimeTest = await destinationService.testDestination('runtime');
+        
+        // Clean up JWT after runtime test
+        if (userJWT) {
+            delete process.env.CURRENT_USER_JWT;
+        }
+        
+        // Try to get more detailed info about runtime destination authentication
+        let authType = 'BasicAuthentication';
+        let hybrid = false;
+        
+        try {
+            // Attempt to get destination details to check authentication type
+            logger.debug('Fetching runtime destination for auth type detection...');
+            
+            // Set the user JWT temporarily for destination testing if available
+            if (userJWT) {
+                const cleanJWT = userJWT.startsWith('Bearer ') ? userJWT.substring(7) : userJWT;
+                process.env.CURRENT_USER_JWT = cleanJWT;
+                logger.debug(`Set user JWT for destination auth detection (length: ${cleanJWT.length})`);
+            } else {
+                logger.debug('No user JWT available for destination auth detection');
+            }
+            
+            const runtimeDest = await destinationService.getRuntimeDestination();
+            
+            logger.debug('Runtime destination details:', {
+                name: destinationConfig.runtimeDestination,
+                authentication: runtimeDest.authentication,
+                hasUsername: !!runtimeDest.username,
+                hasPassword: !!runtimeDest.password,
+                url: runtimeDest.url ? '[REDACTED]' : 'undefined'
+            });
+            
+            if (runtimeDest.authentication === 'PrincipalPropagation') {
+                authType = 'PrincipalPropagation';
+                // Check if it also has basic auth credentials for fallback
+                hybrid = !!(runtimeDest.username && runtimeDest.password);
+                logger.info(`Runtime destination uses Principal Propagation${hybrid ? ' with BasicAuth fallback' : ''}`);
+            } else if (runtimeDest.authentication === 'BasicAuthentication') {
+                authType = 'BasicAuthentication';
+                logger.info('Runtime destination uses BasicAuthentication');
+            } else {
+                logger.warn(`Unknown authentication type: ${runtimeDest.authentication}`);
+                authType = runtimeDest.authentication || 'Unknown';
+            }
+        } catch (error) {
+            logger.error('Failed to determine runtime destination auth type:', error);
+            
+            // Check if it's a Principal Propagation JWT error
+            const errorMessage = (error as any)?.message || String(error) || '';
+            if (errorMessage.includes('user token') || errorMessage.includes('PrincipalPropagation')) {
+                authType = 'PrincipalPropagation';
+                logger.info('Detected Principal Propagation destination (JWT required)');
+            } else {
+                authType = 'Detection Failed';
+            }
+        } finally {
+            // Clean up the JWT environment variable
+            if (userJWT) {
+                delete process.env.CURRENT_USER_JWT;
+                logger.debug('Cleaned up user JWT after destination testing');
+            }
+        }
+
+        const runtimeResult = {
+            name: destinationConfig.runtimeDestination,
+            available: runtimeTest.available,
+            error: runtimeTest.error,
+            authType,
+            hybrid
+        };
+
+        return {
+            designTime: designTimeResult,
+            runtime: runtimeResult,
+            config: {
+                useSingleDestination: destinationConfig.useSingleDestination
+            }
+        };
+    } catch (error) {
+        logger.error('❌ Failed to get destination status:', error);
+        return {
+            designTime: { name: 'Unknown', available: false, error: `Status check failed: ${error}` },
+            runtime: { name: 'Unknown', available: false, error: `Status check failed: ${error}` },
+            config: { useSingleDestination: false }
+        };
+    }
+}
+
 function getConfigurationSource(): string {
     // Check if configuration is coming from CF services, environment, or .env
     if (process.env.VCAP_SERVICES) {
@@ -139,6 +256,7 @@ try {
     // Set up OData callbacks for admin endpoints
     authServer.setReloadCallback(reloadODataServices);
     authServer.setStatusCallback(getODataConfigStatus);
+    authServer.setDestinationStatusCallback(getDestinationStatus);
     
     logger.info('✅ Auth server initialized successfully');
 } catch (error) {
