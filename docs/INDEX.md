@@ -27,6 +27,7 @@ This documentation is organized into focused sections for easy navigation and re
 |----------|-------------|-------------|
 | **[API_REFERENCE.md](API_REFERENCE.md)** | Complete API documentation for all tools | Implementing MCP clients, tool usage |
 | **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** | Common issues and solutions | Debugging problems, error resolution |
+| **[CLOUD_FOUNDRY_CONFIG.md](CLOUD_FOUNDRY_CONFIG.md)** | Current CF environment configuration | Understanding actual deployed configuration |
 | **[CHANGELOG.md](CHANGELOG.md)** | Version history and changes | Understanding what changed between versions |
 
 ## 🗺️ Documentation Navigation
