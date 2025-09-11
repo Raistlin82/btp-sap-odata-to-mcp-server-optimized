@@ -17,6 +17,9 @@
     "start:stdio": "npm run build && node dist/mcp-server.js",
     "inspect:mcp": "npm run build && npx @modelcontextprotocol/inspector node dist/mcp-server.js",
     "inspect": "npx @modelcontextprotocol/inspector",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:ai": "jest src/tests/ai-integration.test.ts",
     "build:btp": "mbt build",
     "deploy:btp": "cf deploy ./mta_archives/btp-sap-odata-to-mcp-server-optimized_1.0.0.mtar "
   },
