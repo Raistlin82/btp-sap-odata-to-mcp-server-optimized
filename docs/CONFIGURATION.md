@@ -51,11 +51,42 @@ SECURITY_HEADERS=true             # Enable security headers
 CACHE_TTL=1800000                 # Cache TTL in milliseconds (30 min)
 CONNECTION_POOL_SIZE=10           # Max connections per destination
 REQUEST_TIMEOUT=30000             # Request timeout in milliseconds
+REQUEST_RETRIES=3                 # Number of retry attempts
+
+# Authentication & Authorization
+AUTH_PORT=3001                    # Authentication server port
+XSUAA_XSAPPNAME=btp-sap-odata-to-mcp-server  # XSUAA app name
+USER_JWT=                         # User JWT token (runtime)
+TECHNICAL_USER_JWT=               # Technical user JWT token
+
+# MCP Session Management
+SAP_MCP_SESSION_ID=               # SAP MCP session identifier
+MCP_SESSION_ID=                   # Generic MCP session identifier
+SAP_SESSION_ID=                   # SAP session identifier
+
+# MCP Authentication Tokens
+SAP_BTP_JWT_TOKEN=                # SAP BTP JWT token
+SAP_ACCESS_TOKEN=                 # SAP access token
+MCP_AUTH_TOKEN=                   # MCP authentication token
+
+# OData Service Discovery
+ODATA_SERVICE_PATTERNS=           # Comma-separated service patterns to include
+ODATA_EXCLUSION_PATTERNS=         # Comma-separated service patterns to exclude
+ODATA_ALLOW_ALL=false            # Allow all OData services (override patterns)
+ODATA_DISCOVERY_MODE=whitelist    # Discovery mode: whitelist, blacklist, all
+ODATA_MAX_SERVICES=50            # Maximum number of services to discover
+
+# SAP Destinations Configuration
+SAP_DESTINATION_NAME=SAP_SYSTEM   # Primary destination name for design-time
+SAP_DESTINATION_NAME_RT=SAP_SYSTEM_RT  # Runtime destination name
+SAP_USE_SINGLE_DESTINATION=false  # Use single destination for both design/runtime
+destinations=                     # JSON array of destination configurations (for local dev)
 
 # Feature Flags
 ENABLE_HEALTH_CHECKS=true
 ENABLE_METRICS=true
 ENABLE_AUDIT_LOGGING=true
+DISABLE_READ_ENTITY_TOOL=false    # Disable read entity tool
 ```
 
 ### Configuration File (.env)
@@ -100,6 +131,11 @@ MAX_SESSIONS_PER_USER=1
 ENABLE_CORS=true
 ENABLE_DEBUG_ROUTES=true
 HOT_RELOAD=true
+
+# Role Collections (matches xs-security.json)
+ROLE_COLLECTIONS=MCPAdministrator,MCPUser,MCPManager,MCPViewer
+ROLE_TEMPLATES=MCPAdmin,MCPEditor,MCPManager,MCPViewer
+ADMIN_ROLE_COLLECTION=MCPAdministrator
 ```
 
 ## 🔐 Authentication Configuration
