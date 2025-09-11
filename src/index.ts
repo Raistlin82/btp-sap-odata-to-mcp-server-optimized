@@ -21,6 +21,7 @@ import { SAPDiscoveryService } from './services/sap-discovery.js';
 import { ODataService } from './types/sap-types.js';
 import { ServiceDiscoveryConfigService } from './services/service-discovery-config.js';
 import { AuthServer } from './services/auth-server.js';
+import { aiIntegration } from './services/ai-integration.js';
 
 /**
  * Modern Express server hosting SAP MCP Server with session management
@@ -600,6 +601,35 @@ export function createApp(): express.Application {
                 port: process.env.AUTH_PORT || '3001'
             }
         });
+    });
+
+    // AI Integration health endpoint
+    app.get('/health/ai', async (req, res) => {
+        try {
+            const aiHealth = await aiIntegration.healthCheck();
+            res.json({
+                status: 'healthy',
+                timestamp: new Date().toISOString(),
+                ai: aiHealth,
+                phase1Features: {
+                    dataAnalysis: '✅ Available',
+                    queryOptimization: '✅ Available', 
+                    anomalyDetection: '✅ Available',
+                    businessInsights: '✅ Available'
+                }
+            });
+        } catch (error) {
+            res.status(500).json({
+                status: 'error',
+                timestamp: new Date().toISOString(),
+                error: 'AI health check failed',
+                ai: {
+                    status: 'error',
+                    capabilities: [],
+                    aiEnabled: false
+                }
+            });
+        }
     });
 
     // MCP server info endpoint
