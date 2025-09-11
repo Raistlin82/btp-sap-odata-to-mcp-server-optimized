@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAP MCP Server - Admin Dashboard</title>
+    
+    <!-- SAP UI5 Web Components -->
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/Assets.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/Button.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/Card.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/Title.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/Text.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/Table.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/TableColumn.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/TableRow.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/TableCell.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/Badge.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/Panel.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/MessageStrip.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/BusyIndicator.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/Dialog.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/Bar.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents-icons/dist/AllIcons.js"></script>
+    
+    <!-- SAP Theme and Fonts -->
+    <link rel="stylesheet" href="https://ui5.sap.com/resources/sap/ui/core/themes/sap_horizon/library.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=72:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --sap-font-family: "72", "72full", Arial, Helvetica, sans-serif;
+            --sap-background: #f5f6fa;
+            --sap-content-background: #ffffff;
+            --sap-primary-color: #0070f2;
+            --sap-success-color: #30914c;
+            --sap-warning-color: #e76500;
+            --sap-error-color: #b00;
+            --sap-text-color: #32363a;
+            --sap-text-secondary: #6a6d70;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--sap-font-family);
+            background: var(--sap-background);
+            min-height: 100vh;
+            color: var(--sap-text-color);
+        }
+
+        .header-bar {
+            background: var(--sap-content-background);
+            box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.1);
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 0.1875rem solid var(--sap-primary-color);
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--sap-primary-color);
+        }
+
+        .sap-logo {
+            width: 2.5rem;
+            height: 2.5rem;
+            background: var(--sap-primary-color);
+            border-radius: 0.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.875rem;
+            color: var(--sap-text-secondary);
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            --ui5-card-border-radius: 0.5rem;
+            --ui5-card-box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.06);
+            --ui5-card-border: 0.0625rem solid #e4e7ea;
+        }
+
+        .stat-content {
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--sap-primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--sap-text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.03125rem;
+        }
+
+        .section-card {
+            --ui5-card-border-radius: 0.5rem;
+            --ui5-card-box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.06);
+            margin-bottom: 2rem;
+        }
+
+        .card-header {
+            padding: 1.5rem;
+            background: #f8f9fb;
+            border-bottom: 0.0625rem solid #e4e7ea;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-content {
+            padding: 1.5rem;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .info-card {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border-left: 0.25rem solid var(--sap-primary-color);
+        }
+
+        .info-card.success {
+            border-left-color: var(--sap-success-color);
+            background: #f0f9f4;
+        }
+
+        .info-card.warning {
+            border-left-color: var(--sap-warning-color);
+            background: #fff8f0;
+        }
+
+        .info-card.error {
+            border-left-color: var(--sap-error-color);
+            background: #fef2f2;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 0.5rem;
+            height: 0.5rem;
+            border-radius: 50%;
+        }
+
+        .status-dot.active {
+            background: var(--sap-success-color);
+        }
+
+        .status-dot.error {
+            background: var(--sap-error-color);
+        }
+
+        .status-dot.warning {
+            background: var(--sap-warning-color);
+        }
+
+        .code-block {
+            background: #f1f3f4;
+            padding: 0.75rem;
+            border-radius: 0.25rem;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            font-size: 0.8125rem;
+            margin: 0.75rem 0;
+            overflow-x: auto;
+            border: 0.0625rem solid #e0e0e0;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .loading-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        /* SAP UI5 component customizations */
+        ui5-button {
+            margin-right: 0.5rem;
+        }
+
+        ui5-button:last-child {
+            margin-right: 0;
+        }
+
+        ui5-table {
+            --ui5-table-border-radius: 0.5rem;
+        }
+
+        ui5-badge {
+            --ui5-badge-font-size: 0.75rem;
+        }
+
+        ui5-badge.admin {
+            --ui5-badge-color: var(--sap-error-color);
+        }
+
+        ui5-badge.editor {
+            --ui5-badge-color: var(--sap-success-color);
+        }
+
+        ui5-badge.viewer {
+            --ui5-badge-color: var(--sap-primary-color);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-bar {
+                padding: 1rem;
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .main-container {
+                padding: 1rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <ui5-bar class="header-bar">
+        <div class="header-title" slot="startContent">
+            <div class="sap-logo">S</div>
+            <ui5-title level="H3">MCP Server Admin Dashboard</ui5-title>
+        </div>
+        <div class="user-info" slot="endContent">
+            <ui5-text id="currentUser">Loading...</ui5-text>
+            <ui5-badge color-scheme="8" id="authStatus">Admin</ui5-badge>
+        </div>
+    </ui5-bar>
+
+    <div class="main-container">
+        <!-- Statistics Cards -->
+        <div class="stats-grid" id="statsGrid">
+            <ui5-card class="stat-card">
+                <div class="stat-content">
+                    <div class="stat-value" id="totalUsers">-</div>
+                    <div class="stat-label">Total Users</div>
+                </div>
+            </ui5-card>
+            <ui5-card class="stat-card">
+                <div class="stat-content">
+                    <div class="stat-value" id="activeUsers">-</div>
+                    <div class="stat-label">Active Sessions</div>
+                </div>
+            </ui5-card>
+            <ui5-card class="stat-card">
+                <div class="stat-content">
+                    <div class="stat-value" id="adminUsers">-</div>
+                    <div class="stat-label">Admin Users</div>
+                </div>
+            </ui5-card>
+        </div>
+
+        <!-- OData Configuration Management -->
+        <ui5-card class="section-card">
+            <div class="card-header">
+                <ui5-title level="H4">
+                    <ui5-icon name="sap-icon://settings" style="margin-right: 0.5rem;"></ui5-icon>
+                    OData Service Configuration
+                </ui5-title>
+                <ui5-button design="Emphasized" icon="sap-icon://refresh" id="reloadBtn" onclick="reloadODataConfig()">
+                    Reload Services
+                </ui5-button>
+            </div>
+            <div class="card-content">
+                <div id="configStatus">
+                    <div class="loading-container">
+                        <ui5-busy-indicator active size="Medium"></ui5-busy-indicator>
+                        <ui5-text>Loading configuration status...</ui5-text>
+                    </div>
+                </div>
+                
+                <ui5-message-strip design="Information" hide-close-button>
+                    <ui5-icon name="sap-icon://hint" slot="icon"></ui5-icon>
+                    <strong>Configuration Methods:</strong><br>
+                    <div style="margin-top: 0.5rem; line-height: 1.6; font-size: 0.875rem;">
+                        • <strong>CF Environment:</strong> <code>cf set-env APP_NAME ODATA_SERVICE_PATTERNS "Z*,API*"</code><br>
+                        • <strong>User Service:</strong> <code>cf create-user-provided-service odata-config -p '{...}'</code><br>
+                        • <strong>Apply Changes:</strong> Use "Reload Services" button (no restart required)
+                    </div>
+                </ui5-message-strip>
+            </div>
+        </ui5-card>
+
+        <!-- Destination Status -->
+        <ui5-card class="section-card">
+            <div class="card-header">
+                <ui5-title level="H4">
+                    <ui5-icon name="sap-icon://connected" style="margin-right: 0.5rem;"></ui5-icon>
+                    Destination Status
+                </ui5-title>
+                <ui5-button design="Default" icon="sap-icon://refresh" id="destStatusBtn" onclick="loadDestinationStatus()">
+                    Check Status
+                </ui5-button>
+            </div>
+            
+            <div id="destinationStatusContent" class="card-content">
+                <div id="destinationLoadingState" class="loading-container">
+                    <ui5-busy-indicator active size="Medium"></ui5-busy-indicator>
+                    <ui5-text>Loading destination status...</ui5-text>
+                </div>
+                
+                <div id="destinationStatusDisplay" class="hidden">
+                    <div class="config-grid">
+                        <!-- Design-Time Destination -->
+                        <div class="info-card" id="designTimeCard">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                                <ui5-icon name="sap-icon://database" id="designTimeIcon"></ui5-icon>
+                                <ui5-title level="H5">Design-Time Destination</ui5-title>
+                            </div>
+                            <div style="font-size: 0.875rem; color: var(--sap-text-secondary); margin-bottom: 0.25rem;">
+                                <strong>Name:</strong> <span id="designTimeName">-</span>
+                            </div>
+                            <div style="font-size: 0.875rem; margin-bottom: 0.5rem;">
+                                <strong>Status:</strong> 
+                                <span class="status-indicator">
+                                    <span class="status-dot" id="designTimeStatusDot"></span>
+                                    <span id="designTimeStatus">-</span>
+                                </span>
+                            </div>
+                            <div id="designTimeError" class="hidden" style="font-size: 0.8125rem; color: var(--sap-error-color); margin-top: 0.5rem;"></div>
+                            <ui5-text style="font-size: 0.8125rem; color: var(--sap-text-secondary);">
+                                Used for: Service discovery, metadata
+                            </ui5-text>
+                        </div>
+                        
+                        <!-- Runtime Destination -->
+                        <div class="info-card" id="runtimeCard">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                                <ui5-icon name="sap-icon://business-network" id="runtimeIcon"></ui5-icon>
+                                <ui5-title level="H5">Runtime Destination</ui5-title>
+                            </div>
+                            <div style="font-size: 0.875rem; color: var(--sap-text-secondary); margin-bottom: 0.25rem;">
+                                <strong>Name:</strong> <span id="runtimeName">-</span>
+                            </div>
+                            <div style="font-size: 0.875rem; margin-bottom: 0.25rem;">
+                                <strong>Status:</strong> 
+                                <span class="status-indicator">
+                                    <span class="status-dot" id="runtimeStatusDot"></span>
+                                    <span id="runtimeStatus">-</span>
+                                </span>
+                            </div>
+                            <div style="font-size: 0.875rem; margin-bottom: 0.25rem;">
+                                <strong>Auth:</strong> <span id="runtimeAuthType">-</span>
+                            </div>
+                            <div id="runtimeHybrid" class="hidden">
+                                <ui5-badge color-scheme="8">
+                                    <ui5-icon name="sap-icon://locked" style="margin-right: 0.25rem;"></ui5-icon>
+                                    Hybrid: Principal Propagation + BasicAuth fallback
+                                </ui5-badge>
+                            </div>
+                            <div id="runtimeError" class="hidden" style="font-size: 0.8125rem; color: var(--sap-error-color); margin-top: 0.5rem;"></div>
+                            <ui5-text style="font-size: 0.8125rem; color: var(--sap-text-secondary);">
+                                Used for: CRUD operations, data access
+                            </ui5-text>
+                        </div>
+                        
+                        <!-- Configuration Info -->
+                        <div class="info-card">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                                <ui5-icon name="sap-icon://wrench"></ui5-icon>
+                                <ui5-title level="H5">Configuration</ui5-title>
+                            </div>
+                            <div style="font-size: 0.875rem; color: var(--sap-text-secondary); margin-bottom: 0.25rem;">
+                                <strong>Mode:</strong> <span id="configMode">-</span>
+                            </div>
+                            <ui5-text id="configModeDescription" style="font-size: 0.8125rem; color: var(--sap-text-secondary);">-</ui5-text>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </ui5-card>
+
+        <!-- Users Table -->
+        <ui5-card class="section-card">
+            <div class="card-header">
+                <ui5-title level="H4">
+                    <ui5-icon name="sap-icon://group" style="margin-right: 0.5rem;"></ui5-icon>
+                    User Sessions & Authorizations
+                </ui5-title>
+                <ui5-button design="Default" icon="sap-icon://refresh" onclick="loadUsers()">
+                    Refresh
+                </ui5-button>
+            </div>
+
+            <div id="loadingState" class="loading-container">
+                <ui5-busy-indicator active size="Medium"></ui5-busy-indicator>
+                <ui5-text>Loading user data...</ui5-text>
+            </div>
+
+            <div id="errorState" class="hidden card-content">
+                <ui5-message-strip design="Negative" hide-close-button>
+                    <ui5-icon name="sap-icon://error" slot="icon"></ui5-icon>
+                    <strong>Error:</strong> <span id="errorMessage"></span>
+                </ui5-message-strip>
+            </div>
+
+            <div id="usersTableContainer" class="hidden">
+                <ui5-table id="usersTable" mode="None" no-data-text="No users found">
+                    <ui5-table-column slot="columns">
+                        <ui5-text>User</ui5-text>
+                    </ui5-table-column>
+                    <ui5-table-column slot="columns">
+                        <ui5-text>Role</ui5-text>
+                    </ui5-table-column>
+                    <ui5-table-column slot="columns">
+                        <ui5-text>Scopes</ui5-text>
+                    </ui5-table-column>
+                    <ui5-table-column slot="columns">
+                        <ui5-text>Status</ui5-text>
+                    </ui5-table-column>
+                    <ui5-table-column slot="columns">
+                        <ui5-text>Last Activity</ui5-text>
+                    </ui5-table-column>
+                    <ui5-table-column slot="columns">
+                        <ui5-text>Session Type</ui5-text>
+                    </ui5-table-column>
+                    <ui5-table-column slot="columns">
+                        <ui5-text>Actions</ui5-text>
+                    </ui5-table-column>
+                </ui5-table>
+            </div>
+        </ui5-card>
+    </div>
+
+    <!-- User Details Dialog -->
+    <ui5-dialog id="userDetailsDialog" header-text="Session Details">
+        <div style="padding: 1rem; min-width: 400px;">
+            <div id="userDetailsContent">
+                <!-- Content will be populated dynamically -->
+            </div>
+        </div>
+        <div slot="footer">
+            <ui5-button design="Emphasized" onclick="closeUserDetailsDialog()">Close</ui5-button>
+        </div>
+    </ui5-dialog>
+
+    <script>
+        let usersData = [];
+
+        // Utility functions
+        async function safeJsonParse(response) {
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && contentType.includes('application/json')) {
+                return await response.json();
+            } else {
+                // Handle non-JSON responses (e.g., HTML error pages)
+                const text = await response.text();
+                return { 
+                    error: `Invalid response format (${response.status})`, 
+                    message: response.status === 401 ? 'Authentication required' :
+                             response.status === 403 ? 'Access denied' :
+                             response.status === 500 ? 'Internal server error' :
+                             `HTTP ${response.status}: ${response.statusText}`,
+                    details: text
+                };
+            }
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+
+        function formatRelativeTime(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+            if (diffHours > 24) {
+                return `${Math.floor(diffHours / 24)}d ago`;
+            } else if (diffHours > 0) {
+                return `${diffHours}h ago`;
+            } else if (diffMinutes > 0) {
+                return `${diffMinutes}m ago`;
+            } else {
+                return 'Just now';
+            }
+        }
+
+        function getSessionId() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('session') || localStorage.getItem('mcp_session_id') || 'global_user_auth';
+        }
+
+        // Load users data
+        async function loadUsers() {
+            try {
+                document.getElementById('loadingState').classList.remove('hidden');
+                document.getElementById('errorState').classList.add('hidden');
+                document.getElementById('usersTableContainer').classList.add('hidden');
+
+                const sessionId = getSessionId();
+                const response = await fetch(`/auth/admin/users?session=${encodeURIComponent(sessionId)}`);
+                const data = await safeJsonParse(response);
+
+                if (!response.ok) {
+                    throw new Error(data.message || data.error || 'Failed to load users');
+                }
+
+                usersData = data.users;
+                updateStatistics(data.summary);
+                updateUsersTable(data.users);
+                
+                const currentSessionId = getSessionId();
+                document.getElementById('currentUser').textContent = data.requestedBy;
+
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('usersTableContainer').classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Error loading users:', error);
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('errorState').classList.remove('hidden');
+                document.getElementById('errorMessage').textContent = error.message;
+            }
+        }
+
+        function updateStatistics(summary) {
+            document.getElementById('totalUsers').textContent = summary.totalUsers;
+            document.getElementById('activeUsers').textContent = summary.activeUsers;
+            document.getElementById('adminUsers').textContent = summary.adminUsers;
+        }
+
+        function updateUsersTable(users) {
+            const table = document.getElementById('usersTable');
+            const existingRows = table.querySelectorAll('ui5-table-row');
+            existingRows.forEach(row => row.remove());
+
+            users.forEach(user => {
+                const row = document.createElement('ui5-table-row');
+                
+                const statusClass = user.isActive ? 'active' : 'error';
+                const statusText = user.isActive ? 'Active' : 'Expired';
+                
+                row.innerHTML = `
+                    <ui5-table-cell>
+                        <div>
+                            <ui5-text style="font-weight: 600;">${user.user}</ui5-text>
+                            <div style="font-size: 0.8125rem; color: var(--sap-text-secondary);">${user.clientInfo.ipAddress}</div>
+                        </div>
+                    </ui5-table-cell>
+                    <ui5-table-cell>
+                        <ui5-badge class="${user.role}" color-scheme="${user.role === 'admin' ? '1' : user.role === 'editor' ? '8' : '6'}">
+                            ${user.role.toUpperCase()}
+                        </ui5-badge>
+                    </ui5-table-cell>
+                    <ui5-table-cell>
+                        <ui5-text style="font-size: 0.8125rem; color: var(--sap-text-secondary);">
+                            ${user.scopes.join(', ') || 'None'}
+                        </ui5-text>
+                    </ui5-table-cell>
+                    <ui5-table-cell>
+                        <div class="status-indicator">
+                            <span class="status-dot ${statusClass}"></span>
+                            <ui5-text>${statusText}</ui5-text>
+                        </div>
+                    </ui5-table-cell>
+                    <ui5-table-cell>
+                        <ui5-text title="${formatDate(user.lastActivity)}">
+                            ${formatRelativeTime(user.lastActivity)}
+                        </ui5-text>
+                    </ui5-table-cell>
+                    <ui5-table-cell>
+                        <ui5-text style="font-size: 0.8125rem; color: var(--sap-text-secondary);">
+                            ${user.sessionType}
+                        </ui5-text>
+                    </ui5-table-cell>
+                    <ui5-table-cell>
+                        <ui5-button design="Transparent" icon="sap-icon://detail-view" onclick="viewSession('${user.sessionId}')" tooltip="View Details"></ui5-button>
+                        <ui5-button design="Transparent" icon="sap-icon://delete" onclick="deleteSession('${user.sessionId}')" tooltip="Delete Session"></ui5-button>
+                    </ui5-table-cell>
+                `;
+                
+                table.appendChild(row);
+            });
+        }
+
+        function viewSession(sessionId) {
+            const user = usersData.find(u => u.sessionId === sessionId);
+            if (!user) return;
+
+            const content = document.getElementById('userDetailsContent');
+            content.innerHTML = `
+                <div style="display: grid; gap: 1rem;">
+                    <div class="info-card">
+                        <ui5-title level="H5" style="margin-bottom: 0.75rem;">Session Information</ui5-title>
+                        <div style="display: grid; gap: 0.5rem; font-size: 0.875rem;">
+                            <div><strong>Session ID:</strong> <code>${user.sessionId}</code></div>
+                            <div><strong>User:</strong> ${user.user}</div>
+                            <div><strong>Role:</strong> <ui5-badge class="${user.role}" color-scheme="${user.role === 'admin' ? '1' : user.role === 'editor' ? '8' : '6'}">${user.role.toUpperCase()}</ui5-badge></div>
+                            <div><strong>Scopes:</strong> ${user.scopes.join(', ')}</div>
+                            <div><strong>Status:</strong> <span class="status-indicator"><span class="status-dot ${user.isActive ? 'active' : 'error'}"></span>${user.isActive ? 'Active' : 'Expired'}</span></div>
+                        </div>
+                    </div>
+                    <div class="info-card">
+                        <ui5-title level="H5" style="margin-bottom: 0.75rem;">Timestamps</ui5-title>
+                        <div style="display: grid; gap: 0.5rem; font-size: 0.875rem;">
+                            <div><strong>Authenticated:</strong> ${formatDate(user.authenticatedAt)}</div>
+                            <div><strong>Last Activity:</strong> ${formatDate(user.lastActivity)}</div>
+                            <div><strong>Expires:</strong> ${formatDate(user.expiresAt)}</div>
+                        </div>
+                    </div>
+                    <div class="info-card">
+                        <ui5-title level="H5" style="margin-bottom: 0.75rem;">Client Information</ui5-title>
+                        <div style="display: grid; gap: 0.5rem; font-size: 0.875rem;">
+                            <div><strong>IP Address:</strong> ${user.clientInfo.ipAddress}</div>
+                            <div><strong>User Agent:</strong> ${user.clientInfo.userAgent}</div>
+                            <div><strong>Session Type:</strong> ${user.sessionType}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('userDetailsDialog').show();
+        }
+
+        function closeUserDetailsDialog() {
+            document.getElementById('userDetailsDialog').close();
+        }
+
+        async function deleteSession(sessionId) {
+            const user = usersData.find(u => u.sessionId === sessionId);
+            if (!user) return;
+
+            if (confirm(`Are you sure you want to delete the session for ${user.user}?`)) {
+                try {
+                    const authSessionId = getSessionId();
+                    const response = await fetch(`/auth/admin/users/delete?session=${encodeURIComponent(authSessionId)}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ sessionId: sessionId })
+                    });
+
+                    const data = await safeJsonParse(response);
+                    
+                    if (response.ok) {
+                        alert(`Session for ${user.user} deleted successfully`);
+                        loadUsers(); // Refresh the table
+                    } else {
+                        alert(`Error: ${data.message || data.error}`);
+                    }
+                } catch (error) {
+                    alert(`Error deleting session: ${error.message}`);
+                }
+            }
+        }
+
+        async function reloadODataConfig() {
+            const reloadBtn = document.getElementById('reloadBtn');
+            const originalText = reloadBtn.textContent;
+            
+            try {
+                reloadBtn.textContent = 'Reloading...';
+                reloadBtn.disabled = true;
+                
+                const authSessionId = getSessionId();
+                const response = await fetch(`/auth/admin/odata/reload?session=${encodeURIComponent(authSessionId)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await safeJsonParse(response);
+                
+                if (response.ok && result.success) {
+                    alert(`✅ OData Configuration Reload Successful!\n\n${result.message}\n\nServices Count: ${result.servicesCount || 'Unknown'}\n\nTriggered by: ${result.triggeredBy}\nTime: ${new Date(result.triggeredAt).toLocaleString()}`);
+                } else {
+                    const errorMessage = result.message || result.error || `HTTP ${response.status}: ${response.statusText}`;
+                    alert(`❌ OData Reload Failed!\n\n${errorMessage}`);
+                }
+            } catch (error) {
+                alert(`❌ Error reloading OData configuration: ${error.message}`);
+            } finally {
+                reloadBtn.textContent = originalText;
+                reloadBtn.disabled = false;
+            }
+        }
+
+        async function loadConfigStatus() {
+            const statusDiv = document.getElementById('configStatus');
+            
+            try {
+                const authSessionId = getSessionId();
+                const response = await fetch(`/auth/admin/odata/status?session=${encodeURIComponent(authSessionId)}`);
+                const result = await safeJsonParse(response);
+                
+                if (response.ok && result.success) {
+                    const config = result.configuration.config;
+                    const servicesCount = result.configuration.servicesCount;
+                    const discoveredServices = result.configuration.discoveredServices;
+                    
+                    statusDiv.innerHTML = `
+                        <div class="config-grid" style="margin-bottom: 1rem;">
+                            <div class="info-card success">
+                                <div style="font-weight: 600; margin-bottom: 0.5rem;">
+                                    <ui5-icon name="sap-icon://source-code" style="margin-right: 0.5rem;"></ui5-icon>
+                                    Configuration Source
+                                </div>
+                                <ui5-text>${config.configurationSource || 'Unknown'}</ui5-text>
+                            </div>
+                            <div class="info-card success">
+                                <div style="font-weight: 600; margin-bottom: 0.5rem;">
+                                    <ui5-icon name="sap-icon://database" style="margin-right: 0.5rem;"></ui5-icon>
+                                    Services Discovered
+                                </div>
+                                <ui5-text style="font-weight: 600;">${servicesCount} services</ui5-text>
+                            </div>
+                            <div class="info-card warning">
+                                <div style="font-weight: 600; margin-bottom: 0.5rem;">
+                                    <ui5-icon name="sap-icon://measurement-document" style="margin-right: 0.5rem;"></ui5-icon>
+                                    Max Services
+                                </div>
+                                <ui5-text>${config.maxServices || 'Not set'}</ui5-text>
+                            </div>
+                        </div>
+                        
+                        <ui5-panel header-text="Current Configuration" collapsed>
+                            <div style="padding: 1rem;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                                    <div>
+                                        <ui5-title level="H6">Service Patterns:</ui5-title>
+                                        <div class="code-block">
+                                            ${Array.isArray(config.servicePatterns) ? config.servicePatterns.join(', ') : (config.servicePatterns || 'Not set')}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <ui5-title level="H6">Exclusion Patterns:</ui5-title>
+                                        <div class="code-block">
+                                            ${Array.isArray(config.exclusionPatterns) ? config.exclusionPatterns.join(', ') : (config.exclusionPatterns || 'None')}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="margin-top: 0.75rem;">
+                                    <ui5-title level="H6">Allow All Services:</ui5-title>
+                                    <ui5-badge color-scheme="${config.allowAllServices ? '8' : '1'}">
+                                        ${config.allowAllServices ? 'Yes' : 'No'}
+                                    </ui5-badge>
+                                </div>
+                            </div>
+                        </ui5-panel>
+                        
+                        ${discoveredServices.length > 0 ? `
+                        <ui5-panel header-text="Discovered Services (${discoveredServices.length})" collapsed style="margin-top: 1rem;">
+                            <div style="padding: 1rem; max-height: 300px; overflow-y: auto;">
+                                ${discoveredServices.map(service => `
+                                    <div class="info-card" style="margin-bottom: 0.5rem;">
+                                        <div style="font-weight: 600;">${service.name}</div>
+                                        <ui5-text style="font-size: 0.8125rem; color: var(--sap-text-secondary);">ID: ${service.id}</ui5-text>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </ui5-panel>
+                        ` : ''}
+                    `;
+                } else {
+                    statusDiv.innerHTML = `
+                        <ui5-message-strip design="Negative" hide-close-button>
+                            <ui5-icon name="sap-icon://error" slot="icon"></ui5-icon>
+                            Failed to load configuration status: ${result.message || 'Unknown error'}
+                        </ui5-message-strip>
+                    `;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <ui5-message-strip design="Negative" hide-close-button>
+                        <ui5-icon name="sap-icon://error" slot="icon"></ui5-icon>
+                        Error loading configuration: ${error.message}
+                    </ui5-message-strip>
+                `;
+            }
+        }
+
+        async function loadDestinationStatus() {
+            const statusBtn = document.getElementById('destStatusBtn');
+            const loadingState = document.getElementById('destinationLoadingState');
+            const statusDisplay = document.getElementById('destinationStatusDisplay');
+            
+            try {
+                statusBtn.disabled = true;
+                loadingState.classList.remove('hidden');
+                statusDisplay.classList.add('hidden');
+                
+                const authSessionId = getSessionId();
+                const response = await fetch(`/auth/admin/destinations/status?session=${encodeURIComponent(authSessionId)}`);
+                const result = await safeJsonParse(response);
+                
+                if (response.ok && result.success) {
+                    updateDestinationStatusDisplay(result.destinations);
+                    loadingState.classList.add('hidden');
+                    statusDisplay.classList.remove('hidden');
+                } else {
+                    throw new Error(result.message || 'Failed to load destination status');
+                }
+                
+            } catch (error) {
+                console.error('Failed to load destination status:', error);
+                loadingState.innerHTML = `
+                    <ui5-message-strip design="Negative" hide-close-button>
+                        <ui5-icon name="sap-icon://error" slot="icon"></ui5-icon>
+                        Failed to load destination status: ${error.message}
+                    </ui5-message-strip>
+                `;
+            } finally {
+                statusBtn.disabled = false;
+            }
+        }
+
+        function updateDestinationStatusDisplay(destinations) {
+            // Design-time destination
+            const designTimeCard = document.getElementById('designTimeCard');
+            const designTimeName = document.getElementById('designTimeName');
+            const designTimeStatus = document.getElementById('designTimeStatus');
+            const designTimeStatusDot = document.getElementById('designTimeStatusDot');
+            const designTimeError = document.getElementById('designTimeError');
+            
+            designTimeName.textContent = destinations.designTime.name;
+            
+            if (destinations.designTime.available) {
+                designTimeCard.className = 'info-card success';
+                designTimeStatusDot.className = 'status-dot active';
+                designTimeStatus.textContent = 'Available';
+                designTimeError.classList.add('hidden');
+            } else {
+                designTimeCard.className = 'info-card error';
+                designTimeStatusDot.className = 'status-dot error';
+                designTimeStatus.textContent = 'Not Available';
+                if (destinations.designTime.error) {
+                    designTimeError.textContent = destinations.designTime.error;
+                    designTimeError.classList.remove('hidden');
+                } else {
+                    designTimeError.classList.add('hidden');
+                }
+            }
+            
+            // Runtime destination
+            const runtimeCard = document.getElementById('runtimeCard');
+            const runtimeName = document.getElementById('runtimeName');
+            const runtimeStatus = document.getElementById('runtimeStatus');
+            const runtimeStatusDot = document.getElementById('runtimeStatusDot');
+            const runtimeAuthType = document.getElementById('runtimeAuthType');
+            const runtimeHybrid = document.getElementById('runtimeHybrid');
+            const runtimeError = document.getElementById('runtimeError');
+            
+            runtimeName.textContent = destinations.runtime.name;
+            
+            if (destinations.runtime.authType) {
+                runtimeAuthType.textContent = destinations.runtime.authType;
+            }
+            
+            if (destinations.runtime.hybrid) {
+                runtimeHybrid.classList.remove('hidden');
+            } else {
+                runtimeHybrid.classList.add('hidden');
+            }
+            
+            if (destinations.runtime.available) {
+                runtimeCard.className = 'info-card success';
+                runtimeStatusDot.className = 'status-dot active';
+                runtimeStatus.textContent = 'Available';
+                runtimeError.classList.add('hidden');
+            } else {
+                const isPrincipalPropError = destinations.runtime.error && 
+                    (destinations.runtime.error.includes('user token') || 
+                     destinations.runtime.error.includes('PrincipalPropagation'));
+                
+                if (isPrincipalPropError) {
+                    runtimeCard.className = 'info-card warning';
+                    runtimeStatusDot.className = 'status-dot warning';
+                    runtimeStatus.textContent = 'Requires User JWT';
+                    runtimeError.innerHTML = '💡 Principal Propagation requires authenticated user context. Status check from admin dashboard is expected to fail.';
+                    runtimeError.style.color = 'var(--sap-warning-color)';
+                    runtimeError.classList.remove('hidden');
+                } else {
+                    runtimeCard.className = 'info-card error';
+                    runtimeStatusDot.className = 'status-dot error';
+                    runtimeStatus.textContent = 'Not Available';
+                    if (destinations.runtime.error) {
+                        runtimeError.textContent = destinations.runtime.error;
+                        runtimeError.style.color = 'var(--sap-error-color)';
+                        runtimeError.classList.remove('hidden');
+                    } else {
+                        runtimeError.classList.add('hidden');
+                    }
+                }
+            }
+            
+            // Configuration
+            const configMode = document.getElementById('configMode');
+            const configModeDescription = document.getElementById('configModeDescription');
+            
+            if (destinations.config.useSingleDestination) {
+                configMode.textContent = 'Single Destination';
+                configModeDescription.textContent = 'Both operations use the same destination. Simpler setup, but may have different authentication requirements.';
+            } else {
+                configMode.textContent = 'Dual Destination';
+                configModeDescription.textContent = 'Separate destinations for discovery/metadata and runtime operations. Recommended for production environments.';
+            }
+        }
+
+        // Auto-refresh timers
+        setInterval(loadUsers, 30000);
+        setInterval(loadConfigStatus, 60000);
+        setInterval(loadDestinationStatus, 120000);
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUsers();
+            loadConfigStatus();
+            loadDestinationStatus();
+        });
+    </script>
+</body>
+</html>
