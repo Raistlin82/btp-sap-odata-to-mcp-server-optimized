@@ -1,4 +1,5 @@
 {
+  "xsappname": "btp-sap-odata-to-mcp-server-${space}",
   "description": "BTP SAP OData MCP Server Security Configuration",
   "scopes": [
     {
@@ -75,6 +76,13 @@
       "description": "Standard user access to SAP MCP OData Server",
       "role-template-references": [
         "$XSAPPNAME.MCPEditor"
+      ]
+    },
+    {
+      "name": "MCPManager",
+      "description": "Manager access with delete permissions to SAP MCP OData Server",
+      "role-template-references": [
+        "$XSAPPNAME.MCPManager"
       ]
     },
     {

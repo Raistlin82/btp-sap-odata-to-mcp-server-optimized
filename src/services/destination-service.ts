@@ -2,6 +2,8 @@ import { getDestination, HttpDestination } from '@sap-cloud-sdk/connectivity';
 import xsenv from '@sap/xsenv';
 import { Logger } from '../utils/logger.js';
 import { Config } from '../utils/config.js';
+import { SecureErrorHandler } from '../utils/secure-error-handler.js';
+import { JWTUtils } from '../utils/jwt-utils.js';
 import { DestinationContext, DestinationType, getDestinationType } from '../types/destination-types.js';
 
 export class DestinationService {
@@ -59,6 +61,7 @@ export class DestinationService {
 
     /**
      * Get runtime destination (for CRUD operations)
+     * @deprecated Use getRuntimeDestinationWithJWT for secure JWT handling
      */
     async getRuntimeDestination(context?: Partial<DestinationContext>): Promise<HttpDestination> {
         return await this.getDestination({
@@ -66,6 +69,21 @@ export class DestinationService {
             operation: 'read',
             ...context
         });
+    }
+
+    /**
+     * Get runtime destination with secure JWT handling (for CRUD operations)
+     */
+    async getRuntimeDestinationWithJWT(jwt?: string, context?: Partial<DestinationContext>): Promise<HttpDestination> {
+        const destinationContext = {
+            type: 'runtime' as const,
+            operation: 'read' as const,
+            ...context
+        };
+        
+        return jwt 
+            ? await this.getDestinationWithJWT(destinationContext, jwt)
+            : await this.getDestination(destinationContext);
     }
 
     /**
@@ -101,74 +119,11 @@ export class DestinationService {
                 }
             }
 
-            // Clean JWT by removing Bearer prefix if present
-            const cleanJWT = jwt ? jwt.replace(/^Bearer\s+/i, '') : undefined;
+            // Use JWT utility for consistent and secure token handling
+            const destinationOptions = JWTUtils.createDestinationOptions(destinationName, jwt);
             
-            // Use SAP Cloud SDK getDestination with cleaned JWT
-            const destinationOptions = {
-                destinationName,
-                ...(cleanJWT && { jwt: cleanJWT }) // Only include clean JWT if provided
-            };
-
-            // Debug JWT format before passing to SAP Cloud SDK
-            if (cleanJWT) {
-                this.logger.debug(`Original JWT length: ${jwt?.length}, Clean JWT length: ${cleanJWT.length}, Had Bearer prefix: ${jwt?.startsWith('Bearer ')}`);
-                try {
-                    // Try to decode the JWT header and payload to check format
-                    const parts = cleanJWT.split('.');
-                    if (parts.length === 3) {
-                        this.logger.debug(`JWT has 3 parts (valid structure)`);
-                        
-                        // Try to decode the header and payload parts to identify the issue
-                        try {
-                            // Decode header (part 0)
-                            const headerBase64 = parts[0];
-                            const headerDecoded = Buffer.from(headerBase64, 'base64').toString('utf8');
-                            this.logger.debug(`JWT Header decoded: ${headerDecoded}`);
-                            
-                            // Try to parse header as JSON
-                            const headerJSON = JSON.parse(headerDecoded);
-                            this.logger.debug(`JWT Header JSON parsed successfully: ${JSON.stringify(headerJSON)}`);
-                        } catch (headerErr) {
-                            this.logger.error(`JWT Header decoding/parsing failed:`, headerErr);
-                        }
-                        
-                        try {
-                            // Decode payload (part 1) - this is likely where the issue is
-                            const payloadBase64 = parts[1];
-                            this.logger.debug(`JWT Payload Base64 length: ${payloadBase64.length}`);
-                            
-                            // Check for proper Base64 padding
-                            const paddingNeeded = (4 - (payloadBase64.length % 4)) % 4;
-                            const paddedPayload = payloadBase64 + '='.repeat(paddingNeeded);
-                            this.logger.debug(`JWT Payload with padding: length ${paddedPayload.length}, padding added: ${paddingNeeded}`);
-                            
-                            const payloadDecoded = Buffer.from(paddedPayload, 'base64').toString('utf8');
-                            this.logger.debug(`JWT Payload decoded raw: ${payloadDecoded}`);
-                            
-                            // Try to parse payload as JSON - this is where the SAP SDK fails
-                            const payloadJSON = JSON.parse(payloadDecoded);
-                            this.logger.debug(`JWT Payload JSON parsed successfully: ${JSON.stringify(payloadJSON)}`);
-                        } catch (payloadErr) {
-                            this.logger.error(`JWT Payload decoding/parsing failed - THIS IS THE ROOT CAUSE:`, payloadErr);
-                            // Try to get more info about the payload content
-                            try {
-                                const payloadBase64 = parts[1];
-                                const paddingNeeded = (4 - (payloadBase64.length % 4)) % 4;
-                                const paddedPayload = payloadBase64 + '='.repeat(paddingNeeded);
-                                const payloadDecoded = Buffer.from(paddedPayload, 'base64').toString('utf8');
-                                this.logger.error(`Malformed JWT Payload content: ${payloadDecoded.substring(0, 200)}...`);
-                            } catch (innerErr) {
-                                this.logger.error(`Failed to decode JWT payload for inspection:`, innerErr);
-                            }
-                        }
-                    } else {
-                        this.logger.error(`JWT has invalid structure: ${parts.length} parts instead of 3`);
-                    }
-                } catch (err) {
-                    this.logger.error(`JWT format validation failed:`, err);
-                }
-            }
+            // Log JWT validation info securely
+            JWTUtils.logTokenInfo(jwt, `${context.type} destination '${destinationName}'`, this.logger);
 
             const destination = await getDestination(destinationOptions);
             
@@ -223,14 +178,11 @@ export class DestinationService {
             // Get JWT token - this is critical for Principal Propagation
             const jwt = this.getJWT(context);
             
-            // Clean JWT by removing Bearer prefix if present
-            const cleanJWT = jwt ? jwt.replace(/^Bearer\s+/i, '') : undefined;
-
-            // Fallback to SAP Cloud SDK getDestination with proper JWT handling
-            const destinationOptions = {
-                destinationName,
-                ...(cleanJWT && { jwt: cleanJWT }) // Only include clean JWT if available
-            };
+            // Use JWT utility for consistent token handling
+            const destinationOptions = JWTUtils.createDestinationOptions(destinationName, jwt);
+            
+            // Log JWT info securely
+            JWTUtils.logTokenInfo(jwt, `${context.type} destination '${destinationName}' (legacy)`, this.logger);
 
             // Removed debug logging to reduce log spam
 
@@ -301,8 +253,16 @@ export class DestinationService {
 
     /**
      * Test if a destination is available and accessible
+     * @deprecated Use testDestinationWithJWT for secure JWT handling
      */
     async testDestination(destinationType: DestinationType): Promise<{ available: boolean; error?: string }> {
+        return this.testDestinationWithJWT(destinationType);
+    }
+
+    /**
+     * Test if a destination is available and accessible with secure JWT handling
+     */
+    async testDestinationWithJWT(destinationType: DestinationType, jwt?: string): Promise<{ available: boolean; error?: string }> {
         try {
             const destinationName = this.config.getDestination(destinationType);
             // Use proper context with operation for runtime destinations
@@ -310,7 +270,11 @@ export class DestinationService {
                 type: destinationType, 
                 operation: destinationType === 'runtime' ? 'read' as const : 'discovery' as const 
             };
-            const destination = await this.fetchDestinationByName(destinationName, context);
+            
+            // Use secure JWT passing instead of environment variables
+            const destination = jwt 
+                ? await this.fetchDestinationByNameWithJWT(destinationName, context, jwt)
+                : await this.fetchDestinationByName(destinationName, context);
             
             // Basic connectivity test - just verify we can get the destination
             if (destination && destination.url) {
@@ -337,12 +301,8 @@ export class DestinationService {
             }
 
             const jwt = this.getJWT();
-            const cleanJWT = jwt ? jwt.replace(/^Bearer\s+/i, '') : undefined;
-            
-            const destination = await getDestination({
-                destinationName,
-                ...(cleanJWT && { jwt: cleanJWT })
-            });
+            const destinationOptions = JWTUtils.createDestinationOptions(destinationName, jwt);
+            const destination = await getDestination(destinationOptions);
             return destination !== null;
         } catch {
             return false;
@@ -379,12 +339,8 @@ export class DestinationService {
         try {
             // Fallback to SAP Cloud SDK getDestination
             const jwt = this.getJWT();
-            const cleanJWT = jwt ? jwt.replace(/^Bearer\s+/i, '') : undefined;
-            
-            const destination = await getDestination({
-                destinationName,
-                ...(cleanJWT && { jwt: cleanJWT })
-            });
+            const destinationOptions = JWTUtils.createDestinationOptions(destinationName, jwt);
+            const destination = await getDestination(destinationOptions);
             if (!destination) {
                 throw new Error(`Destination '${destinationName}' not found in environment variables or BTP destination service`);
             }
@@ -397,45 +353,24 @@ export class DestinationService {
     }
 
     /**
-     * Get JWT token for destination access with context-aware handling
-     * For Principal Propagation, this extracts the user's JWT token
-     * For hybrid destinations, determines whether to use Principal Propagation or fallback to BasicAuth
+     * @deprecated This method is deprecated and will be removed. Use getDestinationWithJWT() instead.
+     * JWT tokens should be passed explicitly to methods rather than relying on global environment variables.
      */
     private getJWT(context?: DestinationContext): string | undefined {
-        // For runtime operations, check if we should use Principal Propagation
-        if (context?.type === 'runtime') {
-            // Try multiple sources for JWT token in order of preference
-            
-            // 1. From request context (will be set by auth middleware in real requests)
-            if (process.env.CURRENT_USER_JWT) {
-                this.logger.debug('Using current user JWT for Principal Propagation');
-                return process.env.CURRENT_USER_JWT;
-            }
-            
-            // 2. From auth session (for web-based requests through admin dashboard)
-            if (process.env.AUTH_SESSION_JWT) {
-                this.logger.debug('Using auth session JWT for Principal Propagation');
-                return process.env.AUTH_SESSION_JWT;
-            }
-            
-            // 3. Fallback to technical user JWT (not ideal for Principal Propagation)
-            if (process.env.USER_JWT) {
-                this.logger.debug('Using technical user JWT as fallback for runtime operations');
-                return process.env.USER_JWT;
-            }
-            
-            // 4. No JWT available - destination will fallback to BasicAuth if configured
-            this.logger.info('No JWT token available for runtime destination - will use BasicAuthentication fallback if configured');
-            return undefined;
-        } else {
-            // For design-time operations, technical user is usually fine
-            // These operations typically don't require Principal Propagation
+        this.logger.warn('SECURITY WARNING: Using deprecated getJWT() method that relies on global environment variables. Use explicit JWT passing instead.');
+        
+        // For design-time operations, technical user JWT is acceptable for service discovery
+        if (context?.type === 'design-time') {
             const jwt = process.env.USER_JWT || process.env.TECHNICAL_USER_JWT;
             if (jwt) {
                 this.logger.debug('Using technical user JWT for design-time operations');
             }
             return jwt;
         }
+        
+        // For runtime operations, no fallback to global JWTs - force explicit JWT passing
+        this.logger.warn('Runtime operations should use explicit JWT token passing for security');
+        return undefined;
     }
 
     getDestinationCredentials() {

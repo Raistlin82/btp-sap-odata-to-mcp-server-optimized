@@ -145,26 +145,33 @@ export class IASAuthService {
       let finalToken = `Bearer ${tokenResponse.access_token}`;
       let finalScopes = tokenResponse.scope?.split(' ') || userInfo.scope || [];
       
+      this.logger.info(`Initial IAS scopes: ${finalScopes.join(', ')}`);
+      
       try {
-        const xsuaaToken = await this.exchangeIASTokenForXSUAA(tokenResponse.access_token);
-        if (xsuaaToken) {
-          finalToken = xsuaaToken.token;
-          finalScopes = xsuaaToken.scopes;
-          this.logger.info(`Successfully exchanged IAS token for XSUAA token with scopes: ${finalScopes.join(', ')}`);
+        this.logger.info('Using enhanced JWT validator for IAS token validation...');
+        
+        // Import and use the enhanced JWT validator
+        const { JWTValidator } = await import('../utils/jwt-validator.js');
+        const jwtValidator = new JWTValidator(this.logger);
+        
+        const validationResult = await jwtValidator.validateJWT(tokenResponse.access_token);
+        if (validationResult.valid && validationResult.userInfo?.scopes) {
+          finalScopes = validationResult.userInfo.scopes;
+          this.logger.info(`✅ IAS token validated with enhanced validator, mapped scopes: ${finalScopes.join(', ')}`);
+        } else {
+          this.logger.warn('❌ Enhanced JWT validator failed - using basic IAS scopes');
+          this.logger.warn(`Validation error: ${validationResult.error}`);
         }
       } catch (error) {
-        this.logger.warn('Failed to exchange IAS token for XSUAA, using IAS token:', error);
-        // Continue with IAS token - this is expected in some configurations
+        this.logger.error('❌ Enhanced JWT validator failed:', error);
+        // Continue with IAS token - fallback to basic scopes
       }
       
-      // Temporary fix: manually assign admin scopes for specific users until IAS-XSUAA trust is configured
+      // Get user name for logging and token creation
       const userName = userInfo.preferred_username || userInfo.email || userInfo.sub;
-      if (userName === 'gabriele.rendina@lutech.it') {
-        // Add application scopes for admin user
-        const adminScopes = ['read', 'write', 'delete', 'admin', 'discover'];
-        finalScopes = [...finalScopes, ...adminScopes];
-        this.logger.info(`Applied admin scopes for user: ${userName}`);
-      }
+      
+      // Admin scopes should be configured through IAS role collections or XSUAA
+      this.logger.debug(`User scopes from IAS/XSUAA: ${finalScopes.join(', ')}`);
       
       const tokenData: TokenData = {
         token: finalToken,
@@ -230,13 +237,8 @@ export class IASAuthService {
       let finalScopes = tokenResponse.scope?.split(' ') || userInfo.scope || [];
       const userName = userInfo.preferred_username || userInfo.email || username;
       
-      // Temporary fix: manually assign admin scopes for specific users until IAS-XSUAA trust is configured
-      if (userName === 'gabriele.rendina@lutech.it') {
-        // Add application scopes for admin user
-        const adminScopes = ['read', 'write', 'delete', 'admin', 'discover'];
-        finalScopes = [...finalScopes, ...adminScopes];
-        this.logger.info(`Applied admin scopes for user: ${userName}`);
-      }
+      // Admin scopes should be configured through IAS role collections or XSUAA
+      this.logger.debug(`User scopes from IAS: ${finalScopes.join(', ')}`);
       
       const tokenData: TokenData = {
         token: `Bearer ${tokenResponse.access_token}`,
@@ -392,6 +394,51 @@ export class IASAuthService {
       const userInfo: IASUserInfo = await response.json();
       this.logger.debug(`Retrieved user info for: ${userInfo.preferred_username || userInfo.email || userInfo.sub}`);
       
+      // === ENHANCED DEBUG LOG: DECODED JWT CLAIMS FOR SCOPE ANALYSIS ===
+      try {
+        // Decode the JWT token to see all claims including scopes
+        const tokenPart = accessToken.replace('Bearer ', '').split('.')[1];
+        const decodedPayload = JSON.parse(Buffer.from(tokenPart, 'base64').toString());
+        this.logger.warn('--- JWT PAYLOAD ANALYSIS ---');
+        this.logger.warn(JSON.stringify(decodedPayload, null, 2));
+        
+        // Check for scopes in different claim locations
+        const scopeClaims = {
+          scope: decodedPayload.scope,
+          scopes: decodedPayload.scopes,
+          scp: decodedPayload.scp,
+          authorities: decodedPayload.authorities,
+          'xs.user.attributes': decodedPayload['xs.user.attributes'],
+          role_collections: decodedPayload.role_collections,
+          groups: decodedPayload.groups
+        };
+        
+        this.logger.warn('--- SCOPE CLAIMS ANALYSIS ---');
+        Object.entries(scopeClaims).forEach(([key, value]) => {
+          if (value !== undefined) {
+            this.logger.warn(`${key}: ${JSON.stringify(value)}`);
+          }
+        });
+        
+        // Look for admin-related scopes in any claim
+        const allClaimsText = JSON.stringify(decodedPayload).toLowerCase();
+        const hasAdminReference = allClaimsText.includes('admin') || allClaimsText.includes('mcpadmin');
+        this.logger.warn(`Contains admin references: ${hasAdminReference}`);
+        
+        this.logger.warn('--- END JWT ANALYSIS ---');
+        
+        // If JWT contains application scopes directly, extract them
+        const directScopes = decodedPayload.scope?.split?.(' ') || decodedPayload.scopes || [];
+        if (directScopes.some((scope: string) => scope.includes('admin') || scope.includes('read') || scope.includes('write'))) {
+          this.logger.info('✅ Found application scopes directly in JWT token');
+          userInfo.scope = directScopes;
+        }
+        
+      } catch (debugError) {
+        this.logger.warn('Failed to decode JWT for debugging:', debugError);
+      }
+      // === END ENHANCED DEBUG LOG ===
+      
       return userInfo;
 
     } catch (error) {
@@ -401,33 +448,19 @@ export class IASAuthService {
   }
 
   /**
-   * Validate a JWT token with IAS using introspection endpoint
+   * Validate a JWT token with IAS using introspection endpoint (secure validation)
    */
-  async validateToken(token: string): Promise<boolean> {
+  async validateToken(token: string): Promise<{ valid: boolean; payload?: any; error?: string }> {
     if (!this.isConfigured) {
-      return false;
+      return { valid: false, error: 'IAS not configured' };
     }
 
     try {
       // Remove 'Bearer ' prefix if present
       const jwtToken = token.startsWith('Bearer ') ? token.substring(7) : token;
       
-      // First do basic JWT validation
-      const decoded = this.decodeJWT(jwtToken);
-      
-      // Check if token is expired
-      if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-        this.logger.warn('Token validation failed: Token expired');
-        return false;
-      }
-
-      // Check if token has required issuer
-      if (!decoded.iss || !decoded.iss.includes('accounts.ondemand.com')) {
-        this.logger.warn('Token validation failed: Invalid issuer');
-        return false;
-      }
-
-      // Validate with IAS introspection endpoint
+      // Security: Use introspection endpoint instead of local JWT decoding
+      // This ensures the token is validated by the issuer
       const introspectUrl = `${this.iasUrl}/oauth2/introspect`;
       
       const params = new URLSearchParams({
@@ -447,38 +480,41 @@ export class IASAuthService {
 
       if (!response.ok) {
         this.logger.warn(`Token introspection failed: ${response.status}`);
-        return false;
+        return { valid: false, error: `Introspection failed: ${response.status}` };
       }
 
       const introspectResult = await response.json();
       
-      return introspectResult.active === true;
+      if (introspectResult.active === true) {
+        // Token is valid, return payload from introspection
+        return {
+          valid: true,
+          payload: {
+            sub: introspectResult.sub,
+            exp: introspectResult.exp,
+            iss: introspectResult.iss,
+            aud: introspectResult.aud,
+            scope: introspectResult.scope,
+            username: introspectResult.username
+          }
+        };
+      } else {
+        return { valid: false, error: 'Token is not active' };
+      }
 
     } catch (error) {
       this.logger.error('Token validation failed:', error);
-      return false;
+      return { valid: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 
   /**
-   * Decode JWT token (without verification - for development)
-   * In production, use a proper JWT library with signature verification
+   * @deprecated This method is insecure and should not be used.
+   * Use validateToken() method instead which uses proper introspection.
    */
-  private decodeJWT(token: string): any {
-    try {
-      const parts = token.split('.');
-      if (parts.length !== 3) {
-        throw new Error('Invalid JWT format');
-      }
-      
-      const payload = parts[1];
-      const decoded = Buffer.from(payload, 'base64url').toString('utf8');
-      return JSON.parse(decoded);
-      
-    } catch (error) {
-      this.logger.error('Failed to decode JWT:', error);
-      throw new Error('Invalid JWT token');
-    }
+  private decodeJWT(_token: string): never {
+    this.logger.error('SECURITY WARNING: decodeJWT() called - this method is deprecated and insecure');
+    throw new Error('decodeJWT() method is deprecated for security reasons. Use validateToken() instead.');
   }
 
   /**
@@ -487,21 +523,33 @@ export class IASAuthService {
   private async exchangeIASTokenForXSUAA(iasToken: string): Promise<{ token: string; scopes: string[] } | null> {
     try {
       // Get XSUAA service credentials
+      this.logger.info('🔍 Looking for XSUAA service binding...');
       const services = xsenv.getServices({ xsuaa: { label: 'xsuaa' } });
       const xsuaaCredentials = services.xsuaa;
       
       if (!xsuaaCredentials) {
-        this.logger.debug('No XSUAA service binding found, skipping token exchange');
+        this.logger.warn('❌ No XSUAA service binding found, skipping token exchange');
+        this.logger.info('💡 To get application scopes, ensure XSUAA service is bound to your application');
         return null;
       }
 
+      this.logger.info(`✅ Found XSUAA service binding: ${(xsuaaCredentials as any).xsappname}`);
+      this.logger.debug('XSUAA credentials:', {
+        url: (xsuaaCredentials as any).url,
+        clientid: (xsuaaCredentials as any).clientid,
+        xsappname: (xsuaaCredentials as any).xsappname
+      });
+
       // Use the IAS token to create a security context with XSUAA
       // This will validate the token and potentially map to application scopes
+      this.logger.info('🔄 Creating XSUAA security context...');
       const securityContext = await new Promise<any>((resolve, reject) => {
         xssec.createSecurityContext(`Bearer ${iasToken}`, xsuaaCredentials, (err: any, ctx: any) => {
           if (err) {
+            this.logger.error('❌ XSUAA security context creation failed:', err);
             reject(err);
           } else {
+            this.logger.info('✅ XSUAA security context created successfully');
             resolve(ctx);
           }
         });
@@ -511,25 +559,37 @@ export class IASAuthService {
         const userInfo = securityContext.getTokenInfo();
         const grantedScopes = securityContext.getGrantedScopes();
         
-        this.logger.debug(`XSUAA security context created for user: ${userInfo.getLogonName()}`);
-        this.logger.debug(`XSUAA granted scopes: ${grantedScopes.join(', ')}`);
+        this.logger.info(`👤 XSUAA user: ${userInfo.getLogonName()}`);
+        this.logger.info(`🎫 XSUAA granted scopes (${grantedScopes.length}): ${grantedScopes.join(', ')}`);
         
-        // If we have application scopes, use the XSUAA token
+        // Check for application scopes
         const hasAppScopes = grantedScopes.some((scope: string) => 
-          scope.includes('.admin') || scope.includes('.read') || scope.includes('.write') || scope.includes('.delete')
+          scope.includes('.admin') || scope.includes('.read') || scope.includes('.write') || scope.includes('.delete') || scope.includes('.discover')
         );
         
+        this.logger.info(`🔐 Has application scopes: ${hasAppScopes}`);
+        
         if (hasAppScopes) {
+          this.logger.info('✅ Returning XSUAA token with application scopes');
           return {
             token: `Bearer ${iasToken}`, // Keep the same token but with validated scopes
             scopes: grantedScopes
           };
+        } else {
+          this.logger.warn('❌ XSUAA context created but no application scopes found');
+          this.logger.info('💡 Check role collection assignment and role template mapping in BTP Cockpit');
+          return null;
         }
       }
       
+      this.logger.warn('❌ XSUAA security context is null');
       return null;
     } catch (error) {
-      this.logger.debug('IAS to XSUAA token exchange failed:', error);
+      this.logger.error('❌ IAS to XSUAA token exchange failed:', error);
+      if (error instanceof Error) {
+        this.logger.error('Error details:', error.message);
+        this.logger.error('Error stack:', error.stack);
+      }
       return null;
     }
   }

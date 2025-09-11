@@ -646,7 +646,7 @@ export class AuthServer {
     this.app.get('/admin/sessions', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
       try {
         // Check admin scope
-        if (!req.authInfo?.scopes.includes('admin')) {
+        if (!req.authInfo?.scopes.some(scope => scope.includes('admin'))) {
           return res.status(403).json({
             error: 'Insufficient permissions',
             message: 'Admin scope required'
@@ -803,6 +803,195 @@ export class AuthServer {
       }
     });
 
+    // Alternative XSUAA direct authentication endpoint
+    this.app.post('/xsuaa-auth', async (req: Request, res: Response) => {
+      try {
+        const { access_token } = req.body;
+        
+        if (!access_token) {
+          return res.status(400).json({
+            error: 'Missing access_token',
+            message: 'Please provide an XSUAA access token in the request body'
+          });
+        }
+
+        // Try to create XSUAA security context directly
+        const services = xsenv.getServices({ xsuaa: { label: 'xsuaa' } });
+        const xsuaaCredentials = services.xsuaa;
+        
+        if (!xsuaaCredentials) {
+          return res.status(500).json({
+            error: 'XSUAA service not available',
+            message: 'XSUAA service binding not found'
+          });
+        }
+
+        // Create XSUAA security context directly with the provided token
+        const securityContext = await new Promise<any>((resolve, reject) => {
+          xssec.createSecurityContext(`Bearer ${access_token}`, xsuaaCredentials, (err: any, ctx: any) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve(ctx);
+            }
+          });
+        });
+
+        if (securityContext) {
+          const userInfo = securityContext.getTokenInfo();
+          const grantedScopes = securityContext.getGrantedScopes();
+          
+          this.logger.info(`✅ XSUAA direct auth successful for: ${userInfo.getLogonName()}`);
+          this.logger.info(`🎫 XSUAA scopes: ${grantedScopes.join(', ')}`);
+          
+          // Store the token with XSUAA scopes
+          const tokenData: TokenData = {
+            token: `Bearer ${access_token}`,
+            user: userInfo.getLogonName(),
+            scopes: grantedScopes,
+            expiresAt: Date.now() + (3600 * 1000) // 1 hour
+          };
+          
+          await this.tokenStore.set(tokenData, undefined, 'global_user_auth');
+          
+          res.json({
+            success: true,
+            message: 'XSUAA authentication successful',
+            user: userInfo.getLogonName(),
+            scopes: grantedScopes,
+            hasAdminScope: grantedScopes.some((scope: string) => scope.includes('.admin'))
+          });
+        } else {
+          res.status(401).json({
+            error: 'Authentication failed',
+            message: 'Could not create XSUAA security context'
+          });
+        }
+
+      } catch (error) {
+        this.logger.error('XSUAA direct authentication failed:', error);
+        res.status(401).json({
+          error: 'Authentication failed',
+          message: error instanceof Error ? error.message : 'Unknown error',
+          details: 'The provided XSUAA token is invalid or expired'
+        });
+      }
+    });
+
+    // Debug endpoint to check current user scopes and XSUAA configuration
+    this.app.get('/debug/user-scopes', async (req: Request, res: Response) => {
+      try {
+        let userAuth = null;
+        let scopeInfo: { hasGlobalAuth: boolean; hasSessionAuth: boolean; xsuaaConfig: any } = { hasGlobalAuth: false, hasSessionAuth: false, xsuaaConfig: null };
+
+        // Try to get authentication info from session or global auth
+        const sessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+        if (sessionId) {
+          const tokenData = await this.tokenStore.get(sessionId);
+          if (tokenData && Date.now() < tokenData.expiresAt) {
+            userAuth = tokenData;
+            scopeInfo.hasSessionAuth = true;
+          }
+        }
+
+        // Try global session if no specific session found
+        if (!userAuth) {
+          const globalAuth = await this.tokenStore.get('global_user_auth');
+          if (globalAuth && Date.now() < globalAuth.expiresAt) {
+            userAuth = globalAuth;
+            scopeInfo.hasGlobalAuth = true;
+          }
+        }
+
+        // Get XSUAA configuration for scope prefix analysis
+        try {
+          const services = xsenv.getServices({ xsuaa: { label: 'xsuaa' } });
+          scopeInfo.xsuaaConfig = services.xsuaa ? {
+            xsappname: (services.xsuaa as any).xsappname,
+            clientid: (services.xsuaa as any).clientid,
+            url: (services.xsuaa as any).url
+          } : null;
+        } catch (error) {
+          this.logger.debug('XSUAA service not available:', error);
+        }
+
+        if (!userAuth) {
+          return res.json({
+            success: false,
+            message: 'No active authentication session found',
+            scopeInfo,
+            instructions: {
+              sessionAuth: 'Add ?session=YOUR_SESSION_ID to check specific session',
+              globalAuth: 'Login via /auth/login to create global auth',
+              adminAccess: 'Admin access requires scope with format: {xsappname}.admin'
+            }
+          });
+        }
+
+        // Analyze scopes for admin access
+        const xsappname = (scopeInfo.xsuaaConfig as any)?.xsappname || process.env.XSUAA_XSAPPNAME || 'btp-sap-odata-to-mcp-server';
+        const expectedAdminScope = `${xsappname}.admin`;
+        const hasAdminScope = userAuth.scopes?.includes(expectedAdminScope) || userAuth.scopes?.some(scope => scope.includes('admin'));
+        
+        // Check for other scope variations
+        const scopeAnalysis = {
+          totalScopes: userAuth.scopes?.length || 0,
+          scopes: userAuth.scopes || [],
+          expectedAdminScope,
+          hasAdminScope,
+          adminScopeVariants: (userAuth.scopes || []).filter(scope => 
+            scope.includes('admin') || scope.includes('Admin') || scope.includes('ADMIN')
+          ),
+          allScopePatterns: (userAuth.scopes || []).map(scope => ({
+            scope,
+            hasAppPrefix: scope.includes('.'),
+            appName: scope.includes('.') ? scope.split('.')[0] : null
+          }))
+        };
+
+        res.json({
+          success: true,
+          user: userAuth.user,
+          sessionType: scopeInfo.hasGlobalAuth ? 'Global' : 'Session',
+          sessionId: userAuth.sessionId || sessionId,
+          expiresAt: new Date(userAuth.expiresAt).toISOString(),
+          scopeInfo,
+          scopeAnalysis,
+          adminAccessStatus: {
+            hasAccess: hasAdminScope,
+            reason: hasAdminScope ? 'Has required admin scope' : 
+              scopeAnalysis.adminScopeVariants.length > 0 ? 
+                'Has admin-like scopes but not the expected format' : 
+                'No admin scopes found',
+            troubleshooting: hasAdminScope ? null : {
+              expectedScope: expectedAdminScope,
+              xsSecurityConfiguration: {
+                definedRoleCollections: (process.env.ROLE_COLLECTIONS || 'MCPAdministrator,MCPUser,MCPManager,MCPViewer').split(','),
+                definedRoleTemplates: (process.env.ROLE_TEMPLATES || 'MCPAdmin,MCPEditor,MCPManager,MCPViewer').split(','),
+                adminRoleCollection: process.env.ADMIN_ROLE_COLLECTION || 'MCPAdministrator',
+                adminRoleTemplate: 'MCPAdmin'
+              },
+              xsappnameCheck: `Current xsappname: ${xsappname}`,
+              suggestedActions: [
+                `Verify user is assigned to "${process.env.ADMIN_ROLE_COLLECTION || 'MCPAdministrator'}" role collection (not "mcpadmin")`,
+                'Check if XSUAA service was updated with latest xs-security.json',
+                'Confirm role collection exists and maps to MCPAdmin role template',
+                'Verify XSUAA service binding is properly configured'
+              ]
+            }
+          }
+        });
+
+      } catch (error) {
+        this.logger.error('Failed to analyze user scopes:', error);
+        res.status(500).json({
+          error: 'Internal server error',
+          message: 'Failed to analyze user scopes',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    });
+
     // Admin dashboard page - supports both browser sessions and API tokens
     this.app.get('/admin', async (req: Request, res: Response) => {
       try {
@@ -817,7 +1006,7 @@ export class AuthServer {
             const tokenData = await this.tokenStore.get(sessionId);
             if (tokenData && Date.now() < tokenData.expiresAt) {
               isAuthenticated = true;
-              hasAdminScope = tokenData.scopes?.includes('admin') || false;
+              hasAdminScope = tokenData.scopes?.some(scope => scope.includes('admin')) || false;
               userInfo = { user: tokenData.user, scopes: tokenData.scopes };
               this.logger.debug(`Session auth for admin page: ${tokenData.user}, admin: ${hasAdminScope}`);
             }
@@ -832,7 +1021,7 @@ export class AuthServer {
             const globalAuth = await this.tokenStore.get('global_user_auth');
             if (globalAuth && Date.now() < globalAuth.expiresAt) {
               isAuthenticated = true;
-              hasAdminScope = globalAuth.scopes?.includes('admin') || false;
+              hasAdminScope = globalAuth.scopes?.some(scope => scope.includes('admin')) || false;
               userInfo = { user: globalAuth.user, scopes: globalAuth.scopes };
               this.logger.debug(`Global auth for admin page: ${globalAuth.user}, admin: ${hasAdminScope}`);
             }
@@ -848,7 +1037,7 @@ export class AuthServer {
             try {
               const token = authHeader.substring(7);
               const services = xsenv.getServices({ xsuaa: { label: 'xsuaa' } });
-              const xsuaaCredentials = services.xsuaa;
+              const xsuaaCredentials = services.xsuaa as { xsappname: string };
               
               const securityContext = await new Promise((resolve, reject) => {
                 xssec.createSecurityContext(token, xsuaaCredentials, (err: any, ctx: any) => {
@@ -858,9 +1047,9 @@ export class AuthServer {
               });
 
               const authInfo = this.extractAuthInfo(securityContext as any);
-              const appName = process.env.VCAP_APPLICATION ? 
-                JSON.parse(process.env.VCAP_APPLICATION).name : 'btp-sap-odata-to-mcp-server';
-              const requiredScope = `${appName}.admin`;
+              
+              // Use xsappname from XSUAA credentials for correct scope check
+              const requiredScope = `${xsuaaCredentials.xsappname}.admin`;
               
               isAuthenticated = true;
               hasAdminScope = authInfo.scopes.includes(requiredScope);
@@ -884,7 +1073,7 @@ export class AuthServer {
               <head><title>Access Denied</title></head>
               <body>
                 <h1>Access Denied</h1>
-                <p>Admin privileges required. You need the MCPAdmin role collection.</p>
+                <p>Admin privileges required. You need the ${process.env.ADMIN_ROLE_COLLECTION || 'MCPAdministrator'} role collection.</p>
                 <p>Current user: ${userInfo?.user}</p>
                 <p>Current scopes: ${userInfo?.scopes?.join(', ') || 'none'}</p>
                 <p><a href="/auth/">Back to Login</a></p>
@@ -931,7 +1120,7 @@ export class AuthServer {
           }
           if (tokenData && Date.now() < tokenData.expiresAt) {
             isAuthenticated = true;
-            hasAdminScope = tokenData.scopes?.includes('admin') || false;
+            hasAdminScope = tokenData.scopes?.some(scope => scope.includes('admin')) || false;
             authenticatedUser = tokenData.user || 'Unknown';
             this.logger.debug(`Admin /admin/users endpoint - authenticated: ${isAuthenticated}, hasAdminScope: ${hasAdminScope}`);
           }
@@ -948,7 +1137,7 @@ export class AuthServer {
           }
           if (globalAuth && Date.now() < globalAuth.expiresAt) {
             isAuthenticated = true;
-            hasAdminScope = globalAuth.scopes?.includes('admin') || false;
+            hasAdminScope = globalAuth.scopes?.some(scope => scope.includes('admin')) || false;
             authenticatedUser = globalAuth.user || 'Unknown';
             this.logger.debug(`Admin /admin/users endpoint - global auth: authenticated: ${isAuthenticated}, hasAdminScope: ${hasAdminScope}`);
           }
@@ -976,11 +1165,11 @@ export class AuthServer {
           
           // Determine user role based on scopes
           let role = 'user';
-          if (tokenData.scopes?.includes('admin')) {
+          if (tokenData.scopes?.some(scope => scope.includes('admin'))) {
             role = 'admin';
-          } else if (tokenData.scopes?.includes('write')) {
+          } else if (tokenData.scopes?.some(scope => scope.includes('write'))) {
             role = 'editor';
-          } else if (tokenData.scopes?.includes('read')) {
+          } else if (tokenData.scopes?.some(scope => scope.includes('read'))) {
             role = 'viewer';
           }
 
@@ -1079,7 +1268,7 @@ export class AuthServer {
           const tokenData = await this.tokenStore.get(authSessionId);
           if (tokenData && Date.now() < tokenData.expiresAt) {
             isAuthenticated = true;
-            hasAdminScope = tokenData.scopes?.includes('admin') || false;
+            hasAdminScope = tokenData.scopes?.some(scope => scope.includes('admin')) || false;
             authenticatedUser = tokenData.user || 'Unknown';
           }
         }
@@ -1089,7 +1278,7 @@ export class AuthServer {
           const globalAuth = await this.tokenStore.get('global_user_auth');
           if (globalAuth && Date.now() < globalAuth.expiresAt) {
             isAuthenticated = true;
-            hasAdminScope = globalAuth.scopes?.includes('admin') || false;
+            hasAdminScope = globalAuth.scopes?.some(scope => scope.includes('admin')) || false;
             authenticatedUser = globalAuth.user || 'Unknown';
           }
         }
@@ -1155,7 +1344,7 @@ export class AuthServer {
           const tokenData = await this.tokenStore.get(authSessionId);
           if (tokenData && Date.now() < tokenData.expiresAt) {
             isAuthenticated = true;
-            hasAdminScope = tokenData.scopes?.includes('admin') || false;
+            hasAdminScope = tokenData.scopes?.some(scope => scope.includes('admin')) || false;
             authenticatedUser = tokenData.user || 'Unknown';
           }
         }
@@ -1165,7 +1354,7 @@ export class AuthServer {
           const globalAuth = await this.tokenStore.get('global_user_auth');
           if (globalAuth && Date.now() < globalAuth.expiresAt) {
             isAuthenticated = true;
-            hasAdminScope = globalAuth.scopes?.includes('admin') || false;
+            hasAdminScope = globalAuth.scopes?.some(scope => scope.includes('admin')) || false;
             authenticatedUser = globalAuth.user || 'Unknown';
           }
         }
@@ -1236,7 +1425,7 @@ export class AuthServer {
           const tokenData = await this.tokenStore.get(authSessionId);
           if (tokenData && Date.now() < tokenData.expiresAt) {
             isAuthenticated = true;
-            hasAdminScope = tokenData.scopes?.includes('admin') || false;
+            hasAdminScope = tokenData.scopes?.some(scope => scope.includes('admin')) || false;
             authenticatedUser = tokenData.user || 'Unknown';
           }
         }
@@ -1246,7 +1435,7 @@ export class AuthServer {
           const globalAuth = await this.tokenStore.get('global_user_auth');
           if (globalAuth && Date.now() < globalAuth.expiresAt) {
             isAuthenticated = true;
-            hasAdminScope = globalAuth.scopes?.includes('admin') || false;
+            hasAdminScope = globalAuth.scopes?.some(scope => scope.includes('admin')) || false;
             authenticatedUser = globalAuth.user || 'Unknown';
           }
         }
@@ -1319,7 +1508,7 @@ export class AuthServer {
           const tokenData = await this.tokenStore.get(authSessionId);
           if (tokenData && Date.now() < tokenData.expiresAt) {
             isAuthenticated = true;
-            hasAdminScope = tokenData.scopes?.includes('admin') || false;
+            hasAdminScope = tokenData.scopes?.some(scope => scope.includes('admin')) || false;
             authenticatedUser = tokenData.user || 'Unknown';
           }
         }
@@ -1329,7 +1518,7 @@ export class AuthServer {
           const globalAuth = await this.tokenStore.get('global_user_auth');
           if (globalAuth && Date.now() < globalAuth.expiresAt) {
             isAuthenticated = true;
-            hasAdminScope = globalAuth.scopes?.includes('admin') || false;
+            hasAdminScope = globalAuth.scopes?.some(scope => scope.includes('admin')) || false;
             authenticatedUser = globalAuth.user || 'Unknown';
           }
         }
@@ -1379,7 +1568,7 @@ export class AuthServer {
           const tokenData = await this.tokenStore.get(authSessionId);
           if (tokenData && Date.now() < tokenData.expiresAt) {
             isAuthenticated = true;
-            hasAdminScope = tokenData.scopes?.includes('admin') || false;
+            hasAdminScope = tokenData.scopes?.some(scope => scope.includes('admin')) || false;
           }
         }
 
@@ -1420,7 +1609,7 @@ export class AuthServer {
           const tokenData = await this.tokenStore.get(authSessionId);
           if (tokenData && Date.now() < tokenData.expiresAt) {
             isAuthenticated = true;
-            hasAdminScope = tokenData.scopes?.includes('admin') || false;
+            hasAdminScope = tokenData.scopes?.some(scope => scope.includes('admin')) || false;
           }
         }
 
@@ -1621,6 +1810,10 @@ export class AuthServer {
 
   getTokenStore(): TokenStore {
     return this.tokenStore;
+  }
+
+  getIASAuthService(): IASAuthService {
+    return this.iasAuthService;
   }
 
   getApp(): express.Application {

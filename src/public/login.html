@@ -464,7 +464,7 @@
                     document.getElementById('sessionIdDisplay').textContent = sessionId || 'Unknown';
                     
                     // Show admin sections if user has admin privileges
-                    if (status.scopes && status.scopes.includes('admin')) {
+                    if (status.scopes && status.scopes.some(scope => scope.includes('admin'))) {
                         document.getElementById('adminSection').style.display = 'block';
                         document.getElementById('adminButton').style.display = 'inline-block';
                     }
