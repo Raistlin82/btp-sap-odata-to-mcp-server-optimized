@@ -130,28 +130,33 @@ HOT_RELOAD=true
 
 #### 2. Role Collections Setup
 
-Configure role collections in BTP Cockpit:
+Configure role collections in BTP Cockpit (based on actual `xs-security.json`):
 
 ```yaml
 Role Collections:
   - Name: MCPAdministrator
-    Description: Full access to MCP operations
+    Description: Full administrative access to SAP MCP OData Server
+    Role Template: MCPAdmin
     Scopes:
-      - read
-      - write  
-      - delete
-      - admin
+      - read, write, delete, admin, discover
+
+  - Name: MCPManager
+    Description: Manager access with delete permissions
+    Role Template: MCPManager
+    Scopes:
+      - read, write, delete, discover
 
   - Name: MCPUser
-    Description: Standard user access
+    Description: Standard user access to SAP MCP OData Server
+    Role Template: MCPEditor
     Scopes:
-      - read
-      - write
+      - read, write, discover
 
-  - Name: MCPReadOnly
-    Description: Read-only access
+  - Name: MCPViewer
+    Description: Read-only access to SAP MCP OData Server
+    Role Template: MCPViewer
     Scopes:
-      - read
+      - read, discover
 ```
 
 #### 3. XSUAA Service Configuration
