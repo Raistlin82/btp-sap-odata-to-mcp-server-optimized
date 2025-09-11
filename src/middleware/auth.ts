@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import xssec from '@sap/xssec';
-import xsenv from '@sap/xsenv';
 import { Logger } from '../utils/logger.js';
+import { JWTValidator } from '../utils/jwt-validator.js';
+import { SecureErrorHandler } from '../utils/secure-error-handler.js';
+import xsenv from '@sap/xsenv';
 
 const logger = new Logger('AuthMiddleware');
 
@@ -14,7 +15,7 @@ export interface AuthenticatedRequest extends Request {
     userId: string;
     isAuthenticated: boolean;
   };
-  securityContext?: any;
+  securityContext?: unknown;
 }
 
 /**
@@ -26,6 +27,8 @@ export const authMiddleware = async (
   res: Response,
   next: NextFunction
 ): Promise<void | Response> => {
+  const jwtValidator = new JWTValidator(logger);
+  
   try {
     // Get JWT token from Authorization header
     const authHeader = req.headers.authorization;
@@ -46,46 +49,36 @@ export const authMiddleware = async (
       });
     }
 
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    const token = authHeader; // Keep full Bearer token for validation
 
-    // Load XSUAA service credentials
-    const services = xsenv.getServices({ xsuaa: { label: 'xsuaa' } });
-    const xsuaaCredentials = services.xsuaa;
-
-    if (!xsuaaCredentials) {
-      logger.error('XSUAA service credentials not found');
-      return res.status(500).json({
-        error: 'Service Configuration Error',
-        message: 'XSUAA service not configured'
+    // Use secure JWT validation
+    const validationResult = await jwtValidator.validateJWT(token);
+    
+    if (!validationResult.valid) {
+      logger.warn('JWT validation failed:', validationResult.error);
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Invalid or expired JWT token',
+        code: 'INVALID_TOKEN'
       });
     }
 
-    // Create security context and validate JWT
-    const securityContext = await new Promise<any>((resolve, reject) => {
-      xssec.createSecurityContext(token, xsuaaCredentials, (error: any, securityContext: any) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(securityContext);
-        }
-      });
-    });
-
-    // Extract user information and scopes
-    const userInfo = securityContext.getTokenInfo();
-    const scopes = securityContext.getGrantedScopes();
+    // Extract user information from validated token
+    const userInfo = validationResult.userInfo!;
+    const scopes = validationResult.payload?.scopes || [];
     
     // Attach authentication info to request
     req.authInfo = {
-      user: userInfo.getGivenName() + ' ' + userInfo.getFamilyName() || userInfo.getLogonName(),
-      email: userInfo.getEmail(),
+      user: userInfo.name || userInfo.sub,
+      email: userInfo.email,
       scopes: scopes,
-      tenant: userInfo.getIdentityZone(),
-      userId: userInfo.getLogonName(),
+      tenant: validationResult.payload?.tenant || 'default',
+      userId: userInfo.sub,
       isAuthenticated: true
     };
     
-    req.securityContext = securityContext;
+    // Store the validation result for potential use downstream
+    req.securityContext = validationResult.payload;
 
     logger.debug('User authenticated successfully', {
       user: req.authInfo.user,
@@ -96,31 +89,14 @@ export const authMiddleware = async (
     next();
 
   } catch (error) {
-    logger.error('Authentication failed:', error);
-    
-    // Determine error type and response
-    let statusCode = 401;
-    let errorCode = 'AUTH_FAILED';
-    let message = 'Authentication failed';
-
-    if (error instanceof Error) {
-      if (error.message.includes('JWT expired')) {
-        errorCode = 'TOKEN_EXPIRED';
-        message = 'JWT token has expired';
-      } else if (error.message.includes('invalid')) {
-        errorCode = 'INVALID_TOKEN';
-        message = 'Invalid JWT token';
-      } else if (error.message.includes('audience')) {
-        errorCode = 'INVALID_AUDIENCE';
-        message = 'Invalid token audience';
-      }
-    }
-
-    return res.status(statusCode).json({
-      error: 'Authentication Failed',
-      message: message,
-      code: errorCode
+    // Use secure error handler to prevent information leakage
+    const errorHandler = new SecureErrorHandler(logger);
+    const secureError = errorHandler.sanitizeError(error, {
+      operation: 'authentication',
+      requestId: req.headers['x-request-id'] as string
     });
+    
+    return res.status(401).json(secureError);
   }
 };
 
@@ -147,22 +123,47 @@ export const requireScope = (
 
     const userScopes = req.authInfo.scopes || [];
     
-    // Add app name prefix to required scopes if not already present
-    const appName = process.env.VCAP_APPLICATION ? 
-      JSON.parse(process.env.VCAP_APPLICATION).name : 'btp-sap-odata-to-mcp-server';
+    // Get xsappname from XSUAA service binding for correct scope prefix
+    let xsappname = process.env.XSUAA_XSAPPNAME || 'btp-sap-odata-to-mcp-server'; // Default fallback for local dev
+    try {
+      const services: any = xsenv.getServices({ xsuaa: { label: 'xsuaa' } });
+      if (services.xsuaa && services.xsuaa.xsappname) {
+        xsappname = services.xsuaa.xsappname;
+        logger.debug(`Using xsappname '${xsappname}' for scope validation.`);
+      } else {
+        logger.warn('XSUAA service not found or xsappname missing, using fallback name.');
+      }
+    } catch (error) {
+      logger.warn('Could not determine xsappname from service bindings, using fallback.', { error: error instanceof Error ? error.message : String(error) });
+    }
+    
+    // Additional scope validation: also check for scopes that already contain the full app identifier
+    // This handles cases where scopes are already in the format: {full-xsappname}.{scope}
+    const additionalScopeChecks = scopes.map(scope => {
+      // If scope already contains a dot, it might be a full scope name
+      if (scope.includes('.')) {
+        return scope;
+      }
+      // Also check for scopes that might match user scopes directly (for compatibility)
+      return userScopes.find(userScope => userScope.endsWith(`.${scope}`));
+    }).filter((scope): scope is string => Boolean(scope));
     
     const normalizedRequiredScopes = scopes.map(scope => {
-      return scope.includes('.') ? scope : `${appName}.${scope}`;
+      return scope.includes('.') ? scope : `${xsappname}.${scope}`;
     });
 
     let hasAccess = false;
     
     if (requireAll) {
       // All scopes must be present
-      hasAccess = normalizedRequiredScopes.every(scope => userScopes.includes(scope));
+      hasAccess = normalizedRequiredScopes.every(scope => userScopes.includes(scope)) ||
+                  additionalScopeChecks.every(scope => userScopes.includes(scope));
     } else {
-      // At least one scope must be present
-      hasAccess = normalizedRequiredScopes.some(scope => userScopes.includes(scope));
+      // At least one scope must be present - check both normalized scopes and additional scope patterns
+      hasAccess = normalizedRequiredScopes.some(scope => userScopes.includes(scope)) ||
+                  additionalScopeChecks.some(scope => userScopes.includes(scope)) ||
+                  // Also check if any user scope ends with the required scope (for flexible matching)
+                  scopes.some(scope => userScopes.some(userScope => userScope.endsWith(`.${scope}`)));
     }
 
     if (!hasAccess) {
@@ -170,6 +171,9 @@ export const requireScope = (
         user: req.authInfo.user,
         userScopes: userScopes,
         requiredScopes: normalizedRequiredScopes,
+        additionalScopeChecks: additionalScopeChecks,
+        xsappname: xsappname,
+        originalScopes: scopes,
         requireAll
       });
       
@@ -185,7 +189,9 @@ export const requireScope = (
     logger.debug('Authorization successful', {
       user: req.authInfo.user,
       requiredScopes: normalizedRequiredScopes,
-      userScopes: userScopes
+      additionalScopeChecks: additionalScopeChecks,
+      userScopes: userScopes,
+      xsappname: xsappname
     });
 
     next();

@@ -6,6 +6,11 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import 'dotenv/config';
 import { authMiddleware, requireRead, requireWrite, requireDelete, requireAdmin, optionalAuth, AuthenticatedRequest } from './middleware/auth.js';
+import { ShutdownManager } from './utils/shutdown-manager.js';
+import { SecureErrorHandler } from './utils/secure-error-handler.js';
+import { JWTUtils } from './utils/jwt-utils.js';
+import { CloudLoggingService } from './services/cloud-logging-service.js';
+import { HealthService } from './services/health-service.js';
 
 import { MCPServer, createMCPServer } from './mcp-server.js';
 import { Logger } from './utils/logger.js';
@@ -25,19 +30,38 @@ import { AuthServer } from './services/auth-server.js';
  */
 
 const logger = new Logger('btp-sap-odata-to-mcp-server');
+
+// Initialize shutdown manager for graceful cleanup
+const shutdownManager = new ShutdownManager(logger);
 const config = new Config();
+
+// Initialize cloud logging service
+const cloudLoggingService = new CloudLoggingService('btp-sap-odata-to-mcp-server', '1.0.0');
+
+// Initialize services
 const destinationService = new DestinationService(logger, config);
 const sapClient = new SAPClient(destinationService, logger);
 const sapDiscoveryService = new SAPDiscoveryService(sapClient, logger, config);
 const serviceConfigService = new ServiceDiscoveryConfigService(config, logger);
 let discoveredServices: ODataService[] = [];
 
+// Initialize health service (will be initialized after auth components are ready)
+let healthService: HealthService;
+
 /**
  * Reload OData service configuration and rediscover services
  */
 async function reloadODataServices(): Promise<{ success: boolean; servicesCount: number; message: string }> {
+    const startTime = Date.now();
+    
     try {
         logger.info('🔄 Reloading OData configuration and rediscovering services...');
+        
+        // Log service discovery start
+        cloudLoggingService.logSAPIntegrationEvent('info', 'service_discovery', 
+            'Starting OData service rediscovery', {
+                operation: 'reload_configuration'
+            });
         
         // Reload configuration from CF services and environment
         await config.reloadODataConfig();
@@ -48,7 +72,21 @@ async function reloadODataServices(): Promise<{ success: boolean; servicesCount:
         // Update the global services list
         discoveredServices = newServices;
         
+        const duration = Date.now() - startTime;
         logger.info(`✅ Service rediscovery complete: ${newServices.length} services found`);
+        
+        // Log successful discovery
+        cloudLoggingService.logSAPIntegrationEvent('info', 'service_discovery', 
+            'OData service rediscovery completed successfully', {
+                servicesCount: newServices.length,
+                duration,
+                operation: 'rediscovery_complete'
+            });
+            
+        cloudLoggingService.logPerformanceMetrics('odata_service_discovery', 'rediscover_all', {
+            duration,
+            servicesCount: newServices.length
+        });
         
         return {
             success: true,
@@ -56,7 +94,17 @@ async function reloadODataServices(): Promise<{ success: boolean; servicesCount:
             message: `Successfully rediscovered ${newServices.length} OData services with updated configuration`
         };
     } catch (error) {
+        const duration = Date.now() - startTime;
         logger.error('❌ Failed to reload OData services:', error);
+        
+        // Log discovery failure
+        cloudLoggingService.logSAPIntegrationEvent('error', 'service_discovery', 
+            'OData service rediscovery failed', {
+                error: error instanceof Error ? error.message : 'Unknown error',
+                duration,
+                operation: 'rediscovery_failed'
+            });
+        
         return {
             success: false,
             servicesCount: 0,
@@ -118,21 +166,13 @@ async function getDestinationStatus(userJWT?: string): Promise<{
         };
 
         // Test runtime destination (may be same as design-time if single destination mode)
-        // Set JWT for runtime testing if available (strip Bearer prefix if present)
-        if (userJWT) {
-            const cleanJWT = userJWT.startsWith('Bearer ') ? userJWT.substring(7) : userJWT;
-            process.env.CURRENT_USER_JWT = cleanJWT;
-            logger.debug(`Set user JWT for Principal Propagation destination testing (length: ${cleanJWT.length})`);
-        } else {
-            logger.warn('No user JWT provided - Principal Propagation destinations may show as unavailable');
-        }
+        // Use secure JWT utility for consistent token handling
+        const cleanJWT = JWTUtils.cleanBearerToken(userJWT);
         
-        const runtimeTest = await destinationService.testDestination('runtime');
+        // Log JWT info securely
+        JWTUtils.logTokenInfo(userJWT, 'Runtime destination testing', logger);
         
-        // Clean up JWT after runtime test
-        if (userJWT) {
-            delete process.env.CURRENT_USER_JWT;
-        }
+        const runtimeTest = await destinationService.testDestinationWithJWT('runtime', cleanJWT);
         
         // Try to get more detailed info about runtime destination authentication
         let authType = 'BasicAuthentication';
@@ -142,16 +182,14 @@ async function getDestinationStatus(userJWT?: string): Promise<{
             // Attempt to get destination details to check authentication type
             logger.debug('Fetching runtime destination for auth type detection...');
             
-            // Set the user JWT temporarily for destination testing if available
-            if (userJWT) {
-                const cleanJWT = userJWT.startsWith('Bearer ') ? userJWT.substring(7) : userJWT;
-                process.env.CURRENT_USER_JWT = cleanJWT;
-                logger.debug(`Set user JWT for destination auth detection (length: ${cleanJWT.length})`);
+            // Use secure JWT passing for destination auth detection
+            if (cleanJWT) {
+                logger.debug(`Using user JWT for destination auth detection (length: ${cleanJWT.length})`);
             } else {
                 logger.debug('No user JWT available for destination auth detection');
             }
             
-            const runtimeDest = await destinationService.getRuntimeDestination();
+            const runtimeDest = await destinationService.getRuntimeDestinationWithJWT(cleanJWT);
             
             logger.debug('Runtime destination details:', {
                 name: destinationConfig.runtimeDestination,
@@ -185,11 +223,8 @@ async function getDestinationStatus(userJWT?: string): Promise<{
                 authType = 'Detection Failed';
             }
         } finally {
-            // Clean up the JWT environment variable
-            if (userJWT) {
-                delete process.env.CURRENT_USER_JWT;
-                logger.debug('Cleaned up user JWT after destination testing');
-            }
+            // No cleanup needed - JWT was passed securely without environment variables
+            logger.debug('Completed destination testing with secure JWT handling');
         }
 
         const runtimeResult = {
@@ -253,6 +288,25 @@ try {
     });
     tokenStore = authServer.getTokenStore();
     
+    // Register cleanup callbacks with shutdown manager
+    shutdownManager.registerCleanupCallback(async () => {
+        logger.info('Shutting down token store...');
+        tokenStore?.shutdown();
+    }, 'token-store-cleanup');
+    
+    shutdownManager.registerCleanupCallback(async () => {
+        logger.info('Shutting down auth server...');
+        // Auth server doesn't have explicit shutdown, but we'll close any resources
+        if (authServer) {
+            logger.info('Auth server cleanup completed');
+        }
+    }, 'auth-server-cleanup');
+    
+    shutdownManager.registerCleanupCallback(async () => {
+        logger.info('Shutting down cloud logging...');
+        await cloudLoggingService.flush();
+    }, 'cloud-logging-cleanup');
+    
     // Set up OData callbacks for admin endpoints
     authServer.setReloadCallback(reloadODataServices);
     authServer.setStatusCallback(getODataConfigStatus);
@@ -264,6 +318,22 @@ try {
     // Create a stub so the rest of the app can continue
     authServer = null as any;
     tokenStore = null;
+}
+
+// Initialize health service now that other components are ready
+try {
+    const iasAuthService = authServer?.getIASAuthService();
+    healthService = new HealthService(
+        cloudLoggingService,
+        destinationService,
+        tokenStore,
+        iasAuthService
+    );
+    logger.info('✅ Health monitoring service initialized');
+} catch (error) {
+    logger.warn('⚠️  Health service initialization failed:', error);
+    // Create basic health service without optional dependencies
+    healthService = new HealthService();
 }
 
 // Session storage for HTTP transport
@@ -316,8 +386,8 @@ async function getOrCreateSession(sessionId?: string): Promise<{
         // Create and initialize MCP server with authentication
         // Use the same URL as the main server when deployed (no separate auth port)
         const authServerUrl = process.env.VCAP_APPLICATION ? 
-            `https://${JSON.parse(process.env.VCAP_APPLICATION).application_uris[0]}` :  // When deployed to CF
-            `http://localhost:${process.env.AUTH_PORT || '3001'}`;  // Local development
+            `https://${JSON.parse(process.env.VCAP_APPLICATION).application_uris[0]}/auth` :  // When deployed to CF
+            `http://localhost:${process.env.AUTH_PORT || '3001'}/auth`;  // Local development
         const mcpServer = await createMCPServer(discoveredServices, tokenStore, authServerUrl);
 
         // Create HTTP transport
@@ -390,10 +460,31 @@ export function createApp(): express.Application {
 
     app.use(express.json({ limit: '10mb' }));
     app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+    
+    // Add cloud logging middleware
+    app.use(cloudLoggingService.createRequestLoggingMiddleware());
+    
+    // Make cloud logging service available to routes
+    app.locals.cloudLogging = cloudLoggingService;
 
-    // Request logging middleware with authentication info
+    // Enhanced request logging with cloud logging integration
     app.use((req: AuthenticatedRequest, res, next) => {
+        const correlationId = req.headers['x-correlation-id'] as string;
+        
+        // Use cloud logging for structured application events
+        cloudLoggingService.logApplicationEvent('info', 'http_request_start', 
+            `${req.method} ${req.path}`, {
+            correlationId,
+            sessionId: req.headers['mcp-session-id'] as string,
+            userAgent: req.headers['user-agent'],
+            user: req.authInfo?.user || 'anonymous',
+            authenticated: req.authInfo?.isAuthenticated || false,
+            ipAddress: req.ip
+        });
+        
+        // Also log to winston for local development
         logger.debug(`📨 ${req.method} ${req.path}`, {
+            correlationId,
             sessionId: req.headers['mcp-session-id'],
             userAgent: req.headers['user-agent'],
             user: req.authInfo?.user || 'anonymous',
@@ -442,15 +533,70 @@ export function createApp(): express.Application {
         });
     });
 
-    // Health check endpoint (enhanced with auth server status)
-    app.get('/health', (req, res) => {
+    // Enhanced health check endpoints
+    app.get('/health', async (req, res) => {
+        try {
+            const health = await healthService.deepHealthCheck();
+            const statusCode = health.overall === 'healthy' ? 200 : 
+                              health.overall === 'degraded' ? 200 : 503;
+            
+            res.status(statusCode).json({
+                ...health,
+                activeSessions: sessions.size,
+                authServer: {
+                    status: authServer ? 'running' : 'disabled',
+                    port: process.env.AUTH_PORT || '3001'
+                }
+            });
+        } catch (error) {
+            logger.error('Health check failed:', error);
+            res.status(503).json({
+                overall: 'unhealthy',
+                timestamp: new Date().toISOString(),
+                error: 'Health check system failure'
+            });
+        }
+    });
+    
+    // Kubernetes liveness probe
+    app.get('/health/live', async (req, res) => {
+        try {
+            const result = await healthService.livenessProbe();
+            const statusCode = result.status === 'unhealthy' ? 503 : 200;
+            res.status(statusCode).json(result);
+        } catch (error) {
+            res.status(503).json({
+                status: 'unhealthy',
+                timestamp: new Date().toISOString(),
+                error: 'Liveness probe failed'
+            });
+        }
+    });
+    
+    // Kubernetes readiness probe
+    app.get('/health/ready', async (req, res) => {
+        try {
+            const result = await healthService.readinessProbe();
+            const statusCode = result.status === 'unhealthy' ? 503 : 200;
+            res.status(statusCode).json(result);
+        } catch (error) {
+            res.status(503).json({
+                status: 'unhealthy',
+                timestamp: new Date().toISOString(),
+                error: 'Readiness probe failed'
+            });
+        }
+    });
+    
+    // Legacy health endpoint for backward compatibility
+    app.get('/health/legacy', (req, res) => {
         res.json({
             status: 'healthy',
             timestamp: new Date().toISOString(),
             activeSessions: sessions.size,
             version: process.env.npm_package_version || '1.0.0',
             authServer: {
-                status: 'running',
+                status: authServer ? 'running' : 'disabled',
                 port: process.env.AUTH_PORT || '3001'
             }
         });
@@ -496,6 +642,9 @@ export function createApp(): express.Application {
 
     // Main MCP endpoint - handles all MCP communication
     app.post('/mcp', async (req, res) => {
+        const startTime = Date.now();
+        const correlationId = req.headers['x-correlation-id'] as string;
+        
         try {
             // Get session ID from header
             const sessionId = req.headers['mcp-session-id'] as string | undefined;
@@ -504,12 +653,27 @@ export function createApp(): express.Application {
             if (sessionId && sessions.has(sessionId)) {
                 // Reuse existing session
                 session = await getOrCreateSession(sessionId);
+                cloudLoggingService.logApplicationEvent('debug', 'mcp_session_reuse', 
+                    'Reusing existing MCP session', { sessionId, correlationId });
             } else if (!sessionId && isInitializeRequest(req.body)) {
                 // New initialization request
                 session = await getOrCreateSession();
+                cloudLoggingService.logApplicationEvent('info', 'mcp_session_create', 
+                    'Creating new MCP session', { 
+                        sessionId: session.sessionId, 
+                        correlationId,
+                        method: req.body?.method
+                    });
             } else {
                 // Invalid request
                 logger.warn(`❌ Invalid MCP request - no session ID and not initialize request`);
+                cloudLoggingService.logApplicationEvent('warn', 'mcp_invalid_request', 
+                    'Invalid MCP request received', { 
+                        sessionId, 
+                        correlationId,
+                        hasBody: !!req.body,
+                        method: req.body?.method
+                    });
                 return res.status(400).json({
                     jsonrpc: '2.0',
                     error: {
@@ -522,9 +686,28 @@ export function createApp(): express.Application {
 
             // Handle the request
             await session.transport.handleRequest(req, res, req.body);
+            
+            // Log successful request completion
+            const duration = Date.now() - startTime;
+            cloudLoggingService.logPerformanceMetrics('mcp_request', req.body?.method || 'unknown', {
+                duration,
+                correlationId,
+                sessionId: session.sessionId
+            });
 
         } catch (error) {
+            const duration = Date.now() - startTime;
             logger.error('❌ Error handling MCP request:', error);
+            
+            // Log error with structured data
+            cloudLoggingService.logApplicationEvent('error', 'mcp_request_error', 
+                'MCP request processing failed', {
+                    correlationId,
+                    duration,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    method: req.body?.method,
+                    sessionId: req.headers['mcp-session-id'] as string
+                });
 
             if (!res.headersSent) {
                 res.status(500).json({
@@ -642,6 +825,50 @@ export function createApp(): express.Application {
         });
     });
 
+    // Monitoring and observability endpoints
+    app.get('/monitoring/metrics', (req, res) => {
+        try {
+            const metrics = {
+                activeSessions: sessions.size,
+                totalSessions: sessions.size, // Could be enhanced to track total count
+                uptime: process.uptime(),
+                memoryUsage: process.memoryUsage(),
+                nodeVersion: process.version,
+                timestamp: new Date().toISOString(),
+                cloudLogging: cloudLoggingService.getStatus(),
+                environment: {
+                    nodeEnv: process.env.NODE_ENV || 'development',
+                    region: process.env.CF_INSTANCE_INDEX ? 'cloud-foundry' : 'local'
+                }
+            };
+            
+            // Log metrics access
+            cloudLoggingService.logApplicationEvent('info', 'metrics_access', 
+                'Application metrics accessed', {
+                requestId: req.headers['x-request-id'] as string,
+                userAgent: req.headers['user-agent']
+            });
+            
+            res.json(metrics);
+        } catch (error) {
+            logger.error('Failed to get metrics:', error);
+            cloudLoggingService.logApplicationEvent('error', 'metrics_error', 
+                'Failed to retrieve application metrics', { error: String(error) });
+            res.status(500).json({ error: 'Failed to get metrics' });
+        }
+    });
+    
+    // Cloud logging status endpoint
+    app.get('/monitoring/logging', (req, res) => {
+        try {
+            const status = cloudLoggingService.getStatus();
+            res.json(status);
+        } catch (error) {
+            logger.error('Failed to get logging status:', error);
+            res.status(500).json({ error: 'Failed to get logging status' });
+        }
+    });
+
     // Service discovery configuration endpoints
     app.get('/config/services', (req, res) => {
         try {
@@ -696,20 +923,23 @@ export function createApp(): express.Application {
         });
     });
 
-    // Global error handler
+    // Global error handler with secure error sanitization
     app.use((error: Error, req: express.Request, res: express.Response) => {
-        logger.error('❌ Unhandled error:', error);
+        const errorHandler = new SecureErrorHandler(logger);
+        const secureError = errorHandler.sanitizeError(error, {
+            operation: 'request-processing',
+            requestId: req.headers['x-request-id'] as string || 'unknown',
+            userId: (req as AuthenticatedRequest).authInfo?.userId
+        });
 
         if (!res.headersSent) {
-            res.status(500).json({
-                error: 'Internal Server Error',
-                message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
-            });
+            res.status(500).json(secureError);
         }
     });
 
-    // Clean up expired sessions every hour
-    setInterval(cleanupExpiredSessions, 60 * 60 * 1000);
+    // Clean up expired sessions every hour - register with shutdown manager
+    const cleanupInterval = setInterval(cleanupExpiredSessions, 60 * 60 * 1000);
+    shutdownManager.registerInterval(cleanupInterval, 'session-cleanup');
 
     return app;
 }
@@ -723,6 +953,21 @@ export async function startServer(port: number = 3000): Promise<void> {
     return new Promise((resolve, reject) => {
         try {
             const server = app.listen(port, async () => {
+                // Register server shutdown with shutdown manager
+                shutdownManager.registerCleanupCallback(async () => {
+                    logger.info('Shutting down HTTP server...');
+                    return new Promise<void>((resolve) => {
+                        server.close((error) => {
+                            if (error) {
+                                logger.error('Error shutting down server:', error);
+                            } else {
+                                logger.info('HTTP server shut down successfully');
+                            }
+                            resolve();
+                        });
+                    });
+                }, 'http-server-shutdown');
+                
                 // Determine the base URL for this deployment
                 const baseUrl = process.env.VCAP_APPLICATION ? 
                     `https://${JSON.parse(process.env.VCAP_APPLICATION).application_uris[0]}` :
@@ -732,8 +977,18 @@ export async function startServer(port: number = 3000): Promise<void> {
                 logger.info(`📊 Health check: ${baseUrl}/health`);
                 logger.info(`📚 API docs: ${baseUrl}/docs`);
                 logger.info(`🔧 MCP endpoint: ${baseUrl}/mcp`);
+                logger.info(`📈 Monitoring: ${baseUrl}/monitoring/metrics`);
 
                 logger.info('🚀 Initializing Modern SAP MCP Server...');
+                
+                // Log application startup
+                cloudLoggingService.logApplicationEvent('info', 'application_startup', 
+                    'SAP MCP Server started successfully', {
+                        baseUrl,
+                        port,
+                        nodeEnv: process.env.NODE_ENV || 'development',
+                        version: process.env.npm_package_version || '1.0.0'
+                    });
 
                 // Start authentication server on separate port
                 try {
@@ -751,10 +1006,37 @@ export async function startServer(port: number = 3000): Promise<void> {
 
                 // Discover SAP OData services
                 logger.info('🔍 Discovering SAP OData services...');
+                
+                const discoveryStartTime = Date.now();
+                cloudLoggingService.logSAPIntegrationEvent('info', 'service_discovery', 
+                    'Starting initial OData service discovery');
+                
                 discoveredServices = await sapDiscoveryService.discoverAllServices();
-
+                
+                const discoveryDuration = Date.now() - discoveryStartTime;
                 logger.info(`✅ Discovered ${discoveredServices.length} OData services`);
                 logger.info(`🔧 Authentication: Discovery is public, data operations require authentication`);
+                
+                // Log successful discovery
+                cloudLoggingService.logSAPIntegrationEvent('info', 'service_discovery', 
+                    'Initial OData service discovery completed', {
+                        servicesCount: discoveredServices.length,
+                        duration: discoveryDuration
+                    });
+                    
+                cloudLoggingService.logPerformanceMetrics('application_startup', 'service_discovery', {
+                    duration: discoveryDuration,
+                    servicesCount: discoveredServices.length
+                });
+                
+                // Log system readiness
+                cloudLoggingService.logApplicationEvent('info', 'system_ready', 
+                    'SAP MCP Server is ready to serve requests', {
+                        activeSessions: sessions.size,
+                        discoveredServices: discoveredServices.length,
+                        baseUrl
+                    });
+                
                 resolve();
             });
 

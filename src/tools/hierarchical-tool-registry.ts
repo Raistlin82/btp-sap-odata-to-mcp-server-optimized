@@ -4,6 +4,7 @@ import { Logger } from "../utils/logger.js";
 import { ODataService, EntityType } from "../types/sap-types.js";
 import { MCPAuthManager } from "../middleware/mcp-auth.js";
 import { TokenStore } from "../services/token-store.js";
+import { SecureErrorHandler } from "../utils/secure-error-handler.js";
 import { DestinationContext, OperationType } from "../types/destination-types.js";
 import { z } from "zod";
 
@@ -22,6 +23,7 @@ import { z } from "zod";
 export class HierarchicalSAPToolRegistry {
     private serviceCategories = new Map<string, string[]>();
     private authManager?: MCPAuthManager;
+    private errorHandler: SecureErrorHandler;
 
     constructor(
         private mcpServer: McpServer,
@@ -33,11 +35,18 @@ export class HierarchicalSAPToolRegistry {
     ) {
         this.categorizeServices();
         
+        // Initialize security middlewares
+        this.errorHandler = new SecureErrorHandler(this.logger);
+        
         // Initialize authentication manager if token store is provided
         if (tokenStore && authServerUrl) {
             this.authManager = new MCPAuthManager(tokenStore, authServerUrl, this.logger);
+            this.logger.info(`✅ MCPAuthManager initialized with authServerUrl: ${authServerUrl}`);
+        } else {
+            this.logger.warn(`⚠️  MCPAuthManager NOT initialized - tokenStore: ${!!tokenStore}, authServerUrl: ${authServerUrl}`);
         }
     }
+
 
     /**
      * Register the 4 hierarchical discovery tools instead of 200+ individual CRUD tools
@@ -434,6 +443,7 @@ export class HierarchicalSAPToolRegistry {
             // Check authentication for this tool
             let userJWT: string | undefined;
             if (this.authManager) {
+                this.logger.debug(`🔐 Authentication required for execute-entity-operation, checking...`);
                 const authResult = await this.authManager.authenticateToolCall('execute-entity-operation', args);
                 
                 if (!authResult.authenticated) {
@@ -454,6 +464,8 @@ export class HierarchicalSAPToolRegistry {
                 } else {
                     this.logger.debug(`User authenticated - no JWT token available (will use BasicAuth if configured in destination)`);
                 }
+            } else {
+                this.logger.warn(`⚠️  No authentication manager available - execute-entity-operation will proceed without authentication`);
             }
 
             // Validate service
