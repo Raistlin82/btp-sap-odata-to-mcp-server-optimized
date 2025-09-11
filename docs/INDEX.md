@@ -20,14 +20,6 @@ This documentation is organized into focused sections for easy navigation and re
 | Document | Description | When to Use |
 |----------|-------------|-------------|
 | **[ARCHITECTURE.md](ARCHITECTURE.md)** | System architecture and component design | Understanding system design, planning extensions |
-
-### 🔧 Operations & Maintenance
-
-| Document | Description | When to Use |
-|----------|-------------|-------------|
-| **[API_REFERENCE.md](API_REFERENCE.md)** | Complete API documentation for all tools | Implementing MCP clients, tool usage |
-| **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** | Common issues and solutions | Debugging problems, error resolution |
-| **[CLOUD_FOUNDRY_CONFIG.md](CLOUD_FOUNDRY_CONFIG.md)** | Current CF environment configuration | Understanding actual deployed configuration |
 | **[CHANGELOG.md](CHANGELOG.md)** | Version history and changes | Understanding what changed between versions |
 
 ## 🗺️ Documentation Navigation
@@ -37,14 +29,12 @@ This documentation is organized into focused sections for easy navigation and re
 #### **Developers**
 1. Start with [README.md](../README.md) for overview
 2. Follow [DEPLOYMENT.md](DEPLOYMENT.md) for local setup
-3. Reference [API_REFERENCE.md](API_REFERENCE.md) for tool usage
-4. Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md) when issues arise
+3. Reference [CONFIGURATION.md](CONFIGURATION.md) for environment setup
 
 #### **System Administrators**
 1. Review [ARCHITECTURE.md](ARCHITECTURE.md) for system understanding
 2. Follow [CONFIGURATION.md](CONFIGURATION.md) for environment setup
 3. Use [DEPLOYMENT.md](DEPLOYMENT.md) for production deployment
-4. Refer to [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for operational issues
 
 #### **Project Managers**
 1. Read [README.md](../README.md) for feature overview
@@ -60,22 +50,12 @@ README.md → CONFIGURATION.md → DEPLOYMENT.md
 
 #### **Understanding the System**
 ```
-README.md → ARCHITECTURE.md → API_REFERENCE.md
+README.md → ARCHITECTURE.md → CONFIGURATION.md
 ```
 
 #### **Production Deployment**
 ```
 ARCHITECTURE.md → CONFIGURATION.md → DEPLOYMENT.md
-```
-
-#### **Troubleshooting Issues**
-```
-TROUBLESHOOTING.md → API_REFERENCE.md → CONFIGURATION.md
-```
-
-#### **Contributing/Extending**
-```
-README.md → ARCHITECTURE.md → CHANGELOG.md → API_REFERENCE.md
 ```
 
 ## 📖 Quick Reference
@@ -85,30 +65,21 @@ README.md → ARCHITECTURE.md → CHANGELOG.md → API_REFERENCE.md
 - **🏠 Project Home**: [README.md](../README.md)
 - **🔧 Configuration**: [CONFIGURATION.md](CONFIGURATION.md)
 - **🚀 Deployment**: [DEPLOYMENT.md](DEPLOYMENT.md)
-- **🔍 API Docs**: [API_REFERENCE.md](API_REFERENCE.md)
-- **🆘 Help**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+- **🏗️ Architecture**: [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ### Key Sections
 
 #### Authentication Setup
-- [CONFIGURATION.md#authentication](CONFIGURATION.md#authentication-configuration)
+- [CONFIGURATION.md#sap-btp-cockpit-configuration](CONFIGURATION.md#sap-btp-cockpit-configuration)
 - [DEPLOYMENT.md#configure-role-collections](DEPLOYMENT.md#6-configure-role-collections)
-- [TROUBLESHOOTING.md#authentication-issues](TROUBLESHOOTING.md#authentication-issues)
 
 #### SAP System Connectivity
-- [CONFIGURATION.md#service-discovery](CONFIGURATION.md#service-discovery-configuration)
-- [TROUBLESHOOTING.md#connectivity-issues](TROUBLESHOOTING.md#connectivity-issues)
-- [API_REFERENCE.md#discovery-tools](API_REFERENCE.md#discovery-tools-public-access)
+- [CONFIGURATION.md#environment-variables](CONFIGURATION.md#environment-variables)
+- [ARCHITECTURE.md#sap-connectivity-layer](ARCHITECTURE.md#4-sap-connectivity-layer)
 
 #### Production Deployment
 - [DEPLOYMENT.md#sap-btp-cloud-foundry](DEPLOYMENT.md#sap-btp-cloud-foundry-deployment)
-- [CONFIGURATION.md#production-configuration](CONFIGURATION.md#production-configuration)
-- [TROUBLESHOOTING.md#deployment-issues](TROUBLESHOOTING.md#deployment-issues)
-
-#### MCP Tool Usage
-- [API_REFERENCE.md#mcp-tools](API_REFERENCE.md#mcp-tools)
-- [API_REFERENCE.md#authentication-flow](API_REFERENCE.md#authentication-flow)
-- [TROUBLESHOOTING.md#data-issues](TROUBLESHOOTING.md#data-issues)
+- [CONFIGURATION.md#service-configuration-files](CONFIGURATION.md#service-configuration-files)
 
 ## 🔍 Search Tips
 
@@ -117,25 +88,19 @@ README.md → ARCHITECTURE.md → CHANGELOG.md → API_REFERENCE.md
 #### **Configuration Issues**
 ```
 Search: "environment variables", "SAP_IAS", "service binding"
-Files: CONFIGURATION.md, DEPLOYMENT.md, TROUBLESHOOTING.md
+Files: CONFIGURATION.md, DEPLOYMENT.md
 ```
 
 #### **Authentication Problems**
 ```
 Search: "session", "IAS", "XSUAA", "authentication"
-Files: TROUBLESHOOTING.md, API_REFERENCE.md, CONFIGURATION.md
+Files: CONFIGURATION.md, ARCHITECTURE.md
 ```
 
 #### **Connectivity Issues**
 ```
 Search: "destination", "connectivity", "SAP system"
-Files: TROUBLESHOOTING.md, CONFIGURATION.md, DEPLOYMENT.md
-```
-
-#### **API Usage**
-```
-Search: "tool", "execute-entity-operation", "session_id"
-Files: API_REFERENCE.md, TROUBLESHOOTING.md
+Files: CONFIGURATION.md, DEPLOYMENT.md
 ```
 
 ### Common Search Patterns
@@ -144,8 +109,6 @@ Files: API_REFERENCE.md, TROUBLESHOOTING.md
 |-------------------------|--------------|---------------|
 | **Setup Instructions** | "prerequisites", "install", "create service" | DEPLOYMENT.md, README.md |
 | **Environment Variables** | "SAP_IAS", "environment", "config" | CONFIGURATION.md, .env.example |
-| **Error Solutions** | Error code or message | TROUBLESHOOTING.md |
-| **API Usage Examples** | Tool name, "example", "request" | API_REFERENCE.md |
 | **Architecture Details** | "component", "flow", "architecture" | ARCHITECTURE.md |
 
 ## 🆕 Recent Updates
@@ -153,11 +116,9 @@ Files: API_REFERENCE.md, TROUBLESHOOTING.md
 | Date | Document | Changes |
 |------|----------|---------|
 | 2025-09-11 | All | Complete documentation overhaul |
-| 2025-09-11 | TROUBLESHOOTING.md | Added comprehensive troubleshooting guide |
-| 2025-09-11 | API_REFERENCE.md | Complete API documentation with examples |
-| 2025-09-11 | DEPLOYMENT.md | Production deployment guide |
-| 2025-09-11 | CONFIGURATION.md | Comprehensive configuration options |
-| 2025-09-11 | ARCHITECTURE.md | System architecture documentation |
+| 2025-09-11 | CONFIGURATION.md | Simplified and added BTP Cockpit user variables |
+| 2025-09-11 | ARCHITECTURE.md | Shortened and focused on core components |
+| 2025-09-11 | INDEX.md | Updated to reflect current documentation structure |
 
 ## 💡 Documentation Standards
 
@@ -173,29 +134,9 @@ Files: API_REFERENCE.md, TROUBLESHOOTING.md
 - **Version Information**: Clear indication of version applicability
 - **Prerequisites**: Clear requirements for each section
 
-### Maintenance
-- **Regular Updates**: Documentation updated with code changes
-- **Community Feedback**: Improvements based on user feedback
-- **Version Tracking**: Changes documented in CHANGELOG.md
-
-## 🤝 Contributing to Documentation
-
-### Improvement Areas
-- **Examples**: More real-world usage examples
-- **Diagrams**: Additional architecture diagrams
-- **Translations**: Multi-language support
-- **Video Guides**: Step-by-step video tutorials
-
-### How to Contribute
-1. **Report Issues**: Documentation bugs or unclear sections
-2. **Suggest Improvements**: Better explanations or examples
-3. **Add Content**: New sections or expanded coverage
-4. **Review Changes**: Help validate documentation updates
-
 ---
 
 **📞 Need Help?**
-- Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues
-- Review [API_REFERENCE.md](API_REFERENCE.md) for tool usage
-- Consult [CONFIGURATION.md](CONFIGURATION.md) for setup questions
+- Check [CONFIGURATION.md](CONFIGURATION.md) for setup questions
+- Review [DEPLOYMENT.md](DEPLOYMENT.md) for deployment issues
 - Reference the [original project](https://github.com/lemaiwo/btp-sap-odata-to-mcp-server) for core concepts

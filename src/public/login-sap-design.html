@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAP MCP Server - Authentication</title>
+    
+    <!-- SAP UI5 Web Components -->
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/Assets.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/Button.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/Card.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/Input.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/Title.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/Text.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/MessageStrip.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents/dist/BusyIndicator.js"></script>
+    <script type="module" src="https://ui5.sap.com/@ui5/webcomponents-icons/dist/AllIcons.js"></script>
+    
+    <!-- SAP 72 Font -->
+    <link rel="stylesheet" href="https://ui5.sap.com/resources/sap/ui/core/themes/sap_horizon/library.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=72:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --sap-font-family: "72", "72full", Arial, Helvetica, sans-serif;
+            --sap-primary-color: #0070f2;
+            --sap-background: #f5f6fa;
+            --sap-content-background: #ffffff;
+            --sap-text-color: #32363a;
+            --sap-text-secondary: #6a6d70;
+            --sap-border-color: #d9d9d9;
+            --sap-success-color: #30914c;
+            --sap-error-color: #b00;
+            --sap-warning-color: #e76500;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--sap-font-family);
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            color: var(--sap-text-color);
+        }
+
+        .main-container {
+            width: 100%;
+            max-width: 450px;
+        }
+
+        .login-card {
+            --ui5-card-border-radius: 0.75rem;
+            --ui5-card-box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.15);
+            margin: 0;
+        }
+
+        .login-header {
+            text-align: center;
+            padding: 2rem 2rem 1rem 2rem;
+            background: var(--sap-content-background);
+            border-radius: 0.75rem 0.75rem 0 0;
+        }
+
+        .sap-logo {
+            width: 4rem;
+            height: 4rem;
+            background: var(--sap-primary-color);
+            border-radius: 50%;
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+            font-weight: 700;
+            box-shadow: 0 0.125rem 0.5rem rgba(0, 112, 242, 0.3);
+        }
+
+        .login-content {
+            padding: 1rem 2rem 2rem 2rem;
+            background: var(--sap-content-background);
+            border-radius: 0 0 0.75rem 0.75rem;
+        }
+
+        .form-field {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-field:last-child {
+            margin-bottom: 0;
+        }
+
+        .auth-method-selection {
+            text-align: center;
+            padding: 1rem 0;
+        }
+
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .success-container {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .success-icon {
+            width: 4rem;
+            height: 4rem;
+            background: var(--sap-success-color);
+            border-radius: 50%;
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+        }
+
+        .info-section {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 0.5rem;
+            border-left: 0.25rem solid var(--sap-primary-color);
+        }
+
+        .info-section ui5-title {
+            margin-bottom: 0.5rem;
+        }
+
+        .session-info {
+            display: grid;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--sap-text-secondary);
+        }
+
+        .session-info strong {
+            color: var(--sap-text-color);
+        }
+
+        .admin-section {
+            background: #e8f4fd;
+            border-left-color: var(--sap-primary-color);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* SAP UI5 Web Components custom styling */
+        ui5-button {
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+
+        ui5-button:last-child {
+            margin-bottom: 0;
+        }
+
+        ui5-message-strip {
+            margin-bottom: 1rem;
+        }
+
+        ui5-busy-indicator {
+            --ui5-busy-indicator-color: var(--sap-primary-color);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            body {
+                padding: 0.5rem;
+            }
+            
+            .login-header,
+            .login-content {
+                padding: 1.5rem 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <ui5-card class="login-card" id="mainCard">
+            
+            <!-- Login Form -->
+            <div id="loginForm">
+                <div class="login-header">
+                    <div class="sap-logo">
+                        <ui5-icon name="sap-icon://building" style="font-size: 1.5rem;"></ui5-icon>
+                    </div>
+                    <ui5-title level="H2">SAP MCP Server</ui5-title>
+                    <ui5-text id="subtitle">Secure access to SAP systems via MCP protocol</ui5-text>
+                </div>
+
+                <div class="login-content">
+                    <!-- Loading State -->
+                    <div id="loadingState" class="loading-container">
+                        <ui5-busy-indicator active size="Large"></ui5-busy-indicator>
+                        <ui5-text id="loadingMessage">Redirecting to SAP Identity Authentication Service...</ui5-text>
+                        <ui5-text id="loadingSubtext">You will be redirected to the standard SAP login page.</ui5-text>
+                    </div>
+
+                    <!-- Error State -->
+                    <div id="errorState" class="hidden">
+                        <ui5-message-strip design="Negative" hide-close-button>
+                            <ui5-icon name="sap-icon://error" slot="icon"></ui5-icon>
+                            <span id="errorMessage">Authentication error occurred</span>
+                        </ui5-message-strip>
+                        
+                        <div class="info-section">
+                            <ui5-title level="H4">Configuration Required</ui5-title>
+                            <ui5-text>Please ensure the following environment variables are configured:</ui5-text>
+                            <ul style="margin: 0.5rem 0; padding-left: 1.5rem; font-size: 0.875rem;">
+                                <li><code>SAP_IAS_URL</code> - Your SAP IAS tenant URL</li>
+                                <li><code>SAP_IAS_CLIENT_ID</code> - OAuth client ID</li>
+                                <li><code>SAP_IAS_CLIENT_SECRET</code> - OAuth client secret</li>
+                            </ul>
+                        </div>
+                        
+                        <ui5-button design="Emphasized" icon="sap-icon://refresh" onclick="location.reload()">
+                            Retry Authentication
+                        </ui5-button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Success State -->
+            <div id="successState" class="hidden">
+                <div class="success-container">
+                    <div class="success-icon">
+                        <ui5-icon name="sap-icon://accept" style="font-size: 1.5rem;"></ui5-icon>
+                    </div>
+                    <ui5-title level="H2">Authentication Successful</ui5-title>
+                    <ui5-text>Welcome! Your session is active and ready to use.</ui5-text>
+                    
+                    <div id="userInfoSection" class="info-section">
+                        <ui5-title level="H4">
+                            <ui5-icon name="sap-icon://person-placeholder" style="margin-right: 0.5rem;"></ui5-icon>
+                            Session Information
+                        </ui5-title>
+                        <div class="session-info">
+                            <div><strong>User:</strong> <span id="userName">Loading...</span></div>
+                            <div><strong>Session ID:</strong> <span id="sessionIdDisplay">Loading...</span></div>
+                            <div><strong>Status:</strong> <span style="color: var(--sap-success-color);">Active</span></div>
+                        </div>
+                    </div>
+
+                    <div id="adminSection" class="info-section admin-section hidden">
+                        <ui5-title level="H4">
+                            <ui5-icon name="sap-icon://settings" style="margin-right: 0.5rem;"></ui5-icon>
+                            Administration
+                        </ui5-title>
+                        <ui5-text>You have administrative privileges for this MCP server.</ui5-text>
+                        <div style="margin-top: 1rem;">
+                            <ui5-button 
+                                design="Emphasized" 
+                                icon="sap-icon://business-suite" 
+                                onclick="openAdminDashboard()">
+                                Open Admin Dashboard
+                            </ui5-button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </ui5-card>
+    </div>
+
+    <script>
+        let sessionId = null;
+        let tokenData = null;
+
+        // OAuth 2.0 Flow Functions
+        async function initiateOAuth2Flow() {
+            console.log('Initiating OAuth2 flow...');
+            try {
+                setLoadingState('Connecting to SAP Identity Authentication Service...');
+                
+                // Use proper callback endpoint
+                const protocol = window.location.host.includes('.cfapps.') || window.location.host.includes('.ondemand.com') ? 'https:' : window.location.protocol;
+                const redirectUri = `${protocol}//${window.location.host}/auth/callback`;
+                const state = generateRandomString(32);
+                
+                sessionStorage.setItem('oauth_state', state);
+                sessionStorage.setItem('oauth_redirect_after_success', window.location.pathname);
+                
+                try {
+                    const configResponse = await fetch('/auth/debug/config');
+                    const config = await configResponse.json();
+                    
+                    if (!config.authorizationEndpoint || !config.clientId) {
+                        throw new Error('SAP IAS configuration not available');
+                    }
+                    
+                    const iasAuthUrl = config.authorizationEndpoint + '?' + new URLSearchParams({
+                        client_id: config.clientId,
+                        response_type: 'code',
+                        redirect_uri: redirectUri,
+                        scope: 'openid profile email groups',
+                        state: state
+                    }).toString();
+                    
+                    console.log('Redirecting to SAP IAS:', iasAuthUrl);
+                    window.location.href = iasAuthUrl;
+                    
+                } catch (configError) {
+                    console.error('IAS configuration error:', configError);
+                    showError('SAP Identity Authentication Service configuration error: ' + configError.message);
+                }
+                
+            } catch (error) {
+                console.error('OAuth initiation error:', error);
+                showError('Failed to initiate authentication: ' + error.message);
+            }
+        }
+        
+        function generateRandomString(length) {
+            const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += charset.charAt(Math.floor(Math.random() * charset.length));
+            }
+            return result;
+        }
+
+        function setLoadingState(message, subtext = '') {
+            document.getElementById('loadingState').classList.remove('hidden');
+            document.getElementById('errorState').classList.add('hidden');
+            document.getElementById('successState').classList.add('hidden');
+            document.getElementById('loginForm').classList.remove('hidden');
+            
+            document.getElementById('loadingMessage').textContent = message;
+            document.getElementById('loadingSubtext').textContent = subtext;
+        }
+
+        function showError(message) {
+            document.getElementById('errorState').classList.remove('hidden');
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('errorMessage').textContent = message;
+        }
+
+        function showSuccessState() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('successState').classList.remove('hidden');
+            updateSuccessDisplay();
+        }
+
+        async function updateSuccessDisplay() {
+            try {
+                const response = await fetch('/auth/status', {
+                    headers: {
+                        'x-mcp-session-id': sessionId
+                    }
+                });
+                
+                if (response.ok) {
+                    const status = await response.json();
+                    
+                    document.getElementById('userName').textContent = status.user || 'Authenticated User';
+                    document.getElementById('sessionIdDisplay').textContent = sessionId || 'Unknown';
+                    
+                    if (status.scopes && status.scopes.some(scope => scope.includes('admin'))) {
+                        document.getElementById('adminSection').classList.remove('hidden');
+                    }
+                } else {
+                    document.getElementById('userName').textContent = 'Authenticated User';
+                    document.getElementById('sessionIdDisplay').textContent = sessionId || 'Unknown';
+                }
+            } catch (error) {
+                console.log('Could not get session info:', error);
+                document.getElementById('userName').textContent = 'Authenticated User';
+                document.getElementById('sessionIdDisplay').textContent = sessionId || 'Unknown';
+            }
+
+            // Handle redirect after authentication
+            const urlParams = new URLSearchParams(window.location.search);
+            const redirectUrl = urlParams.get('redirect');
+            
+            if (redirectUrl) {
+                setTimeout(() => {
+                    window.location.href = redirectUrl;
+                }, 3000);
+            }
+        }
+
+        function openAdminDashboard() {
+            const adminUrl = `/auth/admin?session=${encodeURIComponent(sessionId)}`;
+            window.open(adminUrl, '_blank');
+        }
+
+        // Handle OAuth 2.0 callback
+        async function handleOAuth2Callback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const state = urlParams.get('state');
+            const error = urlParams.get('error');
+            const storedState = sessionStorage.getItem('oauth_state');
+
+            if (error) {
+                showError(`OAuth authentication error: ${error}`);
+                return false;
+            }
+
+            if (!code) {
+                return false;
+            }
+
+            if (!state || state !== storedState) {
+                showError('OAuth state validation failed. Please try again.');
+                return true;
+            }
+
+            try {
+                setLoadingState('Completing authentication...', 'Exchanging authorization code for session token');
+
+                const protocol = window.location.host.includes('.cfapps.') || window.location.host.includes('.ondemand.com') ? 'https:' : window.location.protocol;
+                const response = await fetch('/auth/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        grant_type: 'authorization_code',
+                        code: code,
+                        redirect_uri: `${protocol}//${window.location.host}/auth/callback`
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.session_id) {
+                    sessionId = result.session_id;
+                    tokenData = { sessionId: result.session_id, user: 'OAuth User' };
+                    
+                    sessionStorage.removeItem('oauth_state');
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    
+                    showSuccessState();
+                } else {
+                    throw new Error(result.error_description || result.message || 'Authentication failed');
+                }
+
+            } catch (error) {
+                console.error('OAuth callback error:', error);
+                showError('Authentication completion failed: ' + error.message);
+            }
+
+            return true;
+        }
+
+        // Initialize page
+        window.addEventListener('load', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlSessionId = urlParams.get('session');
+            const success = urlParams.get('success');
+            const error = urlParams.get('error');
+            const code = urlParams.get('code');
+            
+            console.log('Page load - checking authentication state...');
+
+            // Handle OAuth callback
+            if (await handleOAuth2Callback()) {
+                return;
+            }
+
+            if (error) {
+                showError(decodeURIComponent(error));
+                return;
+            } else if (success && urlSessionId) {
+                sessionId = urlSessionId;
+                tokenData = { sessionId: urlSessionId, user: 'OAuth User' };
+                showSuccessState();
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return;
+            }
+            
+            // Check for existing session
+            try {
+                const response = await fetch('/auth/status');
+                if (response.ok) {
+                    const status = await response.json();
+                    if (status.authenticated) {
+                        sessionId = status.sessionId;
+                        tokenData = status;
+                        showSuccessState();
+                        return;
+                    }
+                }
+            } catch (error) {
+                // No existing session, continue to authentication
+            }
+            
+            // Start authentication flow
+            console.log('No existing session, starting authentication...');
+            await initiateOAuth2Flow();
+        });
+    </script>
+</body>
+</html>
