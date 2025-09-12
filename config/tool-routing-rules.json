@@ -1,0 +1,201 @@
+{
+  "version": "2.0.0",
+  "lastUpdated": "2025-01-12",
+  "toolSelectionRules": {
+    "naturalLanguagePatterns": {
+      "italian": [
+        "mostra.*ultim[oi]",
+        "analizza.*creat[oi]",
+        "trova.*sospeso",
+        "visualizza.*dati",
+        "vorrei.*analisi",
+        "dammi.*informazioni",
+        "cerca.*business partner",
+        "lista.*clienti"
+      ],
+      "english": [
+        "show.*last",
+        "analyze.*created", 
+        "find.*pending",
+        "display.*data",
+        "I want.*analysis",
+        "give me.*information",
+        "search.*business partner",
+        "list.*customers"
+      ]
+    },
+    "directQueryPatterns": [
+      "\\$filter=",
+      "\\$select=",
+      "\\$expand=",
+      "\\$top=",
+      "\\$skip=",
+      "Set\\?"
+    ],
+    "performancePatterns": [
+      "slow",
+      "optimize",
+      "performance",
+      "lento",
+      "ottimizza",
+      "prestazioni"
+    ],
+    "processPatterns": [
+      "process",
+      "workflow",
+      "bottleneck",
+      "processo",
+      "flusso",
+      "collo di bottiglia"
+    ]
+  },
+  "toolPriorities": {
+    "naturalLanguage": {
+      "primary": "natural-query-builder",
+      "fallback": "execute-entity-operation",
+      "authRequired": false
+    },
+    "directQuery": {
+      "primary": "execute-entity-operation", 
+      "authRequired": true
+    },
+    "performance": {
+      "primary": "query-performance-optimizer",
+      "authRequired": true
+    },
+    "process": {
+      "primary": "business-process-insights",
+      "authRequired": true
+    }
+  },
+  "workflowSequences": {
+    "naturalLanguageAnalytics": [
+      {
+        "step": 1,
+        "tool": "search-sap-services",
+        "auth": false,
+        "condition": "serviceId unknown"
+      },
+      {
+        "step": 2, 
+        "tool": "discover-service-entities",
+        "auth": false,
+        "condition": "entityType unknown"
+      },
+      {
+        "step": 3,
+        "tool": "get-entity-schema", 
+        "auth": false,
+        "condition": "schema needed"
+      },
+      {
+        "step": 4,
+        "tool": "natural-query-builder",
+        "auth": false,
+        "mandatory": true
+      },
+      {
+        "step": 5,
+        "tool": "execute-entity-operation",
+        "auth": true,
+        "mandatory": true
+      },
+      {
+        "step": 6,
+        "tool": "smart-data-analysis",
+        "auth": true,
+        "condition": "analysis requested"
+      }
+    ],
+    "directExecution": [
+      {
+        "step": 1,
+        "tool": "execute-entity-operation",
+        "auth": true,
+        "mandatory": true
+      }
+    ]
+  },
+  "toolDescriptionTemplates": {
+    "natural-query-builder": {
+      "indicator": "🔄 PREFERRED",
+      "description": "Convert natural language requests into optimized SAP OData queries",
+      "examples": [
+        "show me customers from last month",
+        "analyze business partners created recently",
+        "mostra clienti ultimo mese",
+        "analizza business partner creati di recente"
+      ],
+      "nextSteps": {
+        "recommended": "execute-entity-operation",
+        "reason": "Use generated OData query to retrieve actual SAP data"
+      }
+    },
+    "execute-entity-operation": {
+      "indicator": "⚠️ DIRECT",
+      "description": "Execute exact OData queries on SAP entities",
+      "warning": "Use ONLY with precise OData syntax, not natural language",
+      "examples": [
+        "BusinessPartnerSet?$filter=CreationDate ge datetime'2024-11-01'",
+        "CustomerSet?$top=10&$orderby=Name"
+      ]
+    },
+    "smart-data-analysis": {
+      "indicator": "📊 ANALYSIS",
+      "description": "Analyze SAP data using AI for trends and insights", 
+      "requirement": "Use AFTER getting data from execute-entity-operation",
+      "examples": [
+        "Analyze retrieved business partner data for trends",
+        "Generate insights from customer purchase patterns"
+      ]
+    }
+  },
+  "authenticationRules": {
+    "noAuthRequired": [
+      "search-sap-services",
+      "discover-service-entities", 
+      "get-entity-schema",
+      "natural-query-builder"
+    ],
+    "authRequired": [
+      "execute-entity-operation",
+      "smart-data-analysis",
+      "query-performance-optimizer", 
+      "business-process-insights"
+    ]
+  },
+  "errorPrevention": {
+    "commonMistakes": [
+      {
+        "mistake": "Using execute-entity-operation with natural language",
+        "solution": "Use natural-query-builder first",
+        "example": "Instead of 'execute: show customers' → use natural-query-builder"
+      },
+      {
+        "mistake": "Using smart-data-analysis without data",
+        "solution": "Execute query first to get data",
+        "example": "First get data with execute-entity-operation, then analyze"
+      }
+    ]
+  },
+  "customization": {
+    "companySpecificTerms": {
+      "windtre": [
+        "contratti",
+        "clienti aziendali", 
+        "fatturazione",
+        "servizi telefonici"
+      ]
+    },
+    "domainSpecificWorkflows": {
+      "telecommunications": {
+        "entities": ["Contract", "Customer", "Invoice", "Service"],
+        "commonQueries": [
+          "active contracts",
+          "monthly billing",
+          "service usage"
+        ]
+      }
+    }
+  }
+}

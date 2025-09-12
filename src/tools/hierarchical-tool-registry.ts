@@ -9,6 +9,8 @@ import { DestinationContext, OperationType } from "../types/destination-types.js
 import { z } from "zod";
 // Direct import approach to avoid TypeScript issues
 import { NaturalQueryBuilderTool, SmartDataAnalysisTool, QueryPerformanceOptimizerTool, BusinessProcessInsightsTool } from "./ai-enhanced-tools.js";
+import { WorkflowConfigLoader } from "../utils/workflow-config-loader.js";
+import { IntelligentToolRouter } from "../middleware/intelligent-tool-router.js";
 
 /**
  * Hierarchical Tool Registry - Solves the "tool explosion" problem
@@ -35,6 +37,8 @@ export class HierarchicalSAPToolRegistry {
     private serviceCategories = new Map<string, string[]>();
     private authManager?: MCPAuthManager;
     private errorHandler: SecureErrorHandler;
+    private workflowConfig: WorkflowConfigLoader;
+    private intelligentRouter: IntelligentToolRouter;
 
     constructor(
         private mcpServer: McpServer,
@@ -48,6 +52,10 @@ export class HierarchicalSAPToolRegistry {
         
         // Initialize security middlewares
         this.errorHandler = new SecureErrorHandler(this.logger);
+        
+        // Initialize workflow configuration loader and intelligent router
+        this.workflowConfig = WorkflowConfigLoader.getInstance();
+        this.intelligentRouter = new IntelligentToolRouter();
         
         // Initialize authentication manager if token store is provided
         if (tokenStore && authServerUrl) {
@@ -142,8 +150,296 @@ export class HierarchicalSAPToolRegistry {
 
         this.logger.info("✅ Registered 4 hierarchical discovery tools successfully");
         
+        // Register Session Authentication Check Tool
+        await this.registerAuthCheckTool();
+        
+        // Register Intelligent Router Tool
+        await this.registerIntelligentRouterTool();
+        
         // Register AI-Enhanced Tools for intelligent data processing (temporarily disabled)
         await this.registerAIEnhancedTools();
+    }
+
+    /**
+     * Register Authentication Check Tool - Proactive session validation
+     */
+    private async registerAuthCheckTool(): Promise<void> {
+        this.mcpServer.registerTool(
+            "check-sap-authentication",
+            {
+                title: "Check SAP Authentication Status",
+                description: "🔐 SESSION VALIDATOR: Call this FIRST to check if user is authenticated for SAP operations. Recommended at the start of each conversation to avoid authentication interruptions during workflow execution. Pre-validates session and guides through authentication if needed.",
+                inputSchema: {
+                    validateSession: z.boolean().default(true).describe("Whether to validate existing session"),
+                    requestPreAuth: z.boolean().default(false).describe("Whether to request pre-authentication for upcoming operations"),
+                    context: z.object({
+                        anticipatedOperations: z.array(z.enum(['read', 'create', 'update', 'delete', 'analysis'])).optional().describe("Operations user plans to perform"),
+                        sessionType: z.enum(['interactive', 'batch', 'demo']).optional().describe("Type of session being initiated")
+                    }).optional().describe("Context for authentication check")
+                }
+            },
+            async (args: Record<string, unknown>) => {
+                try {
+                    const validateSession = args.validateSession !== false;
+                    const requestPreAuth = args.requestPreAuth === true;
+                    const context = args.context as any || {};
+                    
+                    this.logger.info(`🔐 Proactive auth check - validate: ${validateSession}, preAuth: ${requestPreAuth}`);
+                    
+                    let authStatus = {
+                        isAuthenticated: false,
+                        sessionValid: false,
+                        userInfo: null as any,
+                        tokenInfo: null as any,
+                        authServerReachable: false,
+                        sessionId: null as string | null
+                    };
+                    
+                    // Check if auth manager is available
+                    if (!this.authManager) {
+                        return {
+                            content: [{
+                                type: "text" as const,
+                                text: JSON.stringify({
+                                    status: 'auth_disabled',
+                                    message: 'Authentication is not configured for this server instance',
+                                    recommendation: 'All SAP operations will proceed without authentication',
+                                    authRequired: false,
+                                    serverMode: 'development_or_demo'
+                                }, null, 2)
+                            }]
+                        };
+                    }
+                    
+                    // Test auth server connectivity
+                    try {
+                        // Perform a lightweight auth test to check server reachability
+                        const connectivityTest = await this.authManager.authenticateToolCall('check-sap-authentication', {});
+                        authStatus.authServerReachable = true;
+                        
+                        if (connectivityTest.authenticated) {
+                            authStatus.isAuthenticated = true;
+                            authStatus.sessionValid = true;
+                            authStatus.userInfo = (connectivityTest.context as any)?.userInfo || null;
+                            authStatus.tokenInfo = connectivityTest.context?.token ? {
+                                hasToken: true,
+                                tokenType: 'JWT',
+                                expiresAt: (connectivityTest.context as any)?.expiresAt || null
+                            } : null;
+                            authStatus.sessionId = connectivityTest.context?.sessionId || null;
+                        }
+                        
+                    } catch (authError) {
+                        this.logger.debug(`Auth connectivity test result: ${authError}`);
+                        authStatus.authServerReachable = false;
+                    }
+                    
+                    // Prepare response based on auth status
+                    let response: any = {
+                        authenticationStatus: authStatus,
+                        recommendations: [],
+                        nextSteps: [],
+                        toolsRequiringAuth: [
+                            'execute-entity-operation',
+                            'smart-data-analysis', 
+                            'query-performance-optimizer',
+                            'business-process-insights'
+                        ],
+                        toolsWithoutAuth: [
+                            'search-sap-services',
+                            'discover-service-entities',
+                            'get-entity-schema',
+                            'natural-query-builder',
+                            'sap-smart-query'
+                        ]
+                    };
+                    
+                    if (authStatus.isAuthenticated && authStatus.sessionValid) {
+                        response.status = 'authenticated';
+                        response.message = '✅ User is authenticated and session is valid';
+                        response.recommendations = [
+                            'You can proceed with any SAP operations without interruption',
+                            'All tools (discovery and execution) are available'
+                        ];
+                        response.sessionInfo = {
+                            sessionId: authStatus.sessionId,
+                            userInfo: authStatus.userInfo,
+                            tokenValid: !!authStatus.tokenInfo
+                        };
+                        
+                        if (context.anticipatedOperations?.length > 0) {
+                            response.operationReadiness = context.anticipatedOperations.map((op: string) => ({
+                                operation: op,
+                                ready: true,
+                                requiresAuth: ['create', 'update', 'delete', 'analysis'].includes(op)
+                            }));
+                        }
+                        
+                    } else if (!authStatus.authServerReachable) {
+                        response.status = 'auth_server_unavailable';
+                        response.message = '⚠️ Authentication server is not reachable';
+                        response.recommendations = [
+                            'Check authentication server configuration',
+                            'You can still use discovery tools (search, discover, schema)',
+                            'Execution tools will fail until authentication is restored'
+                        ];
+                        response.fallbackMode = {
+                            availableTools: response.toolsWithoutAuth,
+                            unavailableTools: response.toolsRequiringAuth
+                        };
+                        
+                    } else {
+                        response.status = 'authentication_required';
+                        response.message = '🔑 Authentication required for SAP data operations';
+                        response.recommendations = [
+                            'Use discovery tools first (search-sap-services, discover-service-entities)',
+                            'When ready for data operations, authentication will be requested',
+                            'Consider authenticating now to avoid workflow interruptions'
+                        ];
+                        response.nextSteps = [
+                            'Start with: search-sap-services to explore available services',
+                            'Then use: discover-service-entities and get-entity-schema for planning',
+                            'Finally: execute-entity-operation (will prompt for authentication)'
+                        ];
+                        
+                        if (requestPreAuth) {
+                            response.preAuthInstructions = {
+                                message: 'To pre-authenticate, call any execution tool and follow the authentication flow',
+                                suggestedTestCall: 'execute-entity-operation with a simple read operation'
+                            };
+                        }
+                    }
+                    
+                    return {
+                        content: [{
+                            type: "text" as const,
+                            text: JSON.stringify(response, null, 2)
+                        }]
+                    };
+                    
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    this.logger.error('Auth check error:', error);
+                    
+                    return {
+                        content: [{
+                            type: "text" as const,
+                            text: JSON.stringify({
+                                status: 'check_failed',
+                                error: 'Authentication check failed',
+                                message: errorMessage,
+                                fallback: {
+                                    recommendation: 'Proceed with discovery tools, authentication will be checked when needed',
+                                    safeTools: ['search-sap-services', 'discover-service-entities', 'get-entity-schema']
+                                }
+                            }, null, 2)
+                        }],
+                        isError: true
+                    };
+                }
+            }
+        );
+
+        this.logger.info("✅ Registered Authentication Check Tool: check-sap-authentication");
+    }
+
+    /**
+     * Register Intelligent Router Tool - Single entry point with smart routing
+     */
+    private async registerIntelligentRouterTool(): Promise<void> {
+        this.mcpServer.registerTool(
+            "sap-smart-query",
+            {
+                title: "SAP Smart Query Router",
+                description: "🧠 SMART ROUTER: Single entry point for all SAP queries! Automatically analyzes your request and routes to the optimal tool. Supports natural language (IT/EN), direct OData queries, performance analysis, and business process insights. Just describe what you need in plain language!",
+                inputSchema: {
+                    userRequest: z.string().describe("Your request in natural language or direct query (e.g., 'show me customers from last month', 'BusinessPartnerSet?$filter=...', 'analyze slow queries')"),
+                    context: z.object({
+                        serviceId: z.string().optional(),
+                        entityType: z.string().optional(),
+                        previousTools: z.array(z.string()).optional().describe("Previously used tools in this session"),
+                        preferredLanguage: z.enum(['italian', 'english']).optional()
+                    }).optional().describe("Additional context for better routing")
+                }
+            },
+            async (args: Record<string, unknown>) => {
+                try {
+                    const userRequest = args.userRequest as string;
+                    const context = args.context as any || {};
+                    
+                    this.logger.info(`🧠 Smart Router analyzing: "${userRequest}"`);
+                    
+                    // Analyze request and get routing recommendation
+                    const routingResult = this.intelligentRouter.analyzeRequest(userRequest, context);
+                    
+                    this.logger.info(`🎯 Router selected: ${routingResult.selectedTool} (confidence: ${routingResult.confidence})`);
+                    
+                    // Get suggested workflow sequence
+                    const fullWorkflow = this.intelligentRouter.getSuggestedWorkflow(routingResult, !context.serviceId);
+                    
+                    // Prepare response with routing decision and guidance
+                    const response = {
+                        routing: {
+                            selectedTool: routingResult.selectedTool,
+                            confidence: routingResult.confidence,
+                            reason: routingResult.reason
+                        },
+                        suggestedWorkflow: {
+                            immediate: routingResult.selectedTool,
+                            fullSequence: fullWorkflow,
+                            nextSteps: routingResult.suggestedSequence
+                        },
+                        guidance: {
+                            message: `Based on your request "${userRequest}", I recommend using the '${routingResult.selectedTool}' tool.`,
+                            reason: routingResult.reason,
+                            nextAction: fullWorkflow.length > 1 ? 
+                                `After using ${routingResult.selectedTool}, consider: ${fullWorkflow.slice(1, 3).join(' → ')}` :
+                                'This tool should provide the complete answer to your request.',
+                            workflowValidation: undefined as any
+                        },
+                        routingStats: this.intelligentRouter.getRoutingStats()
+                    };
+                    
+                    // Add workflow validation if previous tools were used
+                    if (context.previousTools && context.previousTools.length > 0) {
+                        const validation = this.intelligentRouter.validateWorkflowSequence(
+                            routingResult.selectedTool,
+                            context.previousTools,
+                            userRequest
+                        );
+                        response.guidance.workflowValidation = validation;
+                    }
+                    
+                    return {
+                        content: [{
+                            type: "text" as const,
+                            text: JSON.stringify(response, null, 2)
+                        }]
+                    };
+                    
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    this.logger.error('Smart Router error:', error);
+                    
+                    return {
+                        content: [{
+                            type: "text" as const,
+                            text: JSON.stringify({
+                                error: 'Smart routing failed',
+                                message: errorMessage,
+                                fallback: {
+                                    recommendation: 'Use natural-query-builder for natural language or execute-entity-operation for direct OData queries',
+                                    workflow: ['search-sap-services', 'discover-service-entities', 'natural-query-builder', 'execute-entity-operation']
+                                }
+                            }, null, 2)
+                        }],
+                        isError: true
+                    };
+                }
+            }
+        );
+
+        this.logger.info("✅ Registered Smart Router Tool: sap-smart-query");
     }
 
     /**
@@ -156,16 +452,16 @@ export class HierarchicalSAPToolRegistry {
         // Manual registration approach to avoid TypeScript compilation issues
         this.logger.info("🤖 Registering AI-Enhanced tools for intelligent SAP operations");
         
-        // Register Natural Query Builder Tool with Zod schema (NO authentication - design-time transformation)
+        // Register Natural Query Builder Tool with dynamic configuration-driven description
         this.mcpServer.registerTool(
             "natural-query-builder",
             {
                 title: "Natural Query Builder",
-                description: "🔄 PREFERRED TOOL for natural language queries! Convert requests like 'show me customers from last month' or 'analyze business partners created recently' into optimized SAP OData queries. Use this FIRST before execute-entity-operation when the user asks questions in natural language about SAP data. No authentication required.",
+                description: this.workflowConfig.getToolDescription("natural-query-builder"),
                 inputSchema: {
-                    naturalQuery: z.string().describe("Natural language query"),
-                    entityType: z.string().describe("Target SAP entity type"),
-                    serviceId: z.string().describe("SAP service identifier"),
+                    naturalQuery: z.string().describe("Natural language query (e.g. 'show business partners from last month', 'analyze sales trends', 'find pending invoices')"),
+                    entityType: z.string().describe("Target SAP entity type (use discover-service-entities first if unknown)"),
+                    serviceId: z.string().describe("SAP service identifier (use search-sap-services first if unknown)"),
                     userContext: z.object({
                         role: z.string().optional(),
                         businessContext: z.string().optional(),
@@ -180,7 +476,19 @@ export class HierarchicalSAPToolRegistry {
                     
                     const tool = new NaturalQueryBuilderTool();
                     const result = await tool.execute(args as any);
-                    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+                    
+                    // Add dynamic workflow guidance to response
+                    const nextSteps = this.workflowConfig.getNextSteps("natural-query-builder");
+                    const enhancedResult = {
+                        ...result,
+                        nextSteps: nextSteps || {
+                            recommended: "execute-entity-operation",
+                            reason: "Use the generated OData query to retrieve actual SAP data",
+                            thenAnalyze: "After getting data, use smart-data-analysis for insights"
+                        }
+                    };
+                    
+                    return { content: [{ type: "text", text: JSON.stringify(enhancedResult, null, 2) }] };
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                     return { content: [{ type: "text", text: JSON.stringify({ success: false, error: errorMessage }, null, 2) }] };
@@ -188,12 +496,12 @@ export class HierarchicalSAPToolRegistry {
             }
         );
 
-        // Register Smart Data Analysis Tool with Zod schema (requires authentication)
+        // Register Smart Data Analysis Tool with dynamic configuration-driven description
         this.mcpServer.registerTool(
             "smart-data-analysis",
             {
                 title: "Smart Data Analysis", 
-                description: "📊 ANALYSIS TOOL: Use AFTER getting data to analyze trends, anomalies, forecasts in SAP data. Perfect for user requests like 'analyze these business partners' or 'show me trends in this data'. Use after natural-query-builder + execute-entity-operation. Requires SAP authentication.",
+                description: this.workflowConfig.getToolDescription("smart-data-analysis"),
                 inputSchema: {
                     data: z.array(z.any()).describe("Array of data records to analyze"),
                     analysisType: z.enum(['trend', 'anomaly', 'forecast', 'correlation']).describe("Type of analysis to perform"),
@@ -232,12 +540,12 @@ export class HierarchicalSAPToolRegistry {
             }
         );
 
-        // Register Query Performance Optimizer Tool with Zod schema (requires authentication)
+        // Register Query Performance Optimizer Tool with dynamic configuration-driven description
         this.mcpServer.registerTool(
             "query-performance-optimizer",
             {
                 title: "Query Performance Optimizer",
-                description: "Analyze and optimize SAP OData queries for better performance using AI recommendations. Requires SAP authentication.",
+                description: this.workflowConfig.getToolDescription("query-performance-optimizer"),
                 inputSchema: {
                     query: z.string().describe("Original OData query URL to optimize"),
                     entityType: z.string().describe("Target entity type"),
@@ -280,12 +588,12 @@ export class HierarchicalSAPToolRegistry {
             }
         );
 
-        // Register Business Process Insights Tool with Zod schema (requires authentication) 
+        // Register Business Process Insights Tool with dynamic configuration-driven description
         this.mcpServer.registerTool(
             "business-process-insights",
             {
                 title: "Business Process Insights",
-                description: "Analyze SAP business processes to identify bottlenecks, inefficiencies, and optimization opportunities using AI. Requires SAP authentication.",
+                description: this.workflowConfig.getToolDescription("business-process-insights"),
                 inputSchema: {
                     processType: z.enum(['procurement', 'sales', 'finance', 'inventory', 'hr', 'general']).describe("Type of business process to analyze"),
                     processData: z.array(z.any()).describe("Historical process execution data"),
@@ -830,9 +1138,27 @@ export class HierarchicalSAPToolRegistry {
     }
 
     /**
-     * Register service metadata resources (unchanged from original)
+     * Register service metadata resources and workflow guides
      */
     public registerServiceMetadataResources(): void {
+        // Register workflow guidance resource for MCP clients
+        this.mcpServer.registerResource(
+            "sap-workflow-guide",
+            "sap://workflow-guide",
+            {
+                title: "SAP MCP Workflow Guide",
+                description: "Workflow guide for SAP MCP tools usage",
+                mimeType: "text/markdown"
+            },
+            async () => ({
+                contents: [{
+                    uri: "sap://workflow-guide",
+                    mimeType: "text/markdown", 
+                    text: this.workflowConfig.loadWorkflowGuide()
+                }]
+            })
+        );
+
         this.mcpServer.registerResource(
             "sap-service-metadata",
             new ResourceTemplate("sap://service/{serviceId}/metadata", { list: undefined }),
