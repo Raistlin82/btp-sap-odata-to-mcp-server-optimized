@@ -171,7 +171,7 @@ export class HierarchicalSAPToolRegistry {
                 description: "🔐 SESSION VALIDATOR: Call this FIRST to check if user is authenticated for SAP operations. Recommended at the start of each conversation to avoid authentication interruptions during workflow execution. Pre-validates session and guides through authentication if needed.",
                 inputSchema: {
                     validateSession: z.boolean().default(true).describe("Whether to validate existing session"),
-                    requestPreAuth: z.boolean().default(false).describe("Whether to request pre-authentication for upcoming operations"),
+                    requestPreAuth: z.boolean().default(true).describe("Whether to request pre-authentication for upcoming operations (recommended: true)"),
                     context: z.object({
                         anticipatedOperations: z.array(z.enum(['read', 'create', 'update', 'delete', 'analysis'])).optional().describe("Operations user plans to perform"),
                         sessionType: z.enum(['interactive', 'batch', 'demo']).optional().describe("Type of session being initiated")
@@ -303,9 +303,47 @@ export class HierarchicalSAPToolRegistry {
                         ];
                         
                         if (requestPreAuth) {
+                            // Actively trigger authentication process
+                            this.logger.info('🔐 User requested pre-authentication, triggering auth flow...');
+                            
+                            try {
+                                // Trigger authentication by calling authManager directly
+                                const preAuthResult = await this.authManager.authenticateToolCall('check-sap-authentication', {
+                                    preAuthRequest: true,
+                                    context: context
+                                });
+                                
+                                if (preAuthResult.authenticated) {
+                                    response.status = 'pre_auth_successful';
+                                    response.message = '✅ Pre-authentication completed successfully';
+                                    response.authenticationFlow = {
+                                        completed: true,
+                                        sessionId: preAuthResult.context?.sessionId,
+                                        userInfo: (preAuthResult.context as any)?.userInfo
+                                    };
+                                    response.recommendations = [
+                                        'Authentication completed! You can now use all SAP tools without interruption',
+                                        'All execution tools are ready for use'
+                                    ];
+                                } else {
+                                    response.authenticationFlow = {
+                                        required: true,
+                                        authUrl: this.authManager.formatAuthError(preAuthResult).authUrl,
+                                        instructions: 'Please visit the authentication URL to complete login'
+                                    };
+                                }
+                                
+                            } catch (preAuthError) {
+                                this.logger.warn('Pre-authentication failed:', preAuthError);
+                                response.preAuthInstructions = {
+                                    message: 'Pre-authentication failed. You can authenticate later when using execution tools',
+                                    fallback: 'Authentication will be requested when needed during workflow execution'
+                                };
+                            }
+                        } else {
                             response.preAuthInstructions = {
-                                message: 'To pre-authenticate, call any execution tool and follow the authentication flow',
-                                suggestedTestCall: 'execute-entity-operation with a simple read operation'
+                                message: 'To pre-authenticate, call this tool again with requestPreAuth: true',
+                                alternative: 'Authentication will be requested when using execution tools'
                             };
                         }
                     }
