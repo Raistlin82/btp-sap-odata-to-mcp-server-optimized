@@ -65,7 +65,10 @@ export class IntelligentToolRouter {
                 selectedTool: 'business-process-insights',
                 confidence: 0.9,
                 reason: `Business process analysis request detected: ${processMatch.pattern}`,
-                suggestedSequence: ['business-process-insights']
+                suggestedSequence: config.workflowSequences.businessProcessAnalysis?.map((step: any) => step.tool) || [
+                    'execute-entity-operation', 
+                    'business-process-insights'
+                ]
             };
         }
 

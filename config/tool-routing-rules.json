@@ -114,9 +114,149 @@
         "auth": true,
         "mandatory": true
       }
+    ],
+    "businessProcessAnalysis": [
+      {
+        "step": 1,
+        "tool": "search-sap-services",
+        "auth": false,
+        "condition": "serviceId unknown",
+        "description": "Find relevant SAP services for process analysis"
+      },
+      {
+        "step": 2,
+        "tool": "discover-service-entities",
+        "auth": false,
+        "condition": "entityType unknown",
+        "description": "Identify process-related entities"
+      },
+      {
+        "step": 3,
+        "tool": "execute-entity-operation",
+        "auth": true,
+        "mandatory": true,
+        "description": "Extract historical process data"
+      },
+      {
+        "step": 4,
+        "tool": "business-process-insights",
+        "auth": true,
+        "mandatory": true,
+        "description": "Analyze process for bottlenecks and optimization opportunities"
+      }
+    ],
+    "performanceOptimization": [
+      {
+        "step": 1,
+        "tool": "query-performance-optimizer",
+        "auth": true,
+        "mandatory": true,
+        "description": "Analyze and optimize query performance"
+      },
+      {
+        "step": 2,
+        "tool": "execute-entity-operation",
+        "auth": true,
+        "mandatory": true,
+        "description": "Execute optimized query to validate improvements"
+      }
     ]
   },
   "toolDescriptionTemplates": {
+    "check-sap-authentication": {
+      "indicator": "🔐 SESSION",
+      "description": "Check authentication status and validate user session for SAP operations. Call this FIRST at the start of conversations to avoid authentication interruptions.",
+      "requirement": "Recommended as first step in new sessions",
+      "examples": [
+        "Check if user is authenticated",
+        "Validate session before SAP operations",
+        "Pre-authenticate for upcoming workflow"
+      ],
+      "parameters": {
+        "validateSession": "true (default) - Whether to validate existing session",
+        "requestPreAuth": "true (recommended) - Whether to request pre-authentication",
+        "context": "Optional context for session type and anticipated operations"
+      },
+      "nextSteps": {
+        "ifAuthenticated": "Proceed with any SAP tool without interruption",
+        "ifNotAuthenticated": "Complete authentication flow, then continue with workflow"
+      }
+    },
+    "sap-smart-query": {
+      "indicator": "🧠 SMART ROUTER",
+      "description": "Single entry point for ALL SAP queries with intelligent routing. Automatically analyzes requests and routes to optimal tools.",
+      "requirement": "Use for any SAP request when unsure which specific tool to use",
+      "examples": [
+        "show me customers from last month",
+        "analyze procurement workflow",
+        "BusinessPartnerSet?$filter=...",
+        "optimize slow queries",
+        "mostra business partner creati"
+      ],
+      "parameters": {
+        "userRequest": "Your request in natural language or direct query",
+        "context": "Optional context with serviceId, entityType, previousTools"
+      },
+      "nextSteps": {
+        "recommended": "Follow the routing recommendation provided",
+        "reason": "Smart router provides optimal workflow sequence based on request analysis"
+      }
+    },
+    "search-sap-services": {
+      "indicator": "🔍 DISCOVERY",
+      "description": "Search and filter available SAP OData services by name, category, or keyword. Use first to find relevant services.",
+      "requirement": "No authentication required - discovery phase",
+      "examples": [
+        "Find business partner services",
+        "Search for sales-related services",
+        "List finance services"
+      ],
+      "parameters": {
+        "query": "Search term to filter services",
+        "category": "business-partner | sales | finance | procurement | hr | logistics | all",
+        "limit": "Maximum number of services to return (default: 10)"
+      },
+      "nextSteps": {
+        "recommended": "discover-service-entities",
+        "reason": "After finding services, explore their entities"
+      }
+    },
+    "discover-service-entities": {
+      "indicator": "📁 ENTITIES",
+      "description": "List all entities and their capabilities within a specific SAP service. Use after finding a service.",
+      "requirement": "No authentication required - discovery phase",
+      "examples": [
+        "Show entities in API_BUSINESS_PARTNER",
+        "List customer-related entities",
+        "Explore service capabilities"
+      ],
+      "parameters": {
+        "serviceId": "The SAP service ID to explore",
+        "showCapabilities": "true (default) - Show CRUD capabilities for each entity"
+      },
+      "nextSteps": {
+        "recommended": "get-entity-schema or execute-entity-operation",
+        "reason": "After discovering entities, get detailed schema or start operations"
+      }
+    },
+    "get-entity-schema": {
+      "indicator": "📋 SCHEMA",
+      "description": "Get detailed schema information for a specific entity including properties, types, keys, and constraints.",
+      "requirement": "No authentication required - discovery phase",
+      "examples": [
+        "Get BusinessPartner entity schema",
+        "Show Customer properties and types",
+        "Understand entity structure"
+      ],
+      "parameters": {
+        "serviceId": "The SAP service ID",
+        "entityName": "The entity name within the service"
+      },
+      "nextSteps": {
+        "recommended": "execute-entity-operation or natural-query-builder",
+        "reason": "After understanding schema, use it for operations or query building"
+      }
+    },
     "natural-query-builder": {
       "indicator": "🔄 PREFERRED",
       "description": "Convert natural language requests into optimized SAP OData queries",
@@ -148,6 +288,40 @@
         "Analyze retrieved business partner data for trends",
         "Generate insights from customer purchase patterns"
       ]
+    },
+    "business-process-insights": {
+      "indicator": "🔄 PROCESS",
+      "description": "Analyze SAP business processes to identify bottlenecks, inefficiencies, and optimization opportunities using AI",
+      "requirement": "Requires historical process data - use after execute-entity-operation to get process transactions",
+      "examples": [
+        "analyze procurement workflow bottlenecks",
+        "identify inefficiencies in sales process", 
+        "optimize finance approval workflows",
+        "analizza colli di bottiglia nel processo",
+        "ottimizza flusso di lavoro vendite"
+      ],
+      "parameters": {
+        "processType": "procurement | sales | finance | inventory | hr | general",
+        "processData": "Array of historical process execution data from SAP",
+        "timeframe": "Analysis period (e.g., 'last 30 days', 'Q3 2024')",
+        "focusAreas": "efficiency | costs | compliance | quality | speed"
+      },
+      "nextSteps": {
+        "recommended": "No additional tools needed - provides complete analysis",
+        "reason": "business-process-insights is a terminal analysis tool that provides comprehensive recommendations"
+      },
+      "workflow": "businessProcessAnalysis"
+    },
+    "query-performance-optimizer": {
+      "indicator": "⚡ OPTIMIZE", 
+      "description": "Analyze and optimize SAP OData queries for better performance using AI recommendations",
+      "requirement": "Use when queries are slow or need optimization",
+      "examples": [
+        "optimize slow queries in the system",
+        "improve query performance",
+        "le query sono lente, ottimizza"
+      ],
+      "workflow": "performanceOptimization"
     }
   },
   "authenticationRules": {
