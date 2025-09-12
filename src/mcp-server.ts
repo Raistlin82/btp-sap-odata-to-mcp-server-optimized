@@ -90,14 +90,72 @@ export async function createMCPServer(
     return server;
 }
 
-export async function runStdioServer(discoveredServices: ODataService[]): Promise<void> {
+export async function runStdioServer(
+    discoveredServices: ODataService[],
+    tokenStore?: TokenStore, 
+    authServerUrl?: string
+): Promise<void> {
     const logger = new Logger('sap-mcp-server');
     try {
-        const server = await createMCPServer(discoveredServices);
+        const server = await createMCPServer(discoveredServices, tokenStore, authServerUrl);
         await server.connectStdio();
         logger.info('SAP MCP Server running on stdio...');
     } catch (error) {
         logger.error('Failed to start SAP MCP Server:', error);
         process.exit(1);
     }
+}
+
+// Entry point when file is executed directly  
+if (import.meta.url === `file://${process.argv[1]}`) {
+    const logger = new Logger('sap-mcp-server');
+    
+    logger.info('🚀 Starting SAP MCP Server in stdio mode with PRODUCTION authentication...');
+    
+    // Import necessary services for authentication
+    import('./services/destination-service.js').then(({ DestinationService }) => {
+        return import('./services/sap-client.js');
+    }).then(({ SAPClient }) => {
+        return import('./utils/config.js');
+    }).then(({ Config }) => {
+        return import('./services/token-store.js');
+    }).then(({ TokenStore }) => {
+        
+        const config = new Config();
+        
+        // Initialize TokenStore for SAP authentication
+        const tokenStore = new TokenStore();
+        
+        // Get AuthServer URL from environment variables
+        const authServerUrl = process.env.AUTH_SERVER_URL || `http://localhost:${process.env.AUTH_PORT || 3001}`;
+        
+        logger.info(`🔐 Initializing SAP Authentication:`);
+        logger.info(`   - TokenStore: ${!!tokenStore}`);
+        logger.info(`   - AuthServerUrl: ${authServerUrl}`);
+        logger.info(`   - SAP_IAS_URL: ${process.env.SAP_IAS_URL || 'NOT SET'}`);
+        logger.info(`   - SAP_IAS_CLIENT_ID: ${process.env.SAP_IAS_CLIENT_ID ? 'SET' : 'NOT SET'}`);
+        
+        // Discover SAP services using authenticated client
+        const destinationService = new DestinationService(logger, config);
+        const sapClient = new SAPClient(destinationService, logger);
+        
+        // Initialize service discovery
+        return sapClient.discoverServices().then((discoveredServices) => {
+            logger.info(`🔍 Discovered ${discoveredServices.length} SAP services for authenticated access`);
+            
+            // Start MCP server with full authentication
+            return runStdioServer(discoveredServices, tokenStore, authServerUrl);
+        });
+        
+    }).catch((error) => {
+        logger.error('❌ Failed to initialize SAP Authentication:', error);
+        logger.info('🔄 Falling back to basic mode without authentication...');
+        
+        // Fallback: start without authentication for development
+        const discoveredServices: ODataService[] = [];
+        runStdioServer(discoveredServices).catch((fallbackError) => {
+            logger.error('Failed to start MCP server even in fallback mode:', fallbackError);
+            process.exit(1);
+        });
+    });
 }
