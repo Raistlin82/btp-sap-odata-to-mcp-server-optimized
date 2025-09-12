@@ -7,7 +7,8 @@ import { TokenStore } from "../services/token-store.js";
 import { SecureErrorHandler } from "../utils/secure-error-handler.js";
 import { DestinationContext, OperationType } from "../types/destination-types.js";
 import { z } from "zod";
-import { aiEnhancedTools, getAllAIToolNames } from "./ai-enhanced-tools.js";
+// Direct import approach to avoid TypeScript issues
+import { NaturalQueryBuilderTool, SmartDataAnalysisTool, QueryPerformanceOptimizerTool, BusinessProcessInsightsTool } from "./ai-enhanced-tools.js";
 
 /**
  * Hierarchical Tool Registry - Solves the "tool explosion" problem
@@ -118,7 +119,7 @@ export class HierarchicalSAPToolRegistry {
             "execute-entity-operation",
             {
                 title: "Execute Entity Operation",
-                description: "Perform CRUD operations on SAP entities. Use discover-service-entities first to understand available entities and their schemas.",
+                description: "⚠️ Direct CRUD operations on SAP entities with precise OData queries. Use ONLY when you have exact OData query syntax (not natural language). For natural language queries, use natural-query-builder FIRST. Requires authentication.",
                 inputSchema: {
                     serviceId: z.string().describe("The SAP service ID"),
                     entityName: z.string().describe("The entity name within the service"),
@@ -142,7 +143,7 @@ export class HierarchicalSAPToolRegistry {
         this.logger.info("✅ Registered 4 hierarchical discovery tools successfully");
         
         // Register AI-Enhanced Tools for intelligent data processing (temporarily disabled)
-        // await this.registerAIEnhancedTools();
+        await this.registerAIEnhancedTools();
     }
 
     /**
@@ -152,62 +153,178 @@ export class HierarchicalSAPToolRegistry {
      */
     private async registerAIEnhancedTools(): Promise<void> {
         this.logger.info("🤖 AI-Enhanced tools temporarily disabled for TypeScript fixes");
-        /*
+        // Manual registration approach to avoid TypeScript compilation issues
         this.logger.info("🤖 Registering AI-Enhanced tools for intelligent SAP operations");
         
-        for (const tool of aiEnhancedTools) {
-            this.mcpServer.registerTool(
-                tool.name,
-                {
-                    title: tool.name.split('-').map((word: string) => 
-                        word.charAt(0).toUpperCase() + word.slice(1)
-                    ).join(' '),
-                    description: tool.description,
-                    inputSchema: tool.inputSchema
-                },
-                async (args: Record<string, unknown>) => {
-                    try {
-                        this.logger.info(`Executing AI tool: ${tool.name}`, { args });
-                        
-                        const result = await tool.execute(args as any);
-                        
-                        this.logger.info(`AI tool ${tool.name} completed`, { 
-                            success: result.success,
-                            hasResult: !!result
-                        });
-                        
-                        return {
-                            content: [
-                                {
-                                    type: "text" as const,
-                                    text: JSON.stringify(result, null, 2)
-                                }
-                            ]
-                        };
-                    } catch (error) {
-                        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                        this.logger.error(`AI tool ${tool.name} failed`, { error: errorMessage });
-                        
-                        return {
-                            content: [
-                                {
-                                    type: "text" as const,
-                                    text: JSON.stringify({
-                                        success: false,
-                                        error: `AI tool execution failed: ${errorMessage}`,
-                                        toolName: tool.name
-                                    }, null, 2)
-                                }
-                            ]
-                        };
-                    }
+        // Register Natural Query Builder Tool with Zod schema (NO authentication - design-time transformation)
+        this.mcpServer.registerTool(
+            "natural-query-builder",
+            {
+                title: "Natural Query Builder",
+                description: "🔄 PREFERRED TOOL for natural language queries! Convert requests like 'show me customers from last month' or 'analyze business partners created recently' into optimized SAP OData queries. Use this FIRST before execute-entity-operation when the user asks questions in natural language about SAP data. No authentication required.",
+                inputSchema: {
+                    naturalQuery: z.string().describe("Natural language query"),
+                    entityType: z.string().describe("Target SAP entity type"),
+                    serviceId: z.string().describe("SAP service identifier"),
+                    userContext: z.object({
+                        role: z.string().optional(),
+                        businessContext: z.string().optional(),
+                        preferredFields: z.array(z.string()).optional()
+                    }).optional().describe("User context")
                 }
-            );
-        }
-        
-        const aiToolNames = getAllAIToolNames();
-        this.logger.info(`✅ Registered ${aiToolNames.length} AI-Enhanced tools: ${aiToolNames.join(', ')}`);
-        */
+            },
+            async (args: Record<string, unknown>) => {
+                try {
+                    // NO AUTHENTICATION REQUIRED: This is a design-time transformation tool
+                    this.logger.debug(`🔄 Executing natural-query-builder (design-time transformation, no auth required)`);
+                    
+                    const tool = new NaturalQueryBuilderTool();
+                    const result = await tool.execute(args as any);
+                    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    return { content: [{ type: "text", text: JSON.stringify({ success: false, error: errorMessage }, null, 2) }] };
+                }
+            }
+        );
+
+        // Register Smart Data Analysis Tool with Zod schema (requires authentication)
+        this.mcpServer.registerTool(
+            "smart-data-analysis",
+            {
+                title: "Smart Data Analysis", 
+                description: "📊 ANALYSIS TOOL: Use AFTER getting data to analyze trends, anomalies, forecasts in SAP data. Perfect for user requests like 'analyze these business partners' or 'show me trends in this data'. Use after natural-query-builder + execute-entity-operation. Requires SAP authentication.",
+                inputSchema: {
+                    data: z.array(z.any()).describe("Array of data records to analyze"),
+                    analysisType: z.enum(['trend', 'anomaly', 'forecast', 'correlation']).describe("Type of analysis to perform"),
+                    businessContext: z.string().optional().describe("Business context for the analysis"),
+                    entityType: z.string().describe("Type of SAP entity being analyzed")
+                }
+            },
+            async (args: Record<string, unknown>) => {
+                try {
+                    // AUTHENTICATION REQUIRED: Check authentication before AI tool execution
+                    if (this.authManager) {
+                        this.logger.debug(`🔐 Authentication required for smart-data-analysis, checking...`);
+                        const authResult = await this.authManager.authenticateToolCall('smart-data-analysis', args);
+                        
+                        if (!authResult.authenticated) {
+                            return {
+                                content: [{
+                                    type: "text" as const,
+                                    text: JSON.stringify(this.authManager.formatAuthError(authResult), null, 2)
+                                }],
+                                isError: true
+                            };
+                        }
+                        this.logger.info("✅ User authenticated for smart-data-analysis");
+                    } else {
+                        this.logger.warn(`⚠️  No authentication manager available - smart-data-analysis will proceed without authentication`);
+                    }
+                    
+                    const tool = new SmartDataAnalysisTool();
+                    const result = await tool.execute(args as any);
+                    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    return { content: [{ type: "text", text: JSON.stringify({ success: false, error: errorMessage }, null, 2) }] };
+                }
+            }
+        );
+
+        // Register Query Performance Optimizer Tool with Zod schema (requires authentication)
+        this.mcpServer.registerTool(
+            "query-performance-optimizer",
+            {
+                title: "Query Performance Optimizer",
+                description: "Analyze and optimize SAP OData queries for better performance using AI recommendations. Requires SAP authentication.",
+                inputSchema: {
+                    query: z.string().describe("Original OData query URL to optimize"),
+                    entityType: z.string().describe("Target entity type"),
+                    executionStats: z.object({
+                        executionTime: z.number().optional(),
+                        recordCount: z.number().optional(),
+                        dataSize: z.number().optional()
+                    }).optional().describe("Query execution statistics"),
+                    optimizationGoals: z.array(z.enum(['speed', 'bandwidth', 'accuracy', 'caching'])).optional().describe("Primary optimization objectives")
+                }
+            },
+            async (args: Record<string, unknown>) => {
+                try {
+                    // AUTHENTICATION REQUIRED: Check authentication before AI tool execution
+                    if (this.authManager) {
+                        this.logger.debug(`🔐 Authentication required for query-performance-optimizer, checking...`);
+                        const authResult = await this.authManager.authenticateToolCall('query-performance-optimizer', args);
+                        
+                        if (!authResult.authenticated) {
+                            return {
+                                content: [{
+                                    type: "text" as const,
+                                    text: JSON.stringify(this.authManager.formatAuthError(authResult), null, 2)
+                                }],
+                                isError: true
+                            };
+                        }
+                        this.logger.info("✅ User authenticated for query-performance-optimizer");
+                    } else {
+                        this.logger.warn(`⚠️  No authentication manager available - query-performance-optimizer will proceed without authentication`);
+                    }
+                    
+                    const tool = new QueryPerformanceOptimizerTool();
+                    const result = await tool.execute(args as any);
+                    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    return { content: [{ type: "text", text: JSON.stringify({ success: false, error: errorMessage }, null, 2) }] };
+                }
+            }
+        );
+
+        // Register Business Process Insights Tool with Zod schema (requires authentication) 
+        this.mcpServer.registerTool(
+            "business-process-insights",
+            {
+                title: "Business Process Insights",
+                description: "Analyze SAP business processes to identify bottlenecks, inefficiencies, and optimization opportunities using AI. Requires SAP authentication.",
+                inputSchema: {
+                    processType: z.enum(['procurement', 'sales', 'finance', 'inventory', 'hr', 'general']).describe("Type of business process to analyze"),
+                    processData: z.array(z.any()).describe("Historical process execution data"),
+                    timeframe: z.string().optional().describe("Analysis timeframe"),
+                    focusAreas: z.array(z.enum(['efficiency', 'costs', 'compliance', 'quality', 'speed'])).optional().describe("Specific areas to focus the analysis on")
+                }
+            },
+            async (args: Record<string, unknown>) => {
+                try {
+                    // AUTHENTICATION REQUIRED: Check authentication before AI tool execution
+                    if (this.authManager) {
+                        this.logger.debug(`🔐 Authentication required for business-process-insights, checking...`);
+                        const authResult = await this.authManager.authenticateToolCall('business-process-insights', args);
+                        
+                        if (!authResult.authenticated) {
+                            return {
+                                content: [{
+                                    type: "text" as const,
+                                    text: JSON.stringify(this.authManager.formatAuthError(authResult), null, 2)
+                                }],
+                                isError: true
+                            };
+                        }
+                        this.logger.info("✅ User authenticated for business-process-insights");
+                    } else {
+                        this.logger.warn(`⚠️  No authentication manager available - business-process-insights will proceed without authentication`);
+                    }
+                    
+                    const tool = new BusinessProcessInsightsTool();
+                    const result = await tool.execute(args as any);
+                    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    return { content: [{ type: "text", text: JSON.stringify({ success: false, error: errorMessage }, null, 2) }] };
+                }
+            }
+        );
+
+        this.logger.info("✅ Registered 4 AI-Enhanced tools: natural-query-builder, smart-data-analysis, query-performance-optimizer, business-process-insights");
     }
 
     /**
