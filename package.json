@@ -15,6 +15,7 @@
     "start": "node dist/index.js",
     "start:http": "npm run build && node dist/index.js",
     "start:stdio": "npm run build && node dist/mcp-server.js",
+    "mcp": "npm run build && node mcp-stdio.js",
     "inspect:mcp": "npm run build && npx @modelcontextprotocol/inspector node dist/mcp-server.js",
     "inspect": "npx @modelcontextprotocol/inspector",
     "test": "jest",
