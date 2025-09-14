@@ -102,7 +102,7 @@ export class HierarchicalSAPToolRegistry {
             "search-sap-services",
             {
                 title: "Search SAP Services",
-                description: "Search and filter available SAP OData services by name, category, or keyword. Use this first to find relevant services before accessing entities.",
+                description: "Find SAP services by keyword/category.",
                 inputSchema: {
                     query: z.string().optional().describe("Search term to filter services (name, title, description)"),
                     category: z.enum(["business-partner", "sales", "finance", "procurement", "hr", "logistics", "all"]).optional().describe("Service category filter"),
@@ -191,8 +191,8 @@ export class HierarchicalSAPToolRegistry {
         this.mcpServer.registerTool(
             "check-sap-authentication",
             {
-                title: "Check SAP Authentication Status (Auto-Start)",
-                description: "🔐 AUTO-START: Automatically called at session start to validate and pre-authenticate. Ensures smooth workflow without authentication interruptions. MCP clients should call this automatically at the beginning of each new session/conversation.",
+                title: "Check SAP Authentication",
+                description: "🔐 Validate/associate authentication session. Call with session_id to authenticate.",
                 inputSchema: {
                     session_id: z.string().optional().describe("User session ID obtained from OAuth authentication. Provide this to authenticate and associate with your MCP session."),
                     validateSession: z.boolean().default(true).describe("Whether to validate existing session"),
@@ -227,34 +227,10 @@ export class HierarchicalSAPToolRegistry {
                                     content: [{
                                         type: "text" as const,
                                         text: JSON.stringify({
-                                            status: 'authentication_successful',
-                                            message: '✅ Authentication successful! Your session has been associated with this MCP session.',
-                                            authenticationStatus: {
-                                                isAuthenticated: true,
-                                                sessionValid: true,
-                                                userInfo: {
-                                                    user: authResult.context?.user,
-                                                    scopes: authResult.context?.scopes
-                                                },
-                                                sessionId: authResult.context?.sessionId,
-                                                associationCreated: true
-                                            },
-                                            recommendations: [
-                                                'You can now use all SAP tools without providing session_id again',
-                                                'Your authentication will persist for the duration of this MCP session',
-                                                'All execution tools (execute-entity-operation, etc.) are now available'
-                                            ],
-                                            nextSteps: [
-                                                'Use search-sap-services to find available SAP services',
-                                                'Use sap-smart-query for intelligent queries with natural language',
-                                                'Use execute-entity-operation for direct CRUD operations'
-                                            ],
-                                            toolsAvailable: {
-                                                discovery: ['search-sap-services', 'discover-service-entities', 'get-entity-schema'],
-                                                execution: ['execute-entity-operation'],
-                                                ai_enhanced: ['natural-query-builder', 'smart-data-analysis', 'query-performance-optimizer', 'business-process-insights'],
-                                                smart_routing: ['sap-smart-query']
-                                            }
+                                            status: 'authenticated',
+                                            message: '✅ Authentication successful! Session associated.',
+                                            user: authResult.context?.user,
+                                            available_tools: ['search-sap-services', 'sap-smart-query', 'execute-entity-operation']
                                         }, null, 2)
                                     }]
                                 };
@@ -266,22 +242,10 @@ export class HierarchicalSAPToolRegistry {
                                     content: [{
                                         type: "text" as const,
                                         text: JSON.stringify({
-                                            status: 'authentication_failed',
-                                            message: '❌ The provided session ID is invalid or expired.',
-                                            error: authResult.error?.message,
-                                            recommendations: [
-                                                'Your session ID may have expired',
-                                                'Please re-authenticate to get a new session ID'
-                                            ],
-                                            authenticationRequired: {
-                                                authUrl: authResult.error?.authUrl,
-                                                instructions: authResult.error?.instructions || {
-                                                    step1: '1. Visit the authentication URL above',
-                                                    step2: '2. Complete the OAuth authentication process',
-                                                    step3: '3. Copy the Session ID from the success page',
-                                                    step4: '4. Call check-sap-authentication again with the new session_id parameter'
-                                                }
-                                            }
+                                            status: 'auth_failed',
+                                            message: '❌ Session ID invalid/expired',
+                                            auth_url: authResult.error?.authUrl,
+                                            action: 'Visit auth_url, get new session_id, call check-sap-authentication again'
                                         }, null, 2)
                                     }]
                                 };
@@ -294,10 +258,9 @@ export class HierarchicalSAPToolRegistry {
                                 content: [{
                                     type: "text" as const,
                                     text: JSON.stringify({
-                                        status: 'authentication_error',
-                                        message: '❌ Error occurred while testing your session ID',
-                                        error: String(error),
-                                        recommendation: 'Please try again or re-authenticate'
+                                        status: 'error',
+                                        message: '❌ Auth test failed',
+                                        action: 'Try again or re-authenticate'
                                     }, null, 2)
                                 }]
                             };
@@ -410,28 +373,9 @@ export class HierarchicalSAPToolRegistry {
                     } else {
                         response.status = 'authentication_required';
                         response.message = '🔑 Authentication required for SAP data operations';
-                        response.recommendations = [
-                            '🚀 RECOMMENDED: Call check-sap-authentication with your session_id parameter to authenticate now',
-                            'Alternative: Use discovery tools first (search-sap-services, discover-service-entities)',
-                            'When ready for data operations, authentication will be requested'
-                        ];
-                        response.nextSteps = [
-                            '🔑 AUTHENTICATE NOW: Call check-sap-authentication with session_id: "YOUR_SESSION_ID"',
-                            'OR start with: search-sap-services to explore available services',
-                            'Then use: discover-service-entities and get-entity-schema for planning',
-                            'Finally: execute-entity-operation (will prompt for authentication)'
-                        ];
-                        response.authenticationInstructions = {
-                            preferredMethod: 'Call check-sap-authentication with session_id parameter',
-                            example: 'check-sap-authentication({ session_id: "your-session-id-here" })',
-                            getSessionId: {
-                                authUrl: this.authManager ? `${this.authManager.getAuthServerUrl()}/auth/` : 'Authentication URL not available',
-                                step1: 'Visit the OAuth authentication URL above',
-                                step2: 'Complete the SAP authentication process',
-                                step3: 'Copy the Session ID from the success page',
-                                step4: 'Use the Session ID in the check-sap-authentication call'
-                            }
-                        };
+                        response.auth_url = this.authManager ? `${this.authManager.getAuthServerUrl()}/auth/` : 'Auth URL not available';
+                        response.action = 'Visit auth_url → get session_id → call check-sap-authentication({session_id: "your_id"})';
+                        response.available_without_auth = ['search-sap-services', 'discover-service-entities'];
                         
                         if (requestPreAuth) {
                             // Actively trigger authentication process
@@ -1403,36 +1347,34 @@ export class HierarchicalSAPToolRegistry {
     public registerServiceMetadataResources(): void {
         this.logger.info('📜 Registering MCP resources for document grounding');
         
-        // Register workflow guidance resource for MCP clients - READS ACTUAL workflow-guide.md FILE
+        // Register tool routing rules as efficient document grounding resource
         this.mcpServer.registerResource(
-            "sap-workflow-guide",
-            "sap://workflow-guide",
+            "sap-routing-rules",
+            "sap://routing-rules",
             {
-                title: "SAP MCP Workflow Guide",
-                description: "Workflow guide for SAP MCP tools usage",
-                mimeType: "text/markdown"
+                title: "SAP Tool Routing Rules",
+                description: "Complete routing and workflow rules for SAP MCP tools",
+                mimeType: "application/json"
             },
             async () => {
                 try {
-                    // Read the actual workflow-guide.md file for document grounding
-                    const workflowGuidePath = path.join(process.cwd(), 'config', 'workflow-guide.md');
-                    const workflowGuideContent = fs.readFileSync(workflowGuidePath, 'utf-8');
-                    
+                    const routingRulesPath = path.join(process.cwd(), 'config', 'tool-routing-rules.json');
+                    const routingRulesContent = fs.readFileSync(routingRulesPath, 'utf-8');
+
                     return {
                         contents: [{
-                            uri: "sap://workflow-guide",
-                            mimeType: "text/markdown", 
-                            text: workflowGuideContent
+                            uri: "sap://routing-rules",
+                            mimeType: "application/json",
+                            text: routingRulesContent
                         }]
                     };
                 } catch (error) {
-                    this.logger.warn('Failed to read workflow-guide.md, using fallback content:', error);
-                    // Fallback content if file read fails
+                    this.logger.warn('Failed to read tool-routing-rules.json:', error);
                     return {
                         contents: [{
-                            uri: "sap://workflow-guide",
-                            mimeType: "text/markdown", 
-                            text: ""
+                            uri: "sap://routing-rules",
+                            mimeType: "application/json",
+                            text: '{"error": "Tool routing rules not available"}'
                         }]
                     };
                 }
@@ -1507,7 +1449,7 @@ export class HierarchicalSAPToolRegistry {
             })
         );
         
-        this.logger.info('✅ MCP Document Grounding Resources registered: sap://workflow-guide, sap://service/{id}/metadata, sap://services');
+        this.logger.info('✅ MCP Document Grounding Resources registered: sap://routing-rules, sap://service/{id}/metadata, sap://services');
     }
 
 }
