@@ -5,7 +5,7 @@
  * This simulates what happens when CF binds a user-provided service
  */
 
-import { Config } from './dist/utils/config.js';
+import { Config } from '../../dist/utils/config.js';
 
 // Simulate CF VCAP_SERVICES environment variable
 const mockVcapServices = {

@@ -78,6 +78,10 @@ export class MCPServer {
     getServer(): McpServer {
         return this.mcpServer;
     }
+
+    getToolRegistry(): HierarchicalSAPToolRegistry {
+        return this.toolRegistry;
+    }
 }
 
 export async function createMCPServer(

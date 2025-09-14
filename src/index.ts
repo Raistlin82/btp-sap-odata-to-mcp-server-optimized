@@ -72,9 +72,21 @@ async function reloadODataServices(): Promise<{ success: boolean; servicesCount:
         
         // Update the global services list
         discoveredServices = newServices;
-        
+
+        // Update all active MCP server sessions with the new services
+        let updatedSessions = 0;
+        for (const [sessionId, session] of sessions.entries()) {
+            try {
+                await session.server.getToolRegistry().updateDiscoveredServices(newServices);
+                updatedSessions++;
+                logger.debug(`✅ Updated session ${sessionId} with ${newServices.length} services`);
+            } catch (error) {
+                logger.error(`❌ Failed to update session ${sessionId}:`, error);
+            }
+        }
+
         const duration = Date.now() - startTime;
-        logger.info(`✅ Service rediscovery complete: ${newServices.length} services found`);
+        logger.info(`✅ Service rediscovery complete: ${newServices.length} services found, ${updatedSessions} sessions updated`);
         
         // Log successful discovery
         cloudLoggingService.logSAPIntegrationEvent('info', 'service_discovery', 
@@ -342,7 +354,79 @@ const sessions: Map<string, {
     server: MCPServer;
     transport: StreamableHTTPServerTransport;
     createdAt: Date;
+    userSessionId?: string;  // Associate MCP session with user authentication session
 }> = new Map();
+
+// Mapping: MCP Session ID → User Session ID
+const mcpSessionToUserSession: Map<string, string> = new Map();
+
+/**
+ * Associate an MCP session with a user authentication session
+ */
+function associateMCPSessionWithUser(mcpSessionId: string, userSessionId: string): void {
+    logger.info(`🔗 Associating MCP session ${mcpSessionId} with user session ${userSessionId}`);
+
+    // Update the session object
+    const session = sessions.get(mcpSessionId);
+    if (session) {
+        session.userSessionId = userSessionId;
+        sessions.set(mcpSessionId, session);
+    }
+
+    // Update the mapping
+    mcpSessionToUserSession.set(mcpSessionId, userSessionId);
+}
+
+/**
+ * Get user session ID for an MCP session
+ */
+function getUserSessionForMCPSession(mcpSessionId: string): string | undefined {
+    return mcpSessionToUserSession.get(mcpSessionId);
+}
+
+/**
+ * Create automatic association when user provides session ID for the first time
+ * This function will be used by the auth middleware
+ */
+export function createAutoAssociation(userSessionId: string): void {
+    // When a user session ID is used successfully, we create an association
+    // with the most recent MCP session that doesn't have an association yet
+
+    // Find MCP sessions without user session associations
+    for (const [mcpSessionId, session] of sessions.entries()) {
+        if (!session.userSessionId && !mcpSessionToUserSession.has(mcpSessionId)) {
+            // This is a candidate for association
+            logger.info(`🔗 Auto-associating recent unassociated MCP session ${mcpSessionId} with user session ${userSessionId}`);
+            associateMCPSessionWithUser(mcpSessionId, userSessionId);
+            return; // Only associate with the first found session
+        }
+    }
+
+    logger.debug(`No unassociated MCP sessions found for auto-association with user session ${userSessionId}`);
+}
+
+/**
+ * Get user session ID for current request (used by auth middleware)
+ * This will check all current MCP sessions for associations
+ */
+export function getCurrentUserSessionId(): string | undefined {
+    // For now, return the user session from the most recently created MCP session that has an association
+    let mostRecentSession: { mcpSessionId: string; userSessionId: string; createdAt: Date } | undefined;
+
+    for (const [mcpSessionId, session] of sessions.entries()) {
+        if (session.userSessionId) {
+            if (!mostRecentSession || session.createdAt > mostRecentSession.createdAt) {
+                mostRecentSession = {
+                    mcpSessionId,
+                    userSessionId: session.userSessionId,
+                    createdAt: session.createdAt
+                };
+            }
+        }
+    }
+
+    return mostRecentSession?.userSessionId;
+}
 
 /**
  * Clean up expired sessions (older than 24 hours)
@@ -356,6 +440,8 @@ function cleanupExpiredSessions(): void {
             logger.info(`🧹 Cleaning up expired session: ${sessionId}`);
             session.transport.close();
             sessions.delete(sessionId);
+            // Also remove from user session mapping
+            mcpSessionToUserSession.delete(sessionId);
         }
     }
 }
@@ -398,7 +484,7 @@ async function getOrCreateSession(sessionId?: string): Promise<{
                 logger.debug(`✅ Session initialized: ${id}`);
             },
             enableDnsRebindingProtection: false,  // Disable for MCP inspector compatibility
-            allowedHosts: ['127.0.0.1', 'localhost']
+            allowedHosts: ['127.0.0.1', 'localhost', '*']  // Allow all hosts for deployed version
         });
 
         // Connect server to transport
@@ -640,7 +726,7 @@ export function createApp(): express.Application {
             description: 'Modern MCP server for SAP SAP OData services with dynamic CRUD operations',
             protocol: {
                 version: '2025-06-18',
-                transport: 'streamable-http'
+                transport: 'http'
             },
             capabilities: {
                 tools: { listChanged: true },
@@ -927,16 +1013,71 @@ export function createApp(): express.Application {
         }
     });
 
+    // Associate MCP session with user session
+    app.post('/api/associate-session', (req, res) => {
+        try {
+            const { mcpSessionId, userSessionId } = req.body;
+
+            if (!mcpSessionId || !userSessionId) {
+                return res.status(400).json({
+                    error: 'Both mcpSessionId and userSessionId are required'
+                });
+            }
+
+            // Check if MCP session exists
+            if (!sessions.has(mcpSessionId)) {
+                return res.status(404).json({
+                    error: 'MCP session not found'
+                });
+            }
+
+            // Verify that userSessionId exists in tokenStore
+            tokenStore.get(userSessionId).then((tokenData: any) => {
+                if (!tokenData) {
+                    return res.status(404).json({
+                        error: 'User session not found or expired'
+                    });
+                }
+
+                // Associate the sessions
+                associateMCPSessionWithUser(mcpSessionId, userSessionId);
+
+                res.json({
+                    success: true,
+                    message: 'Sessions associated successfully',
+                    mcpSessionId,
+                    userSessionId,
+                    user: tokenData.user
+                });
+            }).catch((error: any) => {
+                logger.error('Error verifying user session:', error);
+                res.status(500).json({
+                    error: 'Failed to verify user session'
+                });
+            });
+
+        } catch (error) {
+            logger.error('Failed to associate sessions:', error);
+            res.status(500).json({ error: 'Failed to associate sessions' });
+        }
+    });
+
     // Update service configuration endpoint
-    app.post('/config/services/update', (req, res) => {
+    app.post('/config/services/update', async (req, res) => {
         try {
             const newConfig = req.body;
             serviceConfigService.updateConfiguration(newConfig);
 
+            logger.info('🔄 Configuration updated, triggering service rediscovery...');
+
+            // Trigger service rediscovery to refresh the sap://services resource
+            const reloadResult = await reloadODataServices();
+
             const updatedConfig = serviceConfigService.getConfigurationSummary();
             res.json({
                 message: 'Configuration updated successfully',
-                configuration: updatedConfig
+                configuration: updatedConfig,
+                serviceRediscovery: reloadResult
             });
         } catch (error) {
             logger.error('Failed to update service configuration:', error);

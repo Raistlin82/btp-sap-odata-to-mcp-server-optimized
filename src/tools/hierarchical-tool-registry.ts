@@ -7,9 +7,11 @@ import { TokenStore } from "../services/token-store.js";
 import { SecureErrorHandler } from "../utils/secure-error-handler.js";
 import { DestinationContext, OperationType } from "../types/destination-types.js";
 import { z } from "zod";
+import * as fs from "fs";
+import * as path from "path";
 // Direct import approach to avoid TypeScript issues
 import { NaturalQueryBuilderTool, SmartDataAnalysisTool, QueryPerformanceOptimizerTool, BusinessProcessInsightsTool } from "./ai-enhanced-tools.js";
-import { WorkflowConfigLoader } from "../utils/workflow-config-loader.js";
+import { realtimeAnalyticsTools } from "./realtime-tools.js";
 import { IntelligentToolRouter } from "../middleware/intelligent-tool-router.js";
 
 /**
@@ -24,20 +26,25 @@ import { IntelligentToolRouter } from "../middleware/intelligent-tool-router.js"
  * 3. get-entity-schema - Get detailed schema for an entity
  * 4. execute-entity-operation - Perform CRUD operations on any entity
  * 
- * AI-Enhanced Tools (4):
+ * AI-Enhanced Tools (4 - Phase 2):
  * 5. natural-query-builder - Convert natural language to optimized queries
  * 6. smart-data-analysis - AI-powered data insights and recommendations
  * 7. query-performance-optimizer - Optimize queries using AI analysis
  * 8. business-process-insights - Analyze business processes for optimization
  * 
- * This reduces context from 200+ tools to just 8 intelligent tools, with AI capabilities
- * that work across any MCP client (Claude, GPT, Gemini, local models, etc.).
+ * Real-time Analytics Tools (4 - Phase 3):
+ * 9. realtime-data-stream - WebSocket streaming with intelligent filtering
+ * 10. kpi-dashboard-builder - Create and manage intelligent KPI dashboards
+ * 11. predictive-analytics-engine - ML-powered forecasting and predictions
+ * 12. business-intelligence-insights - Automated insights from data patterns
+ * 
+ * This reduces context from 200+ tools to just 12 intelligent tools, with AI and real-time
+ * capabilities that work across any MCP client (Claude, GPT, Gemini, local models, etc.).
  */
 export class HierarchicalSAPToolRegistry {
     private serviceCategories = new Map<string, string[]>();
     private authManager?: MCPAuthManager;
     private errorHandler: SecureErrorHandler;
-    private workflowConfig: WorkflowConfigLoader;
     private intelligentRouter: IntelligentToolRouter;
 
     constructor(
@@ -53,8 +60,7 @@ export class HierarchicalSAPToolRegistry {
         // Initialize security middlewares
         this.errorHandler = new SecureErrorHandler(this.logger);
         
-        // Initialize workflow configuration loader and intelligent router
-        this.workflowConfig = WorkflowConfigLoader.getInstance();
+        // Initialize intelligent router
         this.intelligentRouter = new IntelligentToolRouter();
         
         // Initialize authentication manager if token store is provided
@@ -66,6 +72,24 @@ export class HierarchicalSAPToolRegistry {
         }
     }
 
+    /**
+     * Update the discovered services list and refresh resources
+     * This is called when admin configuration filters are updated
+     */
+    public async updateDiscoveredServices(newDiscoveredServices: ODataService[]): Promise<void> {
+        this.logger.info(`🔄 Updating discovered services from ${this.discoveredServices.length} to ${newDiscoveredServices.length} services`);
+
+        // Update the services list
+        this.discoveredServices = newDiscoveredServices;
+
+        // Recategorize services
+        this.categorizeServices();
+
+        // Note: The sap://services resource will automatically reflect the changes
+        // because it reads from this.discoveredServices dynamically
+
+        this.logger.info(`✅ Discovered services updated successfully. sap://services resource will now reflect filtered services.`);
+    }
 
     /**
      * Register the 4 hierarchical discovery tools instead of 200+ individual CRUD tools
@@ -167,9 +191,10 @@ export class HierarchicalSAPToolRegistry {
         this.mcpServer.registerTool(
             "check-sap-authentication",
             {
-                title: "Check SAP Authentication Status",
-                description: "🔐 SESSION VALIDATOR: Call this FIRST to check if user is authenticated for SAP operations. Recommended at the start of each conversation to avoid authentication interruptions during workflow execution. Pre-validates session and guides through authentication if needed.",
+                title: "Check SAP Authentication Status (Auto-Start)",
+                description: "🔐 AUTO-START: Automatically called at session start to validate and pre-authenticate. Ensures smooth workflow without authentication interruptions. MCP clients should call this automatically at the beginning of each new session/conversation.",
                 inputSchema: {
+                    session_id: z.string().optional().describe("User session ID obtained from OAuth authentication. Provide this to authenticate and associate with your MCP session."),
                     validateSession: z.boolean().default(true).describe("Whether to validate existing session"),
                     requestPreAuth: z.boolean().default(true).describe("Whether to request pre-authentication for upcoming operations (recommended: true)"),
                     context: z.object({
@@ -180,12 +205,105 @@ export class HierarchicalSAPToolRegistry {
             },
             async (args: Record<string, unknown>) => {
                 try {
+                    const sessionId = args.session_id as string | undefined;
                     const validateSession = args.validateSession !== false;
                     const requestPreAuth = args.requestPreAuth === true;
                     const context = args.context as any || {};
-                    
-                    this.logger.info(`🔐 Proactive auth check - validate: ${validateSession}, preAuth: ${requestPreAuth}`);
-                    
+
+                    this.logger.info(`🔐 Proactive auth check - sessionId provided: ${!!sessionId}, validate: ${validateSession}, preAuth: ${requestPreAuth}`);
+
+                    // If session ID is provided, try to authenticate with it immediately
+                    if (sessionId && this.authManager) {
+                        this.logger.info(`🔑 User provided session ID, testing authentication...`);
+
+                        try {
+                            // Test authentication with the provided session ID
+                            const authResult = await this.authManager.authenticateToolCall('execute-entity-operation', { session_id: sessionId });
+
+                            if (authResult.authenticated) {
+                                this.logger.info(`✅ Session ID authentication successful for user: ${authResult.context?.user}`);
+
+                                return {
+                                    content: [{
+                                        type: "text" as const,
+                                        text: JSON.stringify({
+                                            status: 'authentication_successful',
+                                            message: '✅ Authentication successful! Your session has been associated with this MCP session.',
+                                            authenticationStatus: {
+                                                isAuthenticated: true,
+                                                sessionValid: true,
+                                                userInfo: {
+                                                    user: authResult.context?.user,
+                                                    scopes: authResult.context?.scopes
+                                                },
+                                                sessionId: authResult.context?.sessionId,
+                                                associationCreated: true
+                                            },
+                                            recommendations: [
+                                                'You can now use all SAP tools without providing session_id again',
+                                                'Your authentication will persist for the duration of this MCP session',
+                                                'All execution tools (execute-entity-operation, etc.) are now available'
+                                            ],
+                                            nextSteps: [
+                                                'Use search-sap-services to find available SAP services',
+                                                'Use sap-smart-query for intelligent queries with natural language',
+                                                'Use execute-entity-operation for direct CRUD operations'
+                                            ],
+                                            toolsAvailable: {
+                                                discovery: ['search-sap-services', 'discover-service-entities', 'get-entity-schema'],
+                                                execution: ['execute-entity-operation'],
+                                                ai_enhanced: ['natural-query-builder', 'smart-data-analysis', 'query-performance-optimizer', 'business-process-insights'],
+                                                smart_routing: ['sap-smart-query']
+                                            }
+                                        }, null, 2)
+                                    }]
+                                };
+
+                            } else {
+                                this.logger.warn(`❌ Session ID authentication failed: ${authResult.error?.message}`);
+
+                                return {
+                                    content: [{
+                                        type: "text" as const,
+                                        text: JSON.stringify({
+                                            status: 'authentication_failed',
+                                            message: '❌ The provided session ID is invalid or expired.',
+                                            error: authResult.error?.message,
+                                            recommendations: [
+                                                'Your session ID may have expired',
+                                                'Please re-authenticate to get a new session ID'
+                                            ],
+                                            authenticationRequired: {
+                                                authUrl: authResult.error?.authUrl,
+                                                instructions: authResult.error?.instructions || {
+                                                    step1: '1. Visit the authentication URL above',
+                                                    step2: '2. Complete the OAuth authentication process',
+                                                    step3: '3. Copy the Session ID from the success page',
+                                                    step4: '4. Call check-sap-authentication again with the new session_id parameter'
+                                                }
+                                            }
+                                        }, null, 2)
+                                    }]
+                                };
+                            }
+
+                        } catch (error) {
+                            this.logger.error('Error testing session ID:', error);
+
+                            return {
+                                content: [{
+                                    type: "text" as const,
+                                    text: JSON.stringify({
+                                        status: 'authentication_error',
+                                        message: '❌ Error occurred while testing your session ID',
+                                        error: String(error),
+                                        recommendation: 'Please try again or re-authenticate'
+                                    }, null, 2)
+                                }]
+                            };
+                        }
+                    }
+
                     let authStatus = {
                         isAuthenticated: false,
                         sessionValid: false,
@@ -214,7 +332,8 @@ export class HierarchicalSAPToolRegistry {
                     // Test auth server connectivity
                     try {
                         // Perform a lightweight auth test to check server reachability
-                        const connectivityTest = await this.authManager.authenticateToolCall('check-sap-authentication', {});
+                        // NOTE: Use a different tool name to avoid recursive call loop
+                        const connectivityTest = await this.authManager.authenticateToolCall('connectivity-test', {});
                         authStatus.authServerReachable = true;
                         
                         if (connectivityTest.authenticated) {
@@ -292,15 +411,27 @@ export class HierarchicalSAPToolRegistry {
                         response.status = 'authentication_required';
                         response.message = '🔑 Authentication required for SAP data operations';
                         response.recommendations = [
-                            'Use discovery tools first (search-sap-services, discover-service-entities)',
-                            'When ready for data operations, authentication will be requested',
-                            'Consider authenticating now to avoid workflow interruptions'
+                            '🚀 RECOMMENDED: Call check-sap-authentication with your session_id parameter to authenticate now',
+                            'Alternative: Use discovery tools first (search-sap-services, discover-service-entities)',
+                            'When ready for data operations, authentication will be requested'
                         ];
                         response.nextSteps = [
-                            'Start with: search-sap-services to explore available services',
+                            '🔑 AUTHENTICATE NOW: Call check-sap-authentication with session_id: "YOUR_SESSION_ID"',
+                            'OR start with: search-sap-services to explore available services',
                             'Then use: discover-service-entities and get-entity-schema for planning',
                             'Finally: execute-entity-operation (will prompt for authentication)'
                         ];
+                        response.authenticationInstructions = {
+                            preferredMethod: 'Call check-sap-authentication with session_id parameter',
+                            example: 'check-sap-authentication({ session_id: "your-session-id-here" })',
+                            getSessionId: {
+                                authUrl: this.authManager ? `${this.authManager.getAuthServerUrl()}/auth/` : 'Authentication URL not available',
+                                step1: 'Visit the OAuth authentication URL above',
+                                step2: 'Complete the SAP authentication process',
+                                step3: 'Copy the Session ID from the success page',
+                                step4: 'Use the Session ID in the check-sap-authentication call'
+                            }
+                        };
                         
                         if (requestPreAuth) {
                             // Actively trigger authentication process
@@ -389,7 +520,7 @@ export class HierarchicalSAPToolRegistry {
             "sap-smart-query",
             {
                 title: "SAP Smart Query Router",
-                description: "🧠 SMART ROUTER: Single entry point for all SAP queries! Automatically analyzes your request and routes to the optimal tool. Supports natural language (IT/EN), direct OData queries, performance analysis, and business process insights. Just describe what you need in plain language!",
+                description: "🧠 PRIMARY ENTRY POINT: Universal router for ALL SAP requests! Automatically routes to the optimal tool sequence. Supports natural language, direct OData queries, analytics, real-time streaming, and more. ALWAYS use this tool for any SAP-related task after authentication!",
                 inputSchema: {
                     userRequest: z.string().describe("Your request in natural language or direct query (e.g., 'show me customers from last month', 'BusinessPartnerSet?$filter=...', 'analyze slow queries')"),
                     context: z.object({
@@ -406,6 +537,11 @@ export class HierarchicalSAPToolRegistry {
                     const context = args.context as any || {};
                     
                     this.logger.info(`🧠 Smart Router analyzing: "${userRequest}"`);
+                    
+                    // Note: Authentication should have been checked automatically at session start
+                    if (!context.previousTools?.includes('check-sap-authentication')) {
+                        this.logger.debug('🔐 Note: Authentication check not in previous tools - should have been done at session start');
+                    }
                     
                     // Analyze request and get routing recommendation
                     const routingResult = this.intelligentRouter.analyzeRequest(userRequest, context);
@@ -428,7 +564,7 @@ export class HierarchicalSAPToolRegistry {
                             nextSteps: routingResult.suggestedSequence
                         },
                         guidance: {
-                            message: `Based on your request "${userRequest}", I recommend using the '${routingResult.selectedTool}' tool.`,
+                            message: `Based on your request "${userRequest}", I recommend using the '${routingResult.selectedTool}' tool.`, 
                             reason: routingResult.reason,
                             nextAction: fullWorkflow.length > 1 ? 
                                 `After using ${routingResult.selectedTool}, consider: ${fullWorkflow.slice(1, 3).join(' → ')}` :
@@ -495,7 +631,7 @@ export class HierarchicalSAPToolRegistry {
             "natural-query-builder",
             {
                 title: "Natural Query Builder",
-                description: this.workflowConfig.getToolDescription("natural-query-builder"),
+                description: "Convert natural language requests into optimized SAP OData queries using AI intelligence. Works with any MCP client (Claude, GPT, etc.)",
                 inputSchema: {
                     naturalQuery: z.string().describe("Natural language query (e.g. 'show business partners from last month', 'analyze sales trends', 'find pending invoices')"),
                     entityType: z.string().describe("Target SAP entity type (use discover-service-entities first if unknown)"),
@@ -515,11 +651,10 @@ export class HierarchicalSAPToolRegistry {
                     const tool = new NaturalQueryBuilderTool();
                     const result = await tool.execute(args as any);
                     
-                    // Add dynamic workflow guidance to response
-                    const nextSteps = this.workflowConfig.getNextSteps("natural-query-builder");
+                    // Add workflow guidance to response
                     const enhancedResult = {
                         ...result,
-                        nextSteps: nextSteps || {
+                        nextSteps: {
                             recommended: "execute-entity-operation",
                             reason: "Use the generated OData query to retrieve actual SAP data",
                             thenAnalyze: "After getting data, use smart-data-analysis for insights"
@@ -539,7 +674,7 @@ export class HierarchicalSAPToolRegistry {
             "smart-data-analysis",
             {
                 title: "Smart Data Analysis", 
-                description: this.workflowConfig.getToolDescription("smart-data-analysis"),
+                description: "Analyze SAP data patterns, trends, and generate actionable business insights with AI-powered statistical analysis. Provides automated data exploration and visualization recommendations.",
                 inputSchema: {
                     data: z.array(z.any()).describe("Array of data records to analyze"),
                     analysisType: z.enum(['trend', 'anomaly', 'forecast', 'correlation']).describe("Type of analysis to perform"),
@@ -568,8 +703,11 @@ export class HierarchicalSAPToolRegistry {
                         this.logger.warn(`⚠️  No authentication manager available - smart-data-analysis will proceed without authentication`);
                     }
                     
+                    // CTM: De-structure session_id from tool arguments to avoid passing it to the tool
+                    const { session_id, ...toolArgs } = args;
+                    
                     const tool = new SmartDataAnalysisTool();
-                    const result = await tool.execute(args as any);
+                    const result = await tool.execute(toolArgs as any);
                     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -583,7 +721,7 @@ export class HierarchicalSAPToolRegistry {
             "query-performance-optimizer",
             {
                 title: "Query Performance Optimizer",
-                description: this.workflowConfig.getToolDescription("query-performance-optimizer"),
+                description: "Optimize SAP OData query performance by analyzing execution patterns and suggesting improvements. Automatically identifies bottlenecks and recommends index strategies.",
                 inputSchema: {
                     query: z.string().describe("Original OData query URL to optimize"),
                     entityType: z.string().describe("Target entity type"),
@@ -616,8 +754,11 @@ export class HierarchicalSAPToolRegistry {
                         this.logger.warn(`⚠️  No authentication manager available - query-performance-optimizer will proceed without authentication`);
                     }
                     
+                    // CTM: De-structure session_id from tool arguments to avoid passing it to the tool
+                    const { session_id, ...toolArgs } = args;
+
                     const tool = new QueryPerformanceOptimizerTool();
-                    const result = await tool.execute(args as any);
+                    const result = await tool.execute(toolArgs as any);
                     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -631,10 +772,10 @@ export class HierarchicalSAPToolRegistry {
             "business-process-insights",
             {
                 title: "Business Process Insights",
-                description: this.workflowConfig.getToolDescription("business-process-insights"),
+                description: "Extract business process insights from SAP transactional data using AI pattern recognition. Identifies workflow inefficiencies and automation opportunities.",
                 inputSchema: {
                     processType: z.enum(['procurement', 'sales', 'finance', 'inventory', 'hr', 'general']).describe("Type of business process to analyze"),
-                    processData: z.array(z.any()).describe("Historical process execution data"),
+                    processData: z.array(z.record(z.any())).describe("Historical process execution data"),
                     timeframe: z.string().optional().describe("Analysis timeframe"),
                     focusAreas: z.array(z.enum(['efficiency', 'costs', 'compliance', 'quality', 'speed'])).optional().describe("Specific areas to focus the analysis on")
                 }
@@ -660,8 +801,11 @@ export class HierarchicalSAPToolRegistry {
                         this.logger.warn(`⚠️  No authentication manager available - business-process-insights will proceed without authentication`);
                     }
                     
+                    // CTM: De-structure session_id from tool arguments to avoid passing it to the tool
+                    const { session_id, ...toolArgs } = args;
+
                     const tool = new BusinessProcessInsightsTool();
-                    const result = await tool.execute(args as any);
+                    const result = await tool.execute(toolArgs as any);
                     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -670,8 +814,162 @@ export class HierarchicalSAPToolRegistry {
             }
         );
 
-        this.logger.info("✅ Registered 4 AI-Enhanced tools: natural-query-builder, smart-data-analysis, query-performance-optimizer, business-process-insights");
+        // ===== PHASE 3: REGISTER REAL-TIME ANALYTICS TOOLS =====
+        await this.registerRealtimeAnalyticsTools();
+
+        this.logger.info("✅ Registered 8 AI-Enhanced tools: 4 Phase 2 + 4 Phase 3 Real-time Analytics tools");
+        
+        // Final summary of all registered tools
+        this.logger.info("🎯 TOTAL TOOLS REGISTERED: 12 (4 Discovery + 4 AI Phase 2 + 4 Real-time Phase 3)");
     }
+
+    /**
+     * Register Phase 3: Real-time Analytics & KPI Dashboard Tools
+     */
+    private async registerRealtimeAnalyticsTools(): Promise<void> {
+        this.logger.info("🔄 Registering Phase 3: Real-time Analytics tools");
+
+        // Register each real-time analytics tool individually
+        for (const tool of realtimeAnalyticsTools) {
+            this.mcpServer.registerTool(
+                tool.name,
+                {
+                    title: tool.description.split(' - ')[0], // Extract title from description
+                    description: tool.description,
+                    inputSchema: (tool.inputSchema as any).shape // Extract the Zod shape
+                },
+                async (args: Record<string, unknown>) => {
+                    try {
+                        // Different authentication requirements based on tool
+                        const requiresAuth = ['kpi-dashboard-builder'].includes(tool.name);
+                        
+                        if (requiresAuth && this.authManager) {
+                            this.logger.debug(`🔐 Authentication required for ${tool.name}, checking...`);
+                            const authResult = await this.authManager.authenticateToolCall(tool.name, args);
+                            
+                            if (!authResult.authenticated) {
+                                return {
+                                    content: [{
+                                        type: "text" as const,
+                                        text: JSON.stringify(this.authManager.formatAuthError(authResult), null, 2)
+                                    }],
+                                    isError: true
+                                };
+                            }
+                            this.logger.info(`✅ User authenticated for ${tool.name}`);
+                        }
+                        
+                        // CTM: De-structure session_id from tool arguments to avoid passing it to the tool
+                        const { session_id, ...toolArgs } = args;
+                        
+                        const result = await tool.execute(toolArgs as any);
+                        return { 
+                            content: [{ 
+                                type: "text" as const, 
+                                text: JSON.stringify(result, null, 2) 
+                            }] 
+                        };
+                    } catch (error) {
+                        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                        return { 
+                            content: [{ 
+                                type: "text" as const, 
+                                text: JSON.stringify({ success: false, error: errorMessage }, null, 2) 
+                            }] 
+                        };
+                    }
+                }
+            );
+        }
+
+        this.logger.info("✅ Registered 4 Real-time Analytics tools: realtime-data-stream, kpi-dashboard-builder, predictive-analytics-engine, business-intelligence-insights");
+    }
+
+    /**
+     * Search local SAP services with filtering capabilities
+     */
+    private async searchServices(args: Record<string, unknown>) {
+        try {
+            const query = args.query as string || '';
+            const category = args.category as string || 'all';
+            const limit = args.limit as number || 10;
+
+            this.logger.info(`🔍 Searching local services: query="${query}", category="${category}", limit=${limit}`);
+
+            // Search local services
+            let filteredServices = this.discoveredServices;
+
+            // Apply category filter
+            if (category !== 'all') {
+                filteredServices = filteredServices.filter(service => {
+                    const serviceCategories = this.serviceCategories.get(service.id) || [];
+                    return serviceCategories.includes(category);
+                });
+            }
+
+            // Apply query filter
+            if (query) {
+                const queryLower = query.toLowerCase();
+                filteredServices = filteredServices.filter(service =>
+                    service.id.toLowerCase().includes(queryLower) ||
+                    service.title.toLowerCase().includes(queryLower) ||
+                    service.description.toLowerCase().includes(queryLower)
+                );
+            }
+
+            // Limit results
+            const services = filteredServices.slice(0, limit).map(service => ({
+                id: service.id,
+                title: service.title,
+                description: service.description,
+                categories: this.serviceCategories.get(service.id) || [],
+                entityCount: service.metadata?.entityTypes?.length || 0,
+                odataVersion: service.odataVersion
+            }));
+
+            // Format response
+            let responseText = `🔍 Search Results for "${query}" in category "${category}"\n\n`;
+            responseText += `📊 Found ${services.length} services\n\n`;
+            
+            if (services.length > 0) {
+                services.forEach((service, idx) => {
+                    responseText += `${idx + 1}. **${service.title}** (${service.id})\n`;
+                    responseText += `   📝 ${service.description}\n`;
+                    responseText += `   📊 ${service.entityCount} entities | ${service.categories.join(', ')}\n\n`;
+                });
+            } else {
+                responseText += `❌ No services found matching your criteria.\n\n`;
+                responseText += `💡 Try:\n`;
+                responseText += `• Different search terms\n`;
+                responseText += `• Broader category (use "all")\n`;
+                responseText += `• Check if services are properly configured in your SAP system\n\n`;
+            }
+
+            responseText += `📋 Next steps:\n`;
+            if (services.length > 0) {
+                responseText += `• Use 'discover-service-entities' to explore service entities\n`;
+            }
+            responseText += `• Use 'natural-query-builder' for data queries`;
+
+            return {
+                content: [{
+                    type: "text" as const,
+                    text: responseText
+                }]
+            };
+
+        } catch (error) {
+            this.logger.error('Error searching services:', error);
+            return {
+                content: [{
+                    type: "text" as const,
+                    text: `❌ Error searching services: ${error instanceof Error ? error.message : String(error)}`
+                }],
+                isError: true
+            };
+        }
+    }
+
 
     /**
      * Categorize services for better discovery using intelligent pattern matching
@@ -731,82 +1029,6 @@ export class HierarchicalSAPToolRegistry {
         this.logger.debug(`Categorized ${this.discoveredServices.length} services into categories`);
     }
 
-    /**
-     * Search services implementation with intelligent filtering
-     */
-    private async searchServices(args: Record<string, unknown>) {
-        try {
-            const query = (args.query as string)?.toLowerCase() || "";
-            const category = args.category as string || "all";
-            const limit = (args.limit as number) || 10;
-
-            let filteredServices = this.discoveredServices;
-
-            // Filter by category first
-            if (category && category !== "all") {
-                filteredServices = filteredServices.filter(service => 
-                    this.serviceCategories.get(service.id)?.includes(category)
-                );
-            }
-
-            // Filter by search query
-            if (query) {
-                filteredServices = filteredServices.filter(service =>
-                    service.id.toLowerCase().includes(query) ||
-                    service.title.toLowerCase().includes(query) ||
-                    service.description.toLowerCase().includes(query)
-                );
-            }
-
-            // Apply limit
-            const totalFound = filteredServices.length;
-            filteredServices = filteredServices.slice(0, limit);
-
-            const result = {
-                query: query || "all",
-                category: category,
-                totalFound: totalFound,
-                showing: filteredServices.length,
-                services: filteredServices.map(service => ({
-                    id: service.id,
-                    title: service.title,
-                    description: service.description,
-                    entityCount: service.metadata?.entityTypes?.length || 0,
-                    categories: this.serviceCategories.get(service.id) || [],
-                    version: service.version,
-                    odataVersion: service.odataVersion
-                }))
-            };
-
-            let responseText = `Found ${totalFound} SAP services`;
-            if (query) responseText += ` matching "${query}"`;
-            if (category !== "all") responseText += ` in category "${category}"`;
-            responseText += `:\n\n${JSON.stringify(result, null, 2)}`;
-            
-            if (result.services.length > 0) {
-                responseText += `\n\n📋 Next step: Use 'discover-service-entities' with a serviceId to see what entities are available in a specific service.`;
-            } else {
-                responseText += `\n\n💡 Try different search terms or categories: business-partner, sales, finance, procurement, hr, logistics`;
-            }
-
-            return {
-                content: [{
-                    type: "text" as const,
-                    text: responseText
-                }]
-            };
-
-        } catch (error) {
-            this.logger.error('Error searching services:', error);
-            return {
-                content: [{
-                    type: "text" as const,
-                    text: `Error searching services: ${error instanceof Error ? error.message : String(error)}`
-                }],
-                isError: true
-            };
-        }
-    }
 
     /**
      * Discover entities within a service with capability information
@@ -1179,7 +1401,9 @@ export class HierarchicalSAPToolRegistry {
      * Register service metadata resources and workflow guides
      */
     public registerServiceMetadataResources(): void {
-        // Register workflow guidance resource for MCP clients
+        this.logger.info('📜 Registering MCP resources for document grounding');
+        
+        // Register workflow guidance resource for MCP clients - READS ACTUAL workflow-guide.md FILE
         this.mcpServer.registerResource(
             "sap-workflow-guide",
             "sap://workflow-guide",
@@ -1188,13 +1412,31 @@ export class HierarchicalSAPToolRegistry {
                 description: "Workflow guide for SAP MCP tools usage",
                 mimeType: "text/markdown"
             },
-            async () => ({
-                contents: [{
-                    uri: "sap://workflow-guide",
-                    mimeType: "text/markdown", 
-                    text: this.workflowConfig.loadWorkflowGuide()
-                }]
-            })
+            async () => {
+                try {
+                    // Read the actual workflow-guide.md file for document grounding
+                    const workflowGuidePath = path.join(process.cwd(), 'config', 'workflow-guide.md');
+                    const workflowGuideContent = fs.readFileSync(workflowGuidePath, 'utf-8');
+                    
+                    return {
+                        contents: [{
+                            uri: "sap://workflow-guide",
+                            mimeType: "text/markdown", 
+                            text: workflowGuideContent
+                        }]
+                    };
+                } catch (error) {
+                    this.logger.warn('Failed to read workflow-guide.md, using fallback content:', error);
+                    // Fallback content if file read fails
+                    return {
+                        contents: [{
+                            uri: "sap://workflow-guide",
+                            mimeType: "text/markdown", 
+                            text: ""
+                        }]
+                    };
+                }
+            }
         );
 
         this.mcpServer.registerResource(
@@ -1264,5 +1506,8 @@ export class HierarchicalSAPToolRegistry {
                 }]
             })
         );
+        
+        this.logger.info('✅ MCP Document Grounding Resources registered: sap://workflow-guide, sap://service/{id}/metadata, sap://services');
     }
+
 }
