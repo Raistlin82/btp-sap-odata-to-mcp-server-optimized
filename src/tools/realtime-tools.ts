@@ -27,7 +27,7 @@ function getRealtimeService(): RealtimeAnalyticsService {
 
 export class RealTimeDataStreamTool {
     public readonly name = 'realtime-data-stream';
-    public readonly description = '🔄 Real-time Data Stream - Stream SAP data in real-time via WebSocket connections with intelligent filtering';
+    public readonly description = 'Real-time Data Stream - Stream SAP data in real-time via WebSocket connections with intelligent filtering';
     
     public readonly inputSchema = z.object({
         action: z.enum(['start_server', 'stop_server', 'subscribe', 'unsubscribe', 'simulate', 'status']),
@@ -148,7 +148,7 @@ export class RealTimeDataStreamTool {
 
 export class KPIDashboardBuilderTool {
     public readonly name = 'kpi-dashboard-builder';
-    public readonly description = '📊 KPI Dashboard Builder - Create and manage intelligent KPI dashboards with real-time SAP data visualization';
+    public readonly description = 'KPI Dashboard Builder - Create and manage intelligent KPI dashboards with real-time SAP data visualization';
     
     public readonly inputSchema = z.object({
         action: z.enum(['create', 'update', 'delete', 'list', 'get', 'refresh']),
@@ -365,7 +365,7 @@ export class KPIDashboardBuilderTool {
 
 export class PredictiveAnalyticsEngineTool {
     public readonly name = 'predictive-analytics-engine';
-    public readonly description = '🔮 Predictive Analytics Engine - Advanced predictive analytics with ML-powered forecasting for SAP business data';
+    public readonly description = 'Predictive Analytics Engine - Advanced predictive analytics with ML-powered forecasting for SAP business data';
     
     public readonly inputSchema = z.object({
         action: z.enum(['predict', 'train', 'evaluate', 'list_models', 'get_model']),
@@ -645,7 +645,7 @@ export class PredictiveAnalyticsEngineTool {
 
 export class BusinessIntelligenceInsightsTool {
     public readonly name = 'business-intelligence-insights';
-    public readonly description = '💡 Business Intelligence Insights - Generate automated business insights and recommendations from real-time SAP data patterns';
+    public readonly description = 'Business Intelligence Insights - Generate automated business insights and recommendations from real-time SAP data patterns';
     
     public readonly inputSchema = z.object({
         action: z.enum(['generate', 'list', 'get', 'configure', 'export']),

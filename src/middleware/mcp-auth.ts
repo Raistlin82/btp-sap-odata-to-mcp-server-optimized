@@ -3,6 +3,7 @@ import { homedir } from 'os';
 import path from 'path';
 import { Logger } from '../utils/logger.js';
 import { TokenStore } from '../services/token-store.js';
+import { createAutoAssociation, getCurrentUserSessionId } from '../index.js';
 
 export interface MCPAuthContext {
   sessionId?: string;
@@ -14,6 +15,7 @@ export interface MCPAuthContext {
     userAgent?: string;
     clientId?: string;
   };
+  source?: string; // Track authentication source (session_id, mcp_session_association, global, etc.)
 }
 
 export interface MCPAuthResult {
@@ -63,6 +65,13 @@ export class MCPAuthManager {
   }
 
   /**
+   * Get the authentication server URL
+   */
+  public getAuthServerUrl(): string {
+    return this.authServerUrl.replace('/auth', '');
+  }
+
+  /**
    * Authenticate MCP tool call - checks multiple authentication sources
    */
   async authenticateToolCall(
@@ -83,32 +92,52 @@ export class MCPAuthManager {
       };
     }
 
-    // For runtime operations (execute-entity-operation), ALWAYS require explicit Session ID
+    // For runtime operations (execute-entity-operation), try session ID first, then fallback to global auth
     if (this.isRuntimeOperation(toolName)) {
+      // First try explicit session ID from arguments
       const sessionId = (args.parameters?.session_id || args.parameters?.auth_session_id) || args?.session_id || args?.auth_session_id;
-      if (!sessionId) {
-        this.logger.warn(`Runtime operation ${toolName} attempted without Session ID`);
-        return {
-          authenticated: false,
-          error: {
-            code: 'SESSION_ID_REQUIRED',
-            message: 'Runtime operations require explicit Session ID. Please provide session_id parameter.',
-            authUrl: `${this.authServerUrl.replace('/auth', '')}/auth/`,
-            instructions: {
-              step1: `1. Authenticate at: ${this.authServerUrl.replace('/auth', '')}/auth/`,
-              step2: `2. Copy your Session ID from the success page`,
-              step3: `3. Include "session_id": "YOUR_SESSION_ID" in your MCP tool parameters`
-            }
-          }
-        };
+
+      let authResult: MCPAuthResult;
+
+      if (sessionId) {
+        // Try session-based authentication
+        authResult = await this.trySessionAuth(args, clientInfo);
+        if (authResult.authenticated) {
+          return authResult;
+        }
+        this.logger.warn(`Runtime operation ${toolName} failed authentication with provided Session ID: ${sessionId}`);
       }
-      
-      // Only try session auth for runtime operations
-      const authResult = await this.trySessionAuth(args, clientInfo);
+
+      // Fallback to MCP session-based authentication (check if MCP session is associated with user session)
+      this.logger.debug(`Runtime operation ${toolName}: No explicit session ID provided, checking MCP session association`);
+      authResult = await this.tryMCPSessionAuth(clientInfo);
+
       if (!authResult.authenticated) {
-        return this.getAuthInstructions();
+        // Final fallback to global authentication (set during OAuth flow)
+        this.logger.debug(`Runtime operation ${toolName}: No MCP session association found, trying global authentication`);
+        authResult = await this.tryGlobalAuth();
       }
-      return authResult;
+
+      if (authResult.authenticated) {
+        this.logger.debug(`Runtime operation ${toolName}: Global authentication successful`);
+        return authResult;
+      }
+
+      // No authentication available - return instructions
+      this.logger.warn(`Runtime operation ${toolName} attempted without valid authentication`);
+      return {
+        authenticated: false,
+        error: {
+          code: 'SESSION_ID_REQUIRED',
+          message: 'Authentication required. Please provide your Session ID to use this tool.',
+          authUrl: `${this.authServerUrl.replace('/auth', '')}/auth/`,
+          instructions: {
+            step1: `1. Authenticate at: ${this.authServerUrl.replace('/auth', '')}/auth/`,
+            step2: `2. Copy your Session ID from the success page`,
+            step3: `3. Include "session_id": "YOUR_SESSION_ID" in your MCP tool parameters`
+          }
+        }
+      };
     }
 
     // For non-runtime operations, use fallback methods including clientId lookup
@@ -149,6 +178,69 @@ export class MCPAuthManager {
     }
 
     return authResult;
+  }
+
+  /**
+   * Method: Try MCP session-based authentication (check if MCP session is associated with user session)
+   */
+  private async tryMCPSessionAuth(clientInfo?: any): Promise<MCPAuthResult> {
+    try {
+      this.logger.debug('MCP session authentication: Checking for existing associations...');
+
+      // Get the associated user session ID for the current request/session
+      const associatedUserSessionId = getCurrentUserSessionId();
+
+      if (associatedUserSessionId) {
+        // We found an associated user session - authenticate using it
+        this.logger.debug(`Found associated user session: ${associatedUserSessionId}`);
+
+        const tokenData = await this.tokenStore.get(associatedUserSessionId);
+        if (tokenData) {
+          this.logger.debug(`✅ MCP session authentication successful for user: ${tokenData.user}`);
+
+          return {
+            authenticated: true,
+            context: {
+              sessionId: tokenData.sessionId,
+              token: tokenData.token,
+              user: tokenData.user,
+              scopes: tokenData.scopes,
+              isAuthenticated: true,
+              clientInfo,
+              source: 'mcp_session_association'
+            }
+          };
+        } else {
+          this.logger.warn(`Associated user session ${associatedUserSessionId} is invalid or expired`);
+          return {
+            authenticated: false,
+            error: {
+              code: 'ASSOCIATED_SESSION_EXPIRED',
+              message: 'Associated user session is invalid or expired'
+            }
+          };
+        }
+      }
+
+      // No association found
+      this.logger.debug('No MCP session associations found');
+      return {
+        authenticated: false,
+        error: {
+          code: 'MCP_SESSION_NOT_ASSOCIATED',
+          message: 'MCP session not associated with user session'
+        }
+      };
+    } catch (error) {
+      this.logger.error('Error during MCP session authentication:', error);
+      return {
+        authenticated: false,
+        error: {
+          code: 'MCP_SESSION_AUTH_ERROR',
+          message: 'Error during MCP session authentication'
+        }
+      };
+    }
   }
 
   /**
@@ -212,6 +304,15 @@ export class MCPAuthManager {
       if (sessionId) {
         const tokenData = await this.tokenStore.get(sessionId);
         if (tokenData) {
+          // SUCCESS: Create automatic association with MCP session
+          this.logger.debug(`✅ Session ID authentication successful for user: ${tokenData.user}`);
+          try {
+            createAutoAssociation(sessionId);
+          } catch (error) {
+            this.logger.warn('Failed to create auto-association:', error);
+            // Don't fail authentication if association fails
+          }
+
           return {
             authenticated: true,
             context: {
