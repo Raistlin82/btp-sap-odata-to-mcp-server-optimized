@@ -11,7 +11,7 @@
 **Transform your SAP interactions**: From complex OData queries to simple conversations. Ask "*Find all high-value pending invoices from this month*" and get intelligent, optimized results.
 
 ### 🌟 Key Highlights
-- 🧠 **8 Intelligent MCP Tools** (4 Core SAP + 4 AI-Enhanced)
+- 🧠 **Intelligent MCP Tools** (Core SAP + AI-Enhanced)
 - 🗣️ **Natural Language to OData** conversion with 95% accuracy  
 - 🔄 **Intelligent Tool Routing** that understands user intent
 - ⚡ **Real-time Query Optimization** with caching
