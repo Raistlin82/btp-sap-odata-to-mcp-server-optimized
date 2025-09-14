@@ -398,7 +398,7 @@ async function getOrCreateSession(sessionId?: string): Promise<{
                 logger.debug(`✅ Session initialized: ${id}`);
             },
             enableDnsRebindingProtection: false,  // Disable for MCP inspector compatibility
-            allowedHosts: ['127.0.0.1', 'localhost']
+            allowedHosts: ['127.0.0.1', 'localhost', '*']  // Allow all hosts for deployed version
         });
 
         // Connect server to transport
@@ -640,7 +640,7 @@ export function createApp(): express.Application {
             description: 'Modern MCP server for SAP SAP OData services with dynamic CRUD operations',
             protocol: {
                 version: '2025-06-18',
-                transport: 'streamable-http'
+                transport: 'http'
             },
             capabilities: {
                 tools: { listChanged: true },

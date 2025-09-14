@@ -1,0 +1,575 @@
+{
+  "version": "2.0.0",
+  "lastUpdated": "2025-01-12",
+  "toolSelectionRules": {
+    "note": "Pattern matching is now handled via document grounding with workflow-guide.md MCP resource",
+    "directQueryPatterns": [
+      "\\$filter=",
+      "\\$select=",
+      "\\$expand=",
+      "\\$top=",
+      "\\$skip=",
+      "Set\\?"
+    ]
+  },
+  "toolPriorities": {
+    "naturalLanguage": {
+      "primary": "natural-query-builder",
+      "fallback": "execute-entity-operation",
+      "authRequired": false
+    },
+    "directQuery": {
+      "primary": "execute-entity-operation", 
+      "authRequired": true
+    },
+    "performance": {
+      "primary": "query-performance-optimizer",
+      "authRequired": true
+    },
+    "process": {
+      "primary": "business-process-insights",
+      "authRequired": true
+    },
+    "realtime": {
+      "primary": "realtime-data-stream",
+      "secondary": "kpi-dashboard-builder",
+      "authRequired": false
+    },
+    "dashboard": {
+      "primary": "kpi-dashboard-builder",
+      "fallback": "smart-data-analysis",
+      "authRequired": true
+    },
+    "predictive": {
+      "primary": "predictive-analytics-engine",
+      "fallback": "smart-data-analysis",
+      "authRequired": false
+    },
+    "insights": {
+      "primary": "business-intelligence-insights",
+      "fallback": "smart-data-analysis",
+      "authRequired": false
+    }
+  },
+  "workflowSequences": {
+    "naturalLanguageAnalytics": [
+      {
+        "step": 1,
+        "tool": "search-sap-services",
+        "auth": false,
+        "condition": "serviceId unknown"
+      },
+      {
+        "step": 2, 
+        "tool": "discover-service-entities",
+        "auth": false,
+        "condition": "entityType unknown"
+      },
+      {
+        "step": 3,
+        "tool": "get-entity-schema", 
+        "auth": false,
+        "condition": "schema needed"
+      },
+      {
+        "step": 4,
+        "tool": "natural-query-builder",
+        "auth": false,
+        "mandatory": true
+      },
+      {
+        "step": 5,
+        "tool": "execute-entity-operation",
+        "auth": true,
+        "mandatory": true
+      },
+      {
+        "step": 6,
+        "tool": "smart-data-analysis",
+        "auth": true,
+        "condition": "analysis requested"
+      }
+    ],
+    "directExecution": [
+      {
+        "step": 1,
+        "tool": "execute-entity-operation",
+        "auth": true,
+        "mandatory": true
+      }
+    ],
+    "businessProcessAnalysis": [
+      {
+        "step": 1,
+        "tool": "search-sap-services",
+        "auth": false,
+        "condition": "serviceId unknown",
+        "description": "Find relevant SAP services for process analysis"
+      },
+      {
+        "step": 2,
+        "tool": "discover-service-entities",
+        "auth": false,
+        "condition": "entityType unknown",
+        "description": "Identify process-related entities"
+      },
+      {
+        "step": 3,
+        "tool": "execute-entity-operation",
+        "auth": true,
+        "mandatory": true,
+        "description": "Extract historical process data"
+      },
+      {
+        "step": 4,
+        "tool": "business-process-insights",
+        "auth": true,
+        "mandatory": true,
+        "description": "Analyze process for bottlenecks and optimization opportunities"
+      }
+    ],
+    "performanceOptimization": [
+      {
+        "step": 1,
+        "tool": "query-performance-optimizer",
+        "auth": true,
+        "mandatory": true,
+        "description": "Analyze and optimize query performance"
+      },
+      {
+        "step": 2,
+        "tool": "execute-entity-operation",
+        "auth": true,
+        "mandatory": true,
+        "description": "Execute optimized query to validate improvements"
+      }
+    ],
+    "realtimeAnalytics": [
+      {
+        "step": 1,
+        "tool": "realtime-data-stream",
+        "auth": false,
+        "mandatory": true,
+        "description": "Initialize WebSocket streaming for real-time data"
+      },
+      {
+        "step": 2,
+        "tool": "kpi-dashboard-builder",
+        "auth": true,
+        "condition": "dashboard needed",
+        "description": "Create KPI dashboard for real-time visualization"
+      },
+      {
+        "step": 3,
+        "tool": "business-intelligence-insights",
+        "auth": false,
+        "condition": "insights needed",
+        "description": "Generate automated insights from streaming data"
+      }
+    ],
+    "predictiveAnalytics": [
+      {
+        "step": 1,
+        "tool": "search-sap-services",
+        "auth": false,
+        "condition": "serviceId unknown",
+        "description": "Find relevant services for predictive modeling"
+      },
+      {
+        "step": 2,
+        "tool": "execute-entity-operation",
+        "auth": true,
+        "condition": "historical data needed",
+        "description": "Extract historical data for model training"
+      },
+      {
+        "step": 3,
+        "tool": "predictive-analytics-engine",
+        "auth": false,
+        "mandatory": true,
+        "description": "Generate ML-powered predictions and forecasts"
+      },
+      {
+        "step": 4,
+        "tool": "business-intelligence-insights",
+        "auth": false,
+        "condition": "insights needed",
+        "description": "Analyze predictions and generate actionable insights"
+      }
+    ],
+    "dashboardCreation": [
+      {
+        "step": 1,
+        "tool": "search-sap-services",
+        "auth": false,
+        "condition": "services unknown",
+        "description": "Identify data sources for dashboard"
+      },
+      {
+        "step": 2,
+        "tool": "discover-service-entities",
+        "auth": false,
+        "condition": "entities unknown",
+        "description": "Discover relevant entities for KPI calculation"
+      },
+      {
+        "step": 3,
+        "tool": "kpi-dashboard-builder",
+        "auth": true,
+        "mandatory": true,
+        "description": "Create intelligent KPI dashboard"
+      },
+      {
+        "step": 4,
+        "tool": "realtime-data-stream",
+        "auth": false,
+        "condition": "real-time updates needed",
+        "description": "Enable real-time data updates for dashboard"
+      }
+    ],
+    "comprehensiveBusinessIntelligence": [
+      {
+        "step": 1,
+        "tool": "execute-entity-operation",
+        "auth": true,
+        "mandatory": true,
+        "description": "Extract business data for comprehensive analysis"
+      },
+      {
+        "step": 2,
+        "tool": "smart-data-analysis",
+        "auth": false,
+        "mandatory": true,
+        "description": "Perform initial data analysis and pattern recognition"
+      },
+      {
+        "step": 3,
+        "tool": "business-intelligence-insights",
+        "auth": false,
+        "mandatory": true,
+        "description": "Generate comprehensive business insights"
+      },
+      {
+        "step": 4,
+        "tool": "predictive-analytics-engine",
+        "auth": false,
+        "condition": "forecasting needed",
+        "description": "Add predictive analytics for future planning"
+      },
+      {
+        "step": 5,
+        "tool": "kpi-dashboard-builder",
+        "auth": true,
+        "condition": "visualization needed",
+        "description": "Create executive dashboard with key insights"
+      }
+    ]
+  },
+  "toolDescriptionTemplates": {
+    "check-sap-authentication": {
+      "indicator": "🔐 SESSION",
+      "description": "Check authentication status and validate user session for SAP operations. Call this FIRST at the start of conversations to avoid authentication interruptions.",
+      "requirement": "Recommended as first step in new sessions",
+      "examples": [
+        "Check if user is authenticated",
+        "Validate session before SAP operations",
+        "Pre-authenticate for upcoming workflow"
+      ],
+      "parameters": {
+        "validateSession": "true (default) - Whether to validate existing session",
+        "requestPreAuth": "true (recommended) - Whether to request pre-authentication",
+        "context": "Optional context for session type and anticipated operations"
+      },
+      "nextSteps": {
+        "ifAuthenticated": "Proceed with any SAP tool without interruption",
+        "ifNotAuthenticated": "Complete authentication flow, then continue with workflow"
+      }
+    },
+    "sap-smart-query": {
+      "indicator": "🧠 SMART ROUTER",
+      "description": "Single entry point for ALL SAP queries with intelligent routing. Automatically analyzes requests and routes to optimal tools.",
+      "requirement": "Use for any SAP request when unsure which specific tool to use",
+      "examples": [
+        "show me customers from last month",
+        "analyze procurement workflow",
+        "BusinessPartnerSet?$filter=...",
+        "optimize slow queries",
+        "mostra business partner creati"
+      ],
+      "parameters": {
+        "userRequest": "Your request in natural language or direct query",
+        "context": "Optional context with serviceId, entityType, previousTools"
+      },
+      "nextSteps": {
+        "recommended": "Follow the routing recommendation provided",
+        "reason": "Smart router provides optimal workflow sequence based on request analysis"
+      }
+    },
+    "search-sap-services": {
+      "indicator": "🔍 DISCOVERY",
+      "description": "Search and filter available SAP OData services by name, category, or keyword. Use first to find relevant services.",
+      "requirement": "No authentication required - discovery phase",
+      "examples": [
+        "Find business partner services",
+        "Search for sales-related services",
+        "List finance services"
+      ],
+      "parameters": {
+        "query": "Search term to filter services",
+        "category": "business-partner | sales | finance | procurement | hr | logistics | all",
+        "limit": "Maximum number of services to return (default: 10)"
+      },
+      "nextSteps": {
+        "recommended": "discover-service-entities",
+        "reason": "After finding services, explore their entities"
+      }
+    },
+    "discover-service-entities": {
+      "indicator": "📁 ENTITIES",
+      "description": "List all entities and their capabilities within a specific SAP service. Use after finding a service.",
+      "requirement": "No authentication required - discovery phase",
+      "examples": [
+        "Show entities in API_BUSINESS_PARTNER",
+        "List customer-related entities",
+        "Explore service capabilities"
+      ],
+      "parameters": {
+        "serviceId": "The SAP service ID to explore",
+        "showCapabilities": "true (default) - Show CRUD capabilities for each entity"
+      },
+      "nextSteps": {
+        "recommended": "get-entity-schema or execute-entity-operation",
+        "reason": "After discovering entities, get detailed schema or start operations"
+      }
+    },
+    "get-entity-schema": {
+      "indicator": "📋 SCHEMA",
+      "description": "Get detailed schema information for a specific entity including properties, types, keys, and constraints.",
+      "requirement": "No authentication required - discovery phase",
+      "examples": [
+        "Get BusinessPartner entity schema",
+        "Show Customer properties and types",
+        "Understand entity structure"
+      ],
+      "parameters": {
+        "serviceId": "The SAP service ID",
+        "entityName": "The entity name within the service"
+      },
+      "nextSteps": {
+        "recommended": "execute-entity-operation or natural-query-builder",
+        "reason": "After understanding schema, use it for operations or query building"
+      }
+    },
+    "natural-query-builder": {
+      "indicator": "🔄 PREFERRED",
+      "description": "Convert natural language requests into optimized SAP OData queries",
+      "examples": [
+        "show me customers from last month",
+        "analyze business partners created recently",
+        "mostra clienti ultimo mese",
+        "analizza business partner creati di recente"
+      ],
+      "nextSteps": {
+        "recommended": "execute-entity-operation",
+        "reason": "Use generated OData query to retrieve actual SAP data"
+      }
+    },
+    "execute-entity-operation": {
+      "indicator": "⚠️ DIRECT",
+      "description": "Execute exact OData queries on SAP entities",
+      "warning": "Use ONLY with precise OData syntax, not natural language",
+      "examples": [
+        "BusinessPartnerSet?$filter=CreationDate ge datetime'2024-11-01'",
+        "CustomerSet?$top=10&$orderby=Name"
+      ]
+    },
+    "smart-data-analysis": {
+      "indicator": "📊 ANALYSIS",
+      "description": "Analyze SAP data using AI for trends and insights", 
+      "requirement": "Use AFTER getting data from execute-entity-operation",
+      "examples": [
+        "Analyze retrieved business partner data for trends",
+        "Generate insights from customer purchase patterns"
+      ]
+    },
+    "business-process-insights": {
+      "indicator": "🔄 PROCESS",
+      "description": "Analyze SAP business processes to identify bottlenecks, inefficiencies, and optimization opportunities using AI",
+      "requirement": "Requires historical process data - use after execute-entity-operation to get process transactions",
+      "examples": [
+        "analyze procurement workflow bottlenecks",
+        "identify inefficiencies in sales process", 
+        "optimize finance approval workflows",
+        "analizza colli di bottiglia nel processo",
+        "ottimizza flusso di lavoro vendite"
+      ],
+      "parameters": {
+        "processType": "procurement | sales | finance | inventory | hr | general",
+        "processData": "Array of historical process execution data from SAP",
+        "timeframe": "Analysis period (e.g., 'last 30 days', 'Q3 2024')",
+        "focusAreas": "efficiency | costs | compliance | quality | speed"
+      },
+      "nextSteps": {
+        "recommended": "No additional tools needed - provides complete analysis",
+        "reason": "business-process-insights is a terminal analysis tool that provides comprehensive recommendations"
+      },
+      "workflow": "businessProcessAnalysis"
+    },
+    "query-performance-optimizer": {
+      "indicator": "⚡ OPTIMIZE", 
+      "description": "Analyze and optimize SAP OData queries for better performance using AI recommendations",
+      "requirement": "Use when queries are slow or need optimization",
+      "examples": [
+        "optimize slow queries in the system",
+        "improve query performance",
+        "le query sono lente, ottimizza"
+      ],
+      "workflow": "performanceOptimization"
+    },
+    "realtime-data-stream": {
+      "indicator": "🔄 STREAM",
+      "description": "Enable real-time WebSocket data streaming from SAP systems with intelligent filtering and subscriptions",
+      "requirement": "Use for live data updates, continuous monitoring, or real-time applications",
+      "examples": [
+        "stream real-time sales data",
+        "continuous monitoring of inventory levels",
+        "live updates for business metrics",
+        "streaming dati in tempo reale",
+        "monitoraggio continuo vendite"
+      ],
+      "parameters": {
+        "action": "start_server | subscribe | simulate | status",
+        "entityType": "SAP entity to stream (e.g., SalesOrder, Product)",
+        "serviceId": "SAP service identifier",
+        "frequency": "realtime | high | medium | low - streaming frequency"
+      },
+      "nextSteps": {
+        "recommended": "kpi-dashboard-builder or business-intelligence-insights",
+        "reason": "Stream data is best visualized in dashboards or analyzed for insights"
+      },
+      "workflow": "realtimeAnalytics"
+    },
+    "kpi-dashboard-builder": {
+      "indicator": "📊 DASHBOARD",
+      "description": "Create intelligent KPI dashboards with real-time SAP data visualization and automated insights",
+      "requirement": "Requires authentication - creates persistent dashboards with live data connections",
+      "examples": [
+        "create sales performance dashboard",
+        "build executive KPI dashboard", 
+        "visualize real-time business metrics",
+        "cruscotto vendite in tempo reale",
+        "dashboard KPI aziendali"
+      ],
+      "parameters": {
+        "action": "create | update | list | get",
+        "dashboard": "Dashboard configuration with KPIs and layout",
+        "includeData": "true/false - include current KPI values"
+      },
+      "nextSteps": {
+        "recommended": "realtime-data-stream for live updates",
+        "reason": "Dashboards are enhanced with real-time data streaming"
+      },
+      "workflow": "dashboardCreation"
+    },
+    "predictive-analytics-engine": {
+      "indicator": "🔮 PREDICT",
+      "description": "Advanced ML-powered forecasting and predictive analytics for SAP business data",
+      "requirement": "Uses historical data to generate future predictions with confidence intervals",
+      "examples": [
+        "predict future sales revenue",
+        "forecast inventory demand",
+        "analyze future business trends",
+        "prevedi ricavi futuri",
+        "analisi predittiva vendite"
+      ],
+      "parameters": {
+        "action": "predict | train | evaluate | list_models",
+        "entityType": "Data entity for prediction",
+        "targetMetric": "Metric to predict (revenue, count, etc.)",
+        "forecastPeriod": "Prediction time horizon",
+        "algorithm": "ML algorithm: time_series | linear_regression | neural_network"
+      },
+      "nextSteps": {
+        "recommended": "business-intelligence-insights for interpretation",
+        "reason": "Predictions are best understood through comprehensive business insights"
+      },
+      "workflow": "predictiveAnalytics"
+    },
+    "business-intelligence-insights": {
+      "indicator": "💡 INSIGHTS",
+      "description": "Generate automated business insights and recommendations from SAP data patterns using AI analysis",
+      "requirement": "Analyzes data to provide actionable business intelligence and trend detection",
+      "examples": [
+        "generate comprehensive business insights",
+        "analyze data patterns and trends",
+        "automated business intelligence report",
+        "insights automatici dai dati",
+        "analisi intelligente business"
+      ],
+      "parameters": {
+        "action": "generate | list | get | configure | export",
+        "entityTypes": "Array of SAP entities to analyze",
+        "analysisType": "trend | anomaly | correlation | optimization | comprehensive",
+        "timeWindow": "Analysis time period",
+        "minConfidence": "Minimum confidence threshold (0-1)"
+      },
+      "nextSteps": {
+        "recommended": "No additional tools needed - terminal analysis",
+        "reason": "Provides comprehensive insights and actionable recommendations"
+      },
+      "workflow": "comprehensiveBusinessIntelligence"
+    }
+  },
+  "authenticationRules": {
+    "noAuthRequired": [
+      "search-sap-services",
+      "discover-service-entities", 
+      "get-entity-schema",
+      "natural-query-builder",
+      "realtime-data-stream",
+      "predictive-analytics-engine",
+      "business-intelligence-insights"
+    ],
+    "authRequired": [
+      "execute-entity-operation",
+      "smart-data-analysis",
+      "query-performance-optimizer", 
+      "business-process-insights",
+      "kpi-dashboard-builder"
+    ]
+  },
+  "errorPrevention": {
+    "commonMistakes": [
+      {
+        "mistake": "Using execute-entity-operation with natural language",
+        "solution": "Use natural-query-builder first",
+        "example": "Instead of 'execute: show customers' → use natural-query-builder"
+      },
+      {
+        "mistake": "Using smart-data-analysis without data",
+        "solution": "Execute query first to get data",
+        "example": "First get data with execute-entity-operation, then analyze"
+      }
+    ]
+  },
+  "customization": {
+    "companySpecificTerms": {
+      "windtre": [
+        "contratti",
+        "clienti aziendali", 
+        "fatturazione",
+        "servizi telefonici"
+      ]
+    },
+    "domainSpecificWorkflows": {
+      "telecommunications": {
+        "entities": ["Contract", "Customer", "Invoice", "Service"],
+        "commonQueries": [
+          "active contracts",
+          "monthly billing",
+          "service usage"
+        ]
+      }
+    }
+  }
+}

@@ -4,7 +4,7 @@
  * Simple test to verify configuration priority and pattern matching
  */
 
-import { Config } from './dist/utils/config.js';
+import { Config } from '../../dist/utils/config.js';
 
 console.log('🧪 Simple Configuration Test\n');
 

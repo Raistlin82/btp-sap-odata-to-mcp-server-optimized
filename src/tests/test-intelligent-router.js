@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // Test script per l'Intelligent Tool Router
-import { IntelligentToolRouter } from './dist/middleware/intelligent-tool-router.js';
+import { IntelligentToolRouter } from '../../dist/middleware/intelligent-tool-router.js';
 
 console.log('🧪 Testing Intelligent Tool Router...\n');
 

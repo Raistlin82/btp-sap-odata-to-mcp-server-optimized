@@ -5,8 +5,8 @@
  * Tests both AI Query Builder service AND AI Enhanced MCP Tools
  */
 
-import { AIQueryBuilderService } from './dist/services/ai-query-builder.js';
-import { aiEnhancedTools, getAIToolByName, getAllAIToolNames } from './dist/tools/ai-enhanced-tools.js';
+import { AIQueryBuilderService } from '../../dist/services/ai-query-builder.js';
+import { aiEnhancedTools, getAIToolByName, getAllAIToolNames } from '../../dist/tools/ai-enhanced-tools.js';
 
 async function testCompletePhase2() {
     console.log('🧪 Testing Complete Phase 2 Integration: AI Query Builder + AI Enhanced Tools\n');
