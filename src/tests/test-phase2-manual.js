@@ -4,7 +4,7 @@
  * Manual Test Script for Phase 2: AI-Powered Query Builder
  */
 
-import { AIQueryBuilderService } from './dist/services/ai-query-builder.js';
+import { AIQueryBuilderService } from '../../dist/services/ai-query-builder.js';
 
 async function testPhase2() {
     console.log('🧪 Testing Phase 2: AI-Powered Query Builder\n');

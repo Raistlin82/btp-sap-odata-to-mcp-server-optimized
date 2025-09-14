@@ -4,7 +4,7 @@
  * Manual Test Script for AI Integration Phase 1
  */
 
-import { AIIntegrationService } from './dist/services/ai-integration.js';
+import { AIIntegrationService } from '../../dist/services/ai-integration.js';
 
 async function testAIIntegration() {
     console.log('🧪 Testing AI Integration Service - Phase 1\n');

@@ -5,8 +5,8 @@
  * 4 Core SAP Tools + 4 AI-Enhanced Tools
  */
 
-import { NaturalQueryBuilderTool, SmartDataAnalysisTool, QueryPerformanceOptimizerTool, BusinessProcessInsightsTool } from './dist/tools/ai-enhanced-tools.js';
-import { AIQueryBuilderService } from './dist/services/ai-query-builder.js';
+import { NaturalQueryBuilderTool, SmartDataAnalysisTool, QueryPerformanceOptimizerTool, BusinessProcessInsightsTool } from '../../dist/tools/ai-enhanced-tools.js';
+import { AIQueryBuilderService } from '../../dist/services/ai-query-builder.js';
 
 async function testAllEightTools() {
     console.log('🧪 Final Test: Verifying All 8 MCP Tools\n');
