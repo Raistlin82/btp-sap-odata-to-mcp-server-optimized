@@ -1,171 +1,78 @@
-# System Architecture
+# Architettura di Sistema
 
-> **Reference to Original Project**  
-> This architecture extends the foundation laid by [@lemaiwo](https://github.com/lemaiwo)'s original [btp-sap-odata-to-mcp-server](https://github.com/lemaiwo/btp-sap-odata-to-mcp-server) with enterprise-grade enhancements.
+Questa architettura estende le fondamenta del progetto originale con miglioramenti enterprise, focalizzandosi su un modello a tool gerarchico e un routing intelligente per massimizzare l'efficienza e la semplicità d'uso.
 
-## 🏗️ High-Level Architecture
+## Architettura Concettuale
 
 ```mermaid
-graph TB
-    subgraph "Client Layer"
-        A[Claude Desktop]
-        B[Other MCP Clients]
-        C[Web Browser]
+graph TD
+    subgraph "Client Layer (Claude, etc.)"
+        A[Client MCP]
     end
-    
-    subgraph "MCP Server Application"
-        D[MCP Protocol Handler]
-        E[Authentication Manager]
-        F[Tool Registry]
-        G[Health Service]
+
+    subgraph "SAP MCP Server"
+        B(sap-smart-query: Universal Router) --> C{Intelligent Routing Engine}
+        C --> D[Tool Gerarchici]
+        D --> E[Authentication & Session Core]
+        E --> F[SAP Connectivity Layer]
     end
-    
+
     subgraph "SAP BTP Services"
-        H[SAP IAS]
-        I[XSUAA Service]
-        J[Connectivity Service]
-        K[Destination Service]
-        L[Cloud Logging]
+        G[XSUAA & IAS]
+        H[Connectivity & Destination]
     end
-    
-    subgraph "SAP Backend Systems"
-        M[SAP S/4HANA]
-        N[Other SAP Systems]
+
+    subgraph "Sistemi SAP Backend"
+        I[SAP S/4HANA, ECC, etc.]
     end
-    
-    A --> D
-    B --> D
-    C --> E
-    D --> E
-    D --> F
-    E --> H
-    E --> I
-    F --> J
-    F --> K
-    G --> L
-    J --> M
-    J --> N
+
+    A --> B
+    E -- "Verifica Ruoli/Ambiti" --> G
+    F -- "Recupera Destination" --> H
+    F -- "Inoltra Chiamata OData" --> I
 ```
 
-## 🔧 Core Components
+## Componenti Chiave
 
-### 1. MCP Protocol Layer
-- **Location**: `src/mcp-server.ts`, `src/tools/hierarchical-tool-registry.ts`
-- **Purpose**: Handle MCP communication and tool management
-- **Features**: HTTP/stdio transport, tool registration, request routing
+### 1. Il Modello a Tool Gerarchici
 
-### 2. Authentication & Authorization
-- **Location**: `src/middleware/auth.ts`, `src/services/auth-server.ts`
-- **Purpose**: Secure access control and session management
-- **Features**: SAP IAS integration, JWT tokens, role-based permissions
+Il problema della "tool explosion" (centinaia di tool per ogni entità e operazione) è risolto a livello architetturale. Invece di registrare un tool per ogni operazione CRUD, il sistema espone un **set limitato di tool di alto livello**:
 
-### 3. Tool Registry
-- **Location**: `src/tools/hierarchical-tool-registry.ts`
-- **Purpose**: Manage and execute SAP OData tools
-- **Categories**:
-  - **Discovery Tools** (Public): `search-sap-services`, `discover-service-entities`
-  - **Runtime Tools** (Authenticated): `execute-entity-operation`
+-   **Tool di Discovery (Pubblici)**: `search-sap-services`, `discover-service-entities`, `get-entity-schema`.
+-   **Tool di Esecuzione (Protetti)**: `execute-entity-operation`.
+-   **Tool AI & Real-time**: `natural-query-builder`, `smart-data-analysis`, `realtime-data-stream`, etc.
 
-### 4. SAP Connectivity Layer
-- **Location**: `src/services/destination-service.ts`, `src/services/sap-client.ts`
-- **Purpose**: Connect to SAP backend systems
-- **Features**: Destination management, connection pooling, principal propagation
+Questo approccio **riduce drasticamente il contesto** inviato al client (da migliaia a poche centinaia di token), migliora le performance e semplifica l'interazione per l'utente finale.
 
-## 🔐 Security Architecture
+### 2. Il Router Universale `sap-smart-query`
 
-### Authentication Flow
+Questo è **l'unico entry point** che l'utente dovrebbe usare. Il router agisce come un "cervello" che:
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant M as MCP Server
-    participant I as SAP IAS
-    participant S as SAP System
-    
-    C->>M: Tool Request
-    M->>M: Check Authentication
-    alt No Session
-        M->>C: Auth Instructions
-        C->>I: Browser OAuth2 Flow
-        I->>M: Store Session
-        M->>C: Return Session ID
-    end
-    C->>M: Tool Request + Session ID
-    M->>S: Execute with User Context
-    S->>M: Return Data
-    M->>C: Return Results
-```
+1.  **Analizza la Richiesta**: Determina se la richiesta è in linguaggio naturale, una query OData diretta o un'intenzione specifica (es. "analizza performance").
+2.  **Orchestra il Workflow**: Seleziona e orchestra la sequenza di tool gerarchici necessari per soddisfare la richiesta.
+3.  **Semplifica l'Interazione**: L'utente non ha bisogno di conoscere quale tool specifico chiamare; il router lo fa per lui.
 
-### Security Features
-1. **Token Management**: JWT validation, session-based auth, auto-renewal
-2. **Authorization**: Role-based access control, scope permissions
-3. **Data Protection**: Request sanitization, audit logging, PII masking
+### 3. Livello di Autenticazione e Sessioni
 
-## 📊 Data Flow
+-   **Location**: `src/middleware/auth.ts`, `src/services/auth-server.ts`
+-   **Funzione**: Gestisce l'accesso sicuro tramite un flusso basato su sessioni che si integra con **SAP IAS** e **XSUAA**.
+-   **Caratteristiche**: L'utente si autentica una sola volta per sessione. Il server mantiene il contesto di sicurezza per tutte le chiamate successive, utilizzando `PrincipalPropagation` dove configurato.
 
-### Service Discovery Flow
-```mermaid
-graph LR
-    A[Client] --> B[search-sap-services]
-    B --> C[Service Discovery Config]
-    C --> D[SAP Service Catalog]
-    D --> E[Filter & Cache Results]
-    E --> A
-```
+### 4. Livello di Connettività SAP
 
-### Entity Operation Flow
-```mermaid
-graph LR
-    A[Client + Session] --> B[execute-entity-operation]
-    B --> C[Validate Auth]
-    C --> D[Build OData Request]
-    D --> E[SAP Backend]
-    E --> F[Transform Response]
-    F --> A
-```
+-   **Location**: `src/services/destination-service.ts`, `src/services/sap-client.ts`
+-   **Funzione**: Abstrae la complessità della connessione ai sistemi SAP backend.
+-   **Caratteristiche**: Utilizza i servizi **Connectivity** e **Destination** di BTP per recuperare le configurazioni di connessione in modo sicuro e gestire il `Principal Propagation`.
 
-## 🚀 Deployment Architecture
+## Flusso dei Dati: Esempio di Query in Linguaggio Naturale
 
-### SAP BTP Cloud Foundry
-```mermaid
-graph TB
-    subgraph "Cloud Foundry Runtime"
-        A[MCP Server App]
-        B[Health Endpoint]
-    end
-    
-    subgraph "Platform Services"
-        C[Connectivity]
-        D[Destination]
-        E[XSUAA]
-        F[Cloud Logging]
-    end
-    
-    A --> C
-    A --> D
-    A --> E
-    A --> F
-```
-
-**Deployment Features**:
-- Auto-scaling based on load
-- Service binding automation
-- Health check integration
-- Zero-downtime deployments
-
-## 📈 Performance Optimizations
-
-### Caching Strategy
-- **Service Metadata**: 1 hour TTL
-- **Schema Definitions**: 30 minutes TTL
-- **Connection Pool**: Max 10 per destination
-
-### Resource Management
-- Async I/O processing
-- Connection reuse
-- Efficient session storage
-- Automatic cleanup processes
+1.  **Utente**: Invia la richiesta "mostrami i clienti di Roma" al tool `sap-smart-query`.
+2.  **Smart Router**: Analizza la richiesta e determina che è necessaria una query.
+3.  **Natural Query Builder**: Il router invoca il tool `natural-query-builder`, che traduce la richiesta nella query OData `A_BusinessPartner?$filter=City eq 'Rome'`.
+4.  **Authentication Check**: Il router invoca `execute-entity-operation` con la query. Il middleware di autenticazione verifica che l'utente abbia una sessione valida e i permessi necessari (es. scope `read`).
+5.  **SAP Connectivity**: Il `SAPClient` recupera la destinazione dal servizio Destination di BTP e inoltra la richiesta OData al sistema SAP S/4HANA.
+6.  **Risposta**: I dati vengono restituiti al client, potenzialmente dopo un'ulteriore analisi da parte del tool `smart-data-analysis`.
 
 ---
 
-**📖 Next Steps**: [Configuration Guide](CONFIGURATION.md) | [Deployment Guide](DEPLOYMENT.md)
+**Prossimi Passi**: [Guida alla Configurazione](./CONFIGURATION.md) | [Guida al Deployment](./DEPLOYMENT.md)
