@@ -9,6 +9,7 @@
  *   npm run test:protocol         - Run only MCP protocol tests
  *   npm run test:auth             - Run only authentication tests
  *   npm run test:tools            - Run only tool execution tests
+ *   npm run test:coverage         - Run complete tool coverage tests
  *   node tests/run-tests.js --verbose --suite=all
  */
 
@@ -16,6 +17,7 @@ import { MCPProtocolTest } from './test-mcp-protocol.js';
 import { AuthenticationTest } from './test-authentication.js';
 import { ToolExecutionTest } from './test-tool-execution.js';
 import { AdvancedFeaturesTest } from './test-advanced-features.js';
+import CompleteToolCoverageTest from './test-complete-tool-coverage.js';
 import chalk from 'chalk';
 
 class TestRunner {
@@ -53,6 +55,10 @@ class TestRunner {
 
             if (this.suite === 'all' || this.suite === 'advanced') {
                 await this.runAdvancedTests();
+            }
+
+            if (this.suite === 'all' || this.suite === 'coverage') {
+                await this.runCompleteToolCoverageTests();
             }
 
             // Print final results
@@ -145,6 +151,20 @@ class TestRunner {
         console.log('');
     }
 
+    async runCompleteToolCoverageTests() {
+        console.log(chalk.bold('🧪 Running Complete Tool Coverage Tests'));
+        console.log(chalk.gray('------------------------------------------'));
+
+        const coverageTest = new CompleteToolCoverageTest({
+            verbose: this.verbose,
+            timeout: 35000
+        });
+
+        const results = await coverageTest.runTest();
+        this.addSuiteResults('Complete Tool Coverage', results);
+        console.log('');
+    }
+
     addSuiteResults(suiteName, results) {
         this.totalResults.passed += results.passed;
         this.totalResults.failed += results.failed;
@@ -217,7 +237,7 @@ function parseArgs() {
     }
 
     // Validate suite option
-    const validSuites = ['all', 'protocol', 'auth', 'tools', 'advanced'];
+    const validSuites = ['all', 'protocol', 'auth', 'tools', 'advanced', 'coverage'];
     if (!validSuites.includes(options.suite)) {
         console.error(chalk.red(`Invalid suite: ${options.suite}`));
         console.error(chalk.gray(`Valid options: ${validSuites.join(', ')}`));
