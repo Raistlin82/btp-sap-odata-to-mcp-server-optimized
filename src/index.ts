@@ -620,27 +620,31 @@ export function createApp(): express.Application {
         });
     });
 
-    // Enhanced health check endpoints
+    // Enhanced health check endpoints - Cloud Foundry compatible
     app.get('/health', async (req, res) => {
         try {
-            const health = await healthService.deepHealthCheck();
-            const statusCode = health.overall === 'healthy' ? 200 : 
-                              health.overall === 'degraded' ? 200 : 503;
-            
-            res.status(statusCode).json({
-                ...health,
+            // For Cloud Foundry liveness probe - always return 200 if application can respond
+            // This prevents unnecessary restarts when only some services are degraded
+            const health = await healthService.livenessProbe();
+
+            res.status(200).json({
+                status: health.status,
+                timestamp: health.timestamp,
                 activeSessions: sessions.size,
                 authServer: {
                     status: authServer ? 'running' : 'disabled',
                     port: process.env.AUTH_PORT || '3001'
-                }
+                },
+                details: health.details,
+                note: 'Liveness probe - application is responsive'
             });
         } catch (error) {
             logger.error('Health check failed:', error);
             res.status(503).json({
-                overall: 'unhealthy',
+                status: 'unhealthy',
                 timestamp: new Date().toISOString(),
-                error: 'Health check system failure'
+                error: 'Health check system failure',
+                note: 'Application cannot respond to requests'
             });
         }
     });
@@ -675,6 +679,31 @@ export function createApp(): express.Application {
         }
     });
     
+    // Comprehensive health status for monitoring (can return non-200)
+    app.get('/health/status', async (req, res) => {
+        try {
+            const health = await healthService.deepHealthCheck();
+            const statusCode = health.overall === 'healthy' ? 200 :
+                              health.overall === 'degraded' ? 200 : 503;
+
+            res.status(statusCode).json({
+                ...health,
+                activeSessions: sessions.size,
+                authServer: {
+                    status: authServer ? 'running' : 'disabled',
+                    port: process.env.AUTH_PORT || '3001'
+                }
+            });
+        } catch (error) {
+            logger.error('Comprehensive health check failed:', error);
+            res.status(503).json({
+                overall: 'unhealthy',
+                timestamp: new Date().toISOString(),
+                error: 'Health check system failure'
+            });
+        }
+    });
+
     // Legacy health endpoint for backward compatibility
     app.get('/health/legacy', (req, res) => {
         res.json({
@@ -1173,7 +1202,11 @@ export async function startServer(port: number = 3000): Promise<void> {
                 }
 
                 // Initialize destination service
-                await destinationService.initialize();
+                try {
+                    await destinationService.initialize();
+                } catch (error) {
+                    logger.warn('⚠️  Destination service initialization failed, continuing with fallback:', error);
+                }
 
                 // Discover SAP OData services
                 logger.info('🔍 Discovering SAP OData services...');
@@ -1241,8 +1274,10 @@ export async function startServer(port: number = 3000): Promise<void> {
 }
 
 // Start server if this file is run directly
-const port = parseInt(process.env.PORT || '3000');
-startServer(port).catch((error) => {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+    const port = parseInt(process.env.PORT || '3000');
+    startServer(port).catch((error) => {
+        console.error('Failed to start server:', error);
+        process.exit(1);
+    });
+}

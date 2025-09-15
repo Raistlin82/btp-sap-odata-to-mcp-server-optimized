@@ -24,35 +24,7 @@ export class SAPToolRegistry {
     constructor(private mcpServer: McpServer, private sapClient: SAPClient, private logger: Logger, private discoveredServices: ODataService[]) {}
 
     public registerServiceMetadataResources(): void {
-        // Register workflow guide as MCP resource for document grounding
-        this.mcpServer.registerResource(
-            "sap-workflow-guide",
-            new ResourceTemplate("sap://config/workflow-guide", { list: undefined }),
-            {
-                title: "SAP MCP Tools Workflow Guide",
-                description: "Complete workflow configuration guide for tool routing, sequences, and best practices"
-            },
-            async () => {
-                const fs = await import('node:fs/promises');
-                const path = await import('node:path');
-                
-                try {
-                    const guidePath = path.join(process.cwd(), 'config', 'workflow-guide.md');
-                    const content = await fs.readFile(guidePath, 'utf-8');
-                    
-                    return {
-                        contents: [{
-                            uri: "sap://config/workflow-guide",
-                            text: content,
-                            mimeType: "text/markdown"
-                        }]
-                    };
-                } catch (error) {
-                    this.logger.error('Failed to read workflow guide', error);
-                    throw new Error('Workflow guide not available');
-                }
-            }
-        );
+        // Workflow guide removed - now using routing-rules.json in hierarchical-tool-registry
 
         this.mcpServer.registerResource(
             "sap-service-metadata",

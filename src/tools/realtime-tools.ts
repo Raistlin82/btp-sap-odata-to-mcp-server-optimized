@@ -27,18 +27,18 @@ function getRealtimeService(): RealtimeAnalyticsService {
 
 export class RealTimeDataStreamTool {
     public readonly name = 'realtime-data-stream';
-    public readonly description = 'Real-time Data Stream - Stream SAP data in real-time via WebSocket connections with intelligent filtering';
+    public readonly description = 'Stream SAP data via WebSocket';
     
     public readonly inputSchema = z.object({
-        action: z.enum(['start_server', 'stop_server', 'subscribe', 'unsubscribe', 'simulate', 'status']),
-        entityType: z.string().optional().describe('SAP entity type to stream (required for subscribe/simulate)'),
-        serviceId: z.string().optional().describe('SAP service ID (required for subscribe/simulate)'),
-        subscriptionId: z.string().optional().describe('Subscription ID (required for unsubscribe)'),
-        frequency: z.enum(['realtime', 'high', 'medium', 'low']).optional().default('medium').describe('Streaming frequency'),
-        filters: z.record(z.any()).optional().describe('Data filters to apply'),
-        port: z.number().optional().describe('WebSocket server port (default: 8081)'),
+        action: z.enum(['start_server', 'stop_server', 'subscribe', 'unsubscribe', 'simulate', 'status']).describe('Action to perform with WebSocket streaming'),
+        entityType: z.string().optional().describe('SAP entity type to stream'),
+        serviceId: z.string().optional().describe('SAP service ID'),
+        subscriptionId: z.string().optional().describe('Subscription ID for unsubscribe'),
+        frequency: z.enum(['realtime', 'high', 'medium', 'low']).optional().default('medium').describe('Data streaming frequency'),
+        filters: z.record(z.any()).optional().describe('Data filters'),
+        port: z.number().optional().describe('WebSocket server port'),
         simulationCount: z.number().optional().default(10).describe('Number of data points to simulate')
-    }).describe('Real-time data streaming configuration');
+    });
     
     [key: string]: unknown;
 
@@ -148,7 +148,7 @@ export class RealTimeDataStreamTool {
 
 export class KPIDashboardBuilderTool {
     public readonly name = 'kpi-dashboard-builder';
-    public readonly description = 'KPI Dashboard Builder - Create and manage intelligent KPI dashboards with real-time SAP data visualization';
+    public readonly description = 'Create and manage KPI dashboards';
     
     public readonly inputSchema = z.object({
         action: z.enum(['create', 'update', 'delete', 'list', 'get', 'refresh']),
@@ -156,7 +156,7 @@ export class KPIDashboardBuilderTool {
         dashboard: KPIDashboardSchema.optional().describe('Dashboard configuration (required for create)'),
         updates: z.record(z.any()).optional().describe('Fields to update (for update action)'),
         includeData: z.boolean().optional().default(false).describe('Include current KPI data in response')
-    }).describe('KPI dashboard management');
+    }).strict().describe('KPI dashboard management');
     
     [key: string]: unknown;
 
@@ -365,7 +365,7 @@ export class KPIDashboardBuilderTool {
 
 export class PredictiveAnalyticsEngineTool {
     public readonly name = 'predictive-analytics-engine';
-    public readonly description = 'Predictive Analytics Engine - Advanced predictive analytics with ML-powered forecasting for SAP business data';
+    public readonly description = 'Run predictive analytics on SAP data';
     
     public readonly inputSchema = z.object({
         action: z.enum(['predict', 'train', 'evaluate', 'list_models', 'get_model']),
@@ -645,7 +645,7 @@ export class PredictiveAnalyticsEngineTool {
 
 export class BusinessIntelligenceInsightsTool {
     public readonly name = 'business-intelligence-insights';
-    public readonly description = 'Business Intelligence Insights - Generate automated business insights and recommendations from real-time SAP data patterns';
+    public readonly description = 'Generate business insights from SAP data';
     
     public readonly inputSchema = z.object({
         action: z.enum(['generate', 'list', 'get', 'configure', 'export']),
