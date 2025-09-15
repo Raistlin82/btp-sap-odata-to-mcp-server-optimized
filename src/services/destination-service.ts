@@ -30,8 +30,21 @@ export class DestinationService {
             this.logger.info('Destination service initialized successfully');
 
         } catch (error) {
-            this.logger.error('Failed to initialize destination service:', error);
-            throw error;
+            // Check if we're running in Cloud Foundry
+            const isCloudFoundry = process.env.VCAP_SERVICES || process.env.CF_INSTANCE_INDEX;
+
+            if (isCloudFoundry) {
+                this.logger.error('❌ Failed to initialize destination service in Cloud Foundry environment:', error);
+                throw error; // Critical error in CF - services must be available
+            } else {
+                this.logger.info('ℹ️  Running in local development mode - destination service fallback active');
+                // Don't throw in local development - use fallback configuration
+                this.vcapServices = {
+                    destination: null,
+                    connectivity: null,
+                    xsuaa: null
+                };
+            }
         }
     }
 

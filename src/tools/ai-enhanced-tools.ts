@@ -171,8 +171,12 @@ export class SmartDataAnalysisTool implements Tool {
         properties: {
             data: {
                 type: 'array' as const,
-                description: 'Array of data records to analyze',
-                items: { type: 'object' as const }
+                description: 'Array of data records to analyze - each record is a key-value object',
+                items: {
+                    type: 'object' as const,
+                    description: 'Data record with flexible schema for SAP entity analysis',
+                    additionalProperties: true
+                }
             },
             analysisType: {
                 type: 'string' as const,
