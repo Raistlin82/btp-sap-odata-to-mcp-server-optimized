@@ -1,37 +1,37 @@
-# Hub della Documentazione
+# Documentation Hub
 
-Benvenuto nella documentazione completa del **SAP OData to AI-Powered MCP Server**.
+Welcome to the complete documentation for the **SAP OData to AI-Powered MCP Server**.
 
-Questa documentazione è strutturata per guidarti attraverso i concetti chiave, l'utilizzo, l'amministrazione e lo sviluppo di questa applicazione potenziata.
+This documentation is structured to guide you through the key concepts, usage, administration, and development of this enhanced application.
 
-## 1. Concetti Chiave
+## 1. Key Concepts
 
-Per comprendere appieno la potenza di questo server, è fondamentale capire due concetti architetturali principali.
+To fully grasp the power of this server, it is essential to understand two main architectural concepts.
 
--   **[Il Modello a Tool Gerarchici](./ARCHITECTURE.md#il-modello-a-tool-gerarchici)**: Scopri perché usiamo un piccolo set di tool intelligenti invece di centinaia di tool specifici per ogni operazione CRUD.
--   **[Il Router Universale `sap-smart-query`](./TOOL_REFERENCE.md#il-router-universale-sap-smart-query)**: Approfondisci come questo singolo entry point analizza, instrada e orchestra le tue richieste per semplificare l'interazione.
+-   **[The Hierarchical Tool Model](./ARCHITECTURE.md#the-hierarchical-tool-model)**: Discover why we use a small set of intelligent tools instead of hundreds of specific tools for each CRUD operation.
+-   **[The `sap-smart-query` Universal Router](./TOOL_REFERENCE.md#the-sap-smart-query-universal-router)**: Learn how this single entry point analyzes, routes, and orchestrates your requests to simplify interaction.
 
-## 2. Guida Utente
+## 2. User Guide
 
-Questa sezione è dedicata a chi deve interagire con il server per interrogare i dati SAP.
+This section is for those who need to interact with the server to query SAP data.
 
--   **[Flusso di Autenticazione](./USER_GUIDE.md#flusso-di-autenticazione-step-by-step)**: Una guida passo-passo su come autenticarsi e gestire le sessioni.
--   **[Riferimento ai Tool](./TOOL_REFERENCE.md)**: La documentazione dettagliata di tutti i tool disponibili, con esempi e parametri.
--   **[Esempi di Workflow](./USER_GUIDE.md#esempi-di-workflow)**: Scenari d'uso comuni, come "trovare un cliente e visualizzare i suoi ordini".
+-   **[Authentication Flow](./USER_GUIDE.md#step-by-step-authentication-flow)**: A step-by-step guide on how to authenticate and manage sessions.
+-   **[Tool Reference](./TOOL_REFERENCE.md)**: Detailed documentation for all available tools, with examples and parameters.
+-   **[Workflow Examples](./USER_GUIDE.md#workflow-examples)**: Common usage scenarios, such as "find a customer and view their orders".
 
-## 3. Guida Amministratore
+## 3. Administrator Guide
 
-Questa sezione è per chi deve deployare, configurare e manutenere l'applicazione.
+This section is for those who need to deploy, configure, and maintain the application.
 
--   **[Deployment](./DEPLOYMENT.md)**: Istruzioni dettagliate per il deploy su **SAP BTP, Cloud Foundry** e per l'**ambiente di sviluppo locale**.
--   **[Configurazione](./CONFIGURATION.md)**: La guida definitiva a tutte le **variabili d'ambiente**, alla configurazione dei servizi BTP (`mta.yaml`) e alla sicurezza (`xs-security.json`).
--   **[Sicurezza e Ruoli](./CONFIGURATION.md#configurazione-della-sicurezza-xs-securityjson)**: Come configurare ruoli e autorizzazioni tramite le Role Collection di BTP.
--   **[Monitoring e Health Check](./DEPLOYMENT.md#monitoring-e-health-check)**: Come monitorare lo stato dell'applicazione tramite gli endpoint di health check.
+-   **[Deployment](./DEPLOYMENT.md)**: Detailed instructions for deploying to **SAP BTP, Cloud Foundry** and for the **local development environment**.
+-   **[Configuration](./CONFIGURATION.md)**: The definitive guide to all **environment variables**, BTP service configuration (`mta.yaml`), and security (`xs-security.json`).
+-   **[Security and Roles](./CONFIGURATION.md#security-configuration-xs-securityjson)**: How to configure roles and permissions through BTP Role Collections.
+-   **[Monitoring and Health Check](./DEPLOYMENT.md#monitoring-and-health-check)**: How to monitor the application's status via health check endpoints.
 
-## 4. Guide Avanzate
+## 4. Advanced Guides
 
-Approfondimenti su aspetti specifici dell'applicazione.
+In-depth information on specific aspects of the application.
 
--   **[Guida al Testing](./guides/TESTING.md)**: Come eseguire e estendere la suite di test automatizzati.
--   **[Analisi del Consumo di Token](./work/TOKEN_CONSUMPTION_ANALYSIS.md)**: Un'analisi dettagliata del consumo di token e delle strategie di ottimizzazione (spostato in `work/`).
--   **[Revisione dell'Identity Management](./work/IDENTITY_MANAGEMENT_REVIEW.md)**: Il piano di azione per la migrazione a XSUAA (spostato in `work/`).
+-   **[Testing Guide](./guides/TESTING.md)**: How to run and extend the automated test suite.
+-   **[Token Consumption Analysis](./work/TOKEN_CONSUMPTION_ANALYSIS.md)**: A detailed analysis of token consumption and optimization strategies (moved to `work/`).
+-   **[Identity Management Review](./work/IDENTITY_MANAGEMENT_REVIEW.md)**: The action plan for migrating to XSUAA (moved to `work/`).

@@ -1,82 +1,82 @@
-# Guida al Deployment
+# Deployment Guide
 
-Questa guida copre i due scenari di deployment principali per il server: il deployment produttivo su **SAP BTP, Cloud Foundry** e la configurazione per lo **sviluppo locale**.
+This guide covers the two main deployment scenarios for the server: production deployment on **SAP BTP, Cloud Foundry** and configuration for **local development**.
 
-## 1. Deployment su SAP BTP, Cloud Foundry (Produzione)
+## 1. Deployment to SAP BTP, Cloud Foundry (Production)
 
-Questo è lo scenario consigliato per l'uso produttivo, sfruttando appieno i servizi della piattaforma BTP.
+This is the recommended scenario for production use, taking full advantage of the BTP platform services.
 
-### Prerequisiti
+### Prerequisites
 
-Assicurati che nel tuo subaccount BTP siano disponibili e "entitled" i seguenti servizi:
+Ensure that the following services are available and entitled in your BTP subaccount:
 
--   **Authorization & Trust Management (XSUAA)**: Per la gestione di ruoli e autorizzazioni.
--   **Identity (IAS)**: Per l'autenticazione degli utenti.
--   **Connectivity**: Per la connessione sicura ai sistemi SAP backend.
--   **Destination**: Per la gestione centralizzata delle destinazioni di sistema.
+-   **Authorization & Trust Management (XSUAA)**: For role and permission management.
+-   **Identity (IAS)**: For user authentication.
+-   **Connectivity**: For secure connection to backend SAP systems.
+-   **Destination**: For centralized management of system destinations.
 
-### Passo 1: Preparazione dei Servizi BTP
+### Step 1: Preparing BTP Services
 
-Prima di deployare l'applicazione, è necessario creare le istanze dei servizi BTP che utilizzerà. Questi comandi vanno eseguiti una sola volta.
+Before deploying the application, you need to create instances of the BTP services it will use. These commands should be run only once.
 
 ```bash
-# 1. Crea il servizio XSUAA usando la tua configurazione di sicurezza
-# (Assicurati che il file xs-security.json sia corretto)
+# 1. Create the XSUAA service using your security configuration
+# (Ensure the xs-security.json file is correct)
 cf create-service xsuaa application sap-mcp-xsuaa -c xs-security.json
 
-# 2. Crea il servizio di connettività
+# 2. Create the connectivity service
 cf create-service connectivity lite sap-mcp-connectivity
 
-# 3. Crea il servizio delle destinazioni
+# 3. Create the destination service
 cf create-service destination lite sap-mcp-destination
 ```
 
-### Passo 2: Build e Deploy dell'Applicazione
+### Step 2: Build and Deploy the Application
 
-Con i servizi pronti, puoi procedere al deploy.
+With the services ready, you can proceed with the deployment.
 
 ```bash
-# 1. Installa le dipendenze del progetto
+# 1. Install project dependencies
 npm install
 
-# 2. Esegui il build dei sorgenti TypeScript
-npm run build
+# 2. Build the TypeScript source code for BTP
+npm run build:btp
 
-# 3. Esegui il deploy su Cloud Foundry
-# Il comando cf push utilizzerà le configurazioni definite in mta.yaml e manifest.yml
-cf push
+# 3. Deploy to Cloud Foundry
+# The deploy command will use the configurations defined in mta.yaml
+npm run deploy:btp
 ```
 
-Dopo il `cf push`, l'applicazione si avvierà e si collegherà automaticamente ai servizi creati in precedenza, come definito nel file `mta.yaml`.
+After the deployment, the application will start and automatically bind to the previously created services, as defined in the `mta.yaml` file.
 
-### Passo 3: Configurazione Post-Deployment
+### Step 3: Post-Deployment Configuration
 
-1.  **Assegnazione Ruoli**: Nel BTP Cockpit, vai in **Security > Role Collections** e assegna le collezioni di ruoli (es. `MCPAdministrator`, `MCPUser`) agli utenti o gruppi di utenti che devono accedere all'applicazione.
+1.  **Assign Roles**: In the BTP Cockpit, go to **Security > Role Collections** and assign the role collections (e.g., `MCPAdministrator`, `MCPUser`) to the users or user groups who need to access the application.
 
-2.  **Configurazione Destination**: Nel BTP Cockpit, vai in **Connectivity > Destinations** e crea le destinazioni necessarie per connetterti ai tuoi sistemi SAP backend (es. S/4HANA). Assicurati che l'autenticazione sia impostata correttamente (es. `PrincipalPropagation`).
+2.  **Configure Destinations**: In the BTP Cockpit, go to **Connectivity > Destinations** and create the necessary destinations to connect to your backend SAP systems (e.g., S/4HANA). Ensure that the authentication is set up correctly (e.g., `PrincipalPropagation`).
 
-3.  **Verifica**: Controlla lo stato dell'applicazione con `cf apps` e accedi all'endpoint `/health` per assicurarti che tutto funzioni correttamente.
+3.  **Verification**: Check the application's status with `cf apps` and access the `/health` endpoint to ensure everything is working correctly.
 
     ```bash
-    # Controlla lo stato dell'app
+    # Check the app status
     cf apps
 
-    # Verifica l'health check (sostituisci con la tua URL)
+    # Verify the health check (replace with your URL)
     curl https://your-app-name.cfapps.region.hana.ondemand.com/health
     ```
 
-## 2. Configurazione per lo Sviluppo Locale
+## 2. Configuration for Local Development
 
-Per sviluppare e testare l'applicazione localmente.
+To develop and test the application locally.
 
-### Prerequisiti
+### Prerequisites
 
 -   Node.js >= 18
--   Un file `.env` correttamente configurato.
+-   A correctly configured `.env` file.
 
-### Passo 1: Configurazione dell'Ambiente
+### Step 1: Environment Setup
 
-1.  **Clona il Repository** e installa le dipendenze:
+1.  **Clone the Repository** and install dependencies:
 
     ```bash
     git clone <this-repo>
@@ -84,55 +84,55 @@ Per sviluppare e testare l'applicazione localmente.
     npm install
     ```
 
-2.  **Crea e configura il file `.env`**:
+2.  **Create and configure the `.env` file**:
 
     ```bash
     cp .env.example .env
     ```
 
-3.  **Modifica il file `.env`** con le credenziali del tuo tenant SAP IAS (per l'autenticazione) e altre configurazioni necessarie per lo sviluppo. Imposta `NODE_ENV=development`.
+3.  **Edit the `.env` file** with the credentials of your SAP IAS tenant (for authentication) and other necessary configurations for development. Set `NODE_ENV=development`.
 
     ```env
-    # Esempio di configurazione per lo sviluppo
+    # Example configuration for development
     NODE_ENV=development
     PORT=8080
     LOG_LEVEL=debug
 
-    # Credenziali del tuo tenant IAS di sviluppo
+    # Credentials for your development IAS tenant
     SAP_IAS_URL=https://your-dev-tenant.accounts.ondemand.com
     SAP_IAS_CLIENT_ID=...
     SAP_IAS_CLIENT_SECRET=...
 
-    # Per simulare il servizio Destination localmente
+    # To simulate the Destination service locally
     destinations=[{"name":"MyLocalDest","url":"http://localhost:4004/catalog","authentication":"NoAuthentication"}]
     ```
 
-### Passo 2: Avvio del Server di Sviluppo
+### Step 2: Starting the Development Server
 
-Esegui uno dei seguenti comandi:
+Run one of the following commands:
 
 ```bash
-# Avvia il server in modalità sviluppo con hot-reload (consigliato)
+# Start the server in development mode with hot-reload (recommended)
 npm run dev
 
-# Avvia il server in modalità standard (richiede build manuale)
+# Start the server in standard mode (requires manual build)
 npm run build
 npm run start
 ```
 
-Il server sarà disponibile all'indirizzo `http://localhost:8080`.
+The server will be available at `http://localhost:8080`.
 
-### Connessione ai Servizi BTP (Opzionale)
+### Connecting to BTP Services (Optional)
 
-Se vuoi connetterti ai servizi BTP reali (come XSUAA o Destination) dal tuo ambiente locale, puoi usare le **service keys**.
+If you want to connect to real BTP services (like XSUAA or Destination) from your local environment, you can use **service keys**.
 
-1.  **Crea una Service Key** in BTP:
+1.  **Create a Service Key** in BTP:
 
     ```bash
     cf create-service-key sap-mcp-destination local-dev-key
     ```
 
-2.  **Visualizza la Service Key** e copia le credenziali nel tuo file `.env` o in un file `default-env.json`.
+2.  **View the Service Key** and copy the credentials into your `.env` file or a `default-env.json` file.
 
     ```bash
     cf service-key sap-mcp-destination local-dev-key
@@ -140,4 +140,4 @@ Se vuoi connetterti ai servizi BTP reali (come XSUAA o Destination) dal tuo ambi
 
 ---
 
-**Prossimi Passi**: [Guida alla Configurazione](./CONFIGURATION.md) | [Riferimento ai Tool](./TOOL_REFERENCE.md)
+**Next Steps**: [Configuration Guide](./CONFIGURATION.md) | [Tool Reference](./TOOL_REFERENCE.md)

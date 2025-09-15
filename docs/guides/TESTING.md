@@ -1,105 +1,105 @@
-# Guida Completa alla Test Suite del SAP MCP Server
+# Complete Guide to the SAP MCP Server Test Suite
 
-Questa guida unificata fornisce tutte le informazioni necessarie per eseguire, manutenere ed estendere la suite di test del SAP MCP Server, garantendo la stabilità e l'affidabilità dell'applicazione.
+This unified guide provides all the necessary information to run, maintain, and extend the SAP MCP Server test suite, ensuring the application's stability and reliability.
 
-## 1. Panoramica e Obiettivi
+## 1. Overview and Objectives
 
-La suite di test è progettata per verificare in modo completo le funzionalità principali del server, tra cui:
+The test suite is designed to comprehensively verify the server's main functionalities, including:
 
--   **Conformità al Protocollo MCP**: Corretta inizializzazione, registrazione dei tool e comunicazione JSON-RPC.
--   **Sistema di Autenticazione**: Gestione delle sessioni, validazione dei token e fallback per lo sviluppo.
--   **Esecuzione dei Tool**: Funzionamento senza errori di tutti i tool principali.
--   **Validazione degli Schemi**: Correttezza e compatibilità degli schemi Zod con lo standard MCP.
--   **Funzionalità Avanzate**: Test specifici per il routing intelligente, l'analisi AI e le feature real-time.
+-   **MCP Protocol Compliance**: Correct initialization, tool registration, and JSON-RPC communication.
+-   **Authentication System**: Session management, token validation, and development fallback.
+-   **Tool Execution**: Error-free operation of all main tools.
+-   **Schema Validation**: Correctness and compatibility of Zod schemas with the MCP standard.
+-   **Advanced Features**: Specific tests for intelligent routing, AI analysis, and real-time features.
 
-## 2. Struttura della Test Suite
+## 2. Test Suite Structure
 
-I test sono organizzati in file modulari all'interno della cartella `/tests`:
+The tests are organized into modular files within the `/tests` folder:
 
 ```
 tests/
-├── run-tests.js                 # Test runner principale che orchestra l'esecuzione
-├── test-mcp-protocol.js         # Test per la conformità al protocollo MCP
-├── test-authentication.js       # Test per il sistema di autenticazione
-├── test-tool-execution.js       # Test per l'esecuzione base dei tool
-└── test-advanced-features.js    # Test per funzionalità avanzate (AI, routing)
+├── run-tests.js                 # Main test runner that orchestrates execution
+├── test-mcp-protocol.js         # Tests for MCP protocol compliance
+├── test-authentication.js       # Tests for the authentication system
+├── test-tool-execution.js       # Tests for basic tool execution
+└── test-advanced-features.js    # Tests for advanced features (AI, routing)
 ```
 
-## 3. Come Eseguire i Test
+## 3. How to Run the Tests
 
-È possibile lanciare i test tramite script NPM o eseguendo direttamente il test runner.
+You can run the tests via NPM scripts or by executing the test runner directly.
 
-### Comandi NPM (Consigliato)
+### NPM Commands (Recommended)
 
 ```bash
-# Esegui la suite di test completa (include anche i test avanzati)
+# Run the complete test suite (includes advanced tests)
 npm run test:all
 
-# Esegui suite specifiche
-npm run test:protocol      # Solo test del protocollo MCP
-npm run test:auth          # Solo test di autenticazione
-npm run test:tools         # Solo test di esecuzione dei tool base
-npm run test:advanced      # Solo test delle funzionalità avanzate
+# Run specific suites
+npm run test:protocol      # Only MCP protocol tests
+npm run test:auth          # Only authentication tests
+npm run test:tools         # Only basic tool execution tests
+npm run test:advanced      # Only advanced feature tests
 
-# Esegui tutti i test con output dettagliato
+# Run all tests with detailed output
 npm run test:full
 ```
 
-### Esecuzione Diretta con Node.js
+### Direct Execution with Node.js
 
 ```bash
-# Esegui la suite completa
+# Run the complete suite
 node tests/run-tests.js
 
-# Esegui una suite specifica
+# Run a specific suite
 node tests/run-tests.js --suite=protocol
 
-# Abilita l'output verboso per il debug
+# Enable verbose output for debugging
 node tests/run-tests.js --suite=all --verbose
 ```
 
-## 4. Copertura dei Test
+## 4. Test Coverage
 
-### Test Suite Attuali
+### Current Test Suites
 
 1.  **MCP Protocol Tests** (`test-mcp-protocol.js`)
-    *   **Verifica**: Connessione al server, messaggi `initialize/initialized`, registrazione di almeno 12 tool, versione del protocollo.
-    *   **Criteri di Successo**: Connessione stabile, protocollo `2024-11-05` supportato, comunicazione JSON-RPC funzionante.
+    *   **Verifies**: Server connection, `initialize/initialized` messages, registration of at least 12 tools, protocol version.
+    *   **Success Criteria**: Stable connection, `2024-11-05` protocol supported, working JSON-RPC communication.
 
 2.  **Authentication Tests** (`test-authentication.js`)
-    *   **Verifica**: Comportamento di `check-sap-authentication` con e senza `session_id`, gestione degli ambienti (sviluppo vs. produzione).
-    *   **Criteri di Successo**: Risposte corrette (`auth_disabled`, `authentication_required`, `auth_failed`) in base al contesto.
+    *   **Verifies**: Behavior of `check-sap-authentication` with and without `session_id`, environment handling (development vs. production).
+    *   **Success Criteria**: Correct responses (`auth_disabled`, `authentication_required`, `auth_failed`) based on the context.
 
 3.  **Tool Execution Tests** (`test-tool-execution.js`)
-    *   **Verifica**: Esecuzione senza errori dei tool principali (`search-sap-services`, `sap-smart-query`, etc.) e validità degli schemi Zod.
-    *   **Criteri di Successo**: Nessun errore "Tool execution failed", schemi conformi, proprietà `items` definita per gli array.
+    *   **Verifies**: Error-free execution of main tools (`search-sap-services`, `sap-smart-query`, etc.) and validity of Zod schemas.
+    *   **Success Criteria**: No "Tool execution failed" errors, compliant schemas, `items` property defined for arrays.
 
 4.  **Advanced Features Tests** (`test-advanced-features.js`)
-    *   **Verifica**: Efficacia del router `sap-smart-query`, esecuzione dei tool AI, completezza degli schemi e performance sotto carico.
-    *   **Criteri di Successo**: Routing corretto, schemi validi, gestione di richieste concorrenti.
+    *   **Verifies**: Effectiveness of the `sap-smart-query` router, execution of AI tools, schema completeness, and performance under load.
+    *   **Success Criteria**: Correct routing, valid schemas, handling of concurrent requests.
 
-## 5. Estendere la Test Suite
+## 5. Extending the Test Suite
 
-### Aggiungere un Nuovo Test per un Tool
+### Adding a New Test for a Tool
 
-Per testare un nuovo tool, aggiungilo all'array `toolsToTest` in `test-tool-execution.js`:
+To test a new tool, add it to the `toolsToTest` array in `test-tool-execution.js`:
 
 ```javascript
 {
-    name: 'nuovo-tool-nome',
+    name: 'new-tool-name',
     args: {
-        param1: 'valore',
+        param1: 'value',
         param2: true
     },
-    description: 'Descrizione del test per il nuovo tool'
+    description: 'Test description for the new tool'
 }
 ```
 
-### Creare una Nuova Suite di Test
+### Creating a New Test Suite
 
-1.  **Crea un nuovo file di test** (es. `tests/test-custom-feature.js`) usando il template fornito in `EXPANDED_TEST_SUITE_GUIDE.md`.
-2.  **Integra il nuovo file** in `run-tests.js` importandolo e aggiungendolo alla logica di esecuzione.
-3.  **Aggiungi un nuovo script NPM** in `package.json` per lanciare la nuova suite in modo isolato.
+1.  **Create a new test file** (e.g., `tests/test-custom-feature.js`).
+2.  **Integrate the new file** into `run-tests.js` by importing it and adding it to the execution logic.
+3.  **Add a new NPM script** in `package.json` to run the new suite in isolation.
 
 ```json
 "scripts": {
@@ -107,21 +107,21 @@ Per testare un nuovo tool, aggiungilo all'array `toolsToTest` in `test-tool-exec
 }
 ```
 
-## 6. Debug e Risoluzione dei Problemi
+## 6. Debugging and Troubleshooting
 
-### Errore: "Tool execution failed"
-*   **Causa Comune**: Schemi Zod non conformi (es. un array senza `.describe()` o senza la proprietà `items`).
-*   **Soluzione**: Verificare la definizione dello schema del tool in `src/tools/hierarchical-tool-registry.ts`.
+### Error: "Tool execution failed"
+*   **Common Cause**: Non-compliant Zod schemas (e.g., an array without `.describe()` or the `items` property).
+*   **Solution**: Check the tool's schema definition in `src/tools/hierarchical-tool-registry.ts`.
 
-### Timeout durante i Test
-*   **Cause Comuni**: Server BTP lento, connessione di rete instabile, memory leak.
-*   **Soluzioni**: Aumentare il timeout tramite la variabile d'ambiente `TEST_TIMEOUT=45000` o eseguire i test in un ambiente locale (`NODE_ENV=development npm run test:all`).
+### Timeout during Tests
+*   **Common Causes**: Slow BTP server, unstable network connection, memory leak.
+*   **Solutions**: Increase the timeout via the environment variable `TEST_TIMEOUT=45000` or run the tests in a local environment (`NODE_ENV=development npm run test:all`).
 
-## 7. Integrazione Continua (CI/CD)
+## 7. Continuous Integration (CI/CD)
 
-I test sono progettati per essere eseguiti in una pipeline di CI/CD per prevenire regressioni.
+The tests are designed to be run in a CI/CD pipeline to prevent regressions.
 
-### Esempio di Hook Pre-Deploy
+### Example Pre-Deploy Hook
 
 ```bash
 #!/bin/bash
@@ -130,28 +130,28 @@ npm run test:all
 
 if [ $? -eq 0 ]; then
     echo "✅ All tests passed - proceeding with deployment"
-    # Includere qui il comando di deploy, es: cf push
+    # Include the deploy command here, e.g., npm run deploy:btp
 else
     echo "❌ Tests failed - blocking deployment"
     exit 1
 fi
 ```
 
-### Esempio per GitHub Actions
+### Example for GitHub Actions
 
 ```yaml
 - name: Run MCP Test Suite & Build
   run: |
     npm ci
     npm run test:all
-    npm run build
+    npm run build:btp
   env:
     NODE_ENV: test
 ```
 
-## 8. Raccomandazioni per il Futuro
+## 8. Future Recommendations
 
--   **Aumentare la Copertura**: Scrivere test per tutti i 12+ tool.
--   **Test di Carico**: Implementare test di performance con un alto numero di richieste concorrenti.
--   **Mock dei Servizi SAP**: Per test più veloci e isolati, creare mock dei servizi SAP.
--   **Code Coverage**: Integrare uno strumento di reporting per la code coverage con l'obiettivo di superare il 90%.
+-   **Increase Coverage**: Write tests for all 12+ tools.
+-   **Load Testing**: Implement performance tests with a high number of concurrent requests.
+-   **Mock SAP Services**: To create faster and more isolated tests, mock the SAP services.
+-   **Code Coverage**: Integrate a code coverage reporting tool with the goal of exceeding 90%.
