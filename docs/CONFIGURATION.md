@@ -1,47 +1,47 @@
-# Guida alla Configurazione
+# Configuration Guide
 
-Questa guida fornisce una panoramica completa di tutte le configurazioni necessarie per il server, dall'ambiente di sviluppo locale al deployment produttivo su SAP BTP.
+This guide provides a comprehensive overview of all the necessary configurations for the server, from the local development environment to a production deployment on SAP BTP.
 
-## 1. Configurazione tramite Variabili d'Ambiente
+## 1. Configuration via Environment Variables
 
-Le variabili d'ambiente sono il metodo primario per configurare l'applicazione. Possono essere definite in un file `.env` per lo sviluppo locale o come "User-Provided Variables" nel BTP Cockpit.
+Environment variables are the primary method for configuring the application. They can be defined in an `.env` file for local development or as "User-Provided Variables" in the BTP Cockpit.
 
-### Variabili Fondamentali (Richieste)
+### Fundamental Variables (Required)
 
-| Variabile | Descrizione | Esempio | 
+| Variable | Description | Example |
 | :--- | :--- | :--- |
-| `SAP_IAS_URL` | URL del tenant SAP Identity Authentication Service. | `https://your-tenant.accounts.ondemand.com` |
-| `SAP_IAS_CLIENT_ID` | Client ID per l'applicazione OAuth in IAS. | `abc-def-123` |
-| `SAP_IAS_CLIENT_SECRET`| Client Secret per l'applicazione OAuth in IAS. | `your-secret` |
-| `PORT` | Porta su cui il server Express sarà in ascolto. | `8080` |
-| `NODE_ENV` | Ambiente operativo dell'applicazione. | `production` o `development` |
+| `SAP_IAS_URL` | URL of the SAP Identity Authentication Service tenant. | `https://your-tenant.accounts.ondemand.com` |
+| `SAP_IAS_CLIENT_ID` | Client ID for the OAuth application in IAS. | `abc-def-123` |
+| `SAP_IAS_CLIENT_SECRET`| Client Secret for the OAuth application in IAS. | `your-secret` |
+| `PORT` | The port on which the Express server will listen. | `8080` |
+| `NODE_ENV` | The application's operating environment. | `production` or `development` |
 
-### Configurazione delle Destination
+### Destination Configuration
 
-| Variabile | Descrizione | Esempio | 
+| Variable | Description | Example |
 | :--- | :--- | :--- |
-| `SAP_DESTINATION_NAME` | Nome della destination BTP usata per il discovery dei servizi. | `SAP_S4HANA_Design` |
-| `SAP_DESTINATION_NAME_RT`| Nome della destination BTP usata a runtime (per le chiamate dati). | `SAP_S4HANA_Runtime` |
-| `SAP_USE_SINGLE_DESTINATION`| Se `true`, usa `SAP_DESTINATION_NAME` per tutto. | `false` |
-| `destinations` | Per lo sviluppo locale, un array JSON che simula il servizio Destination. | `[{"name":"MyDest","url":"..."}]` |
+| `SAP_DESTINATION_NAME` | Name of the BTP destination used for service discovery. | `SAP_S4HANA_Design` |
+| `SAP_DESTINATION_NAME_RT`| Name of the BTP destination used at runtime (for data calls). | `SAP_S4HANA_Runtime` |
+| `SAP_USE_SINGLE_DESTINATION`| If `true`, uses `SAP_DESTINATION_NAME` for everything. | `false` |
+| `destinations` | For local development, a JSON array that simulates the Destination service. | `[{"name":"MyDest","url":"..."}]` |
 
-### Configurazione Avanzata (Opzionale)
+### Advanced Configuration (Optional)
 
-| Variabile | Descrizione | Esempio | 
+| Variable | Description | Example |
 | :--- | :--- | :--- |
-| `LOG_LEVEL` | Livello di dettaglio dei log. | `info`, `debug`, `warn`, `error` |
-| `SESSION_TIMEOUT` | Durata di una sessione utente in millisecondi. | `3600000` (1 ora) |
-| `CORS_ORIGINS` | Elenco separato da virgole degli origin consentiti per CORS. | `https://claude.ai,http://localhost:3000` |
+| `LOG_LEVEL` | The level of detail for logs. | `info`, `debug`, `warn`, `error` |
+| `SESSION_TIMEOUT` | Duration of a user session in milliseconds. | `3600000` (1 hour) |
+| `CORS_ORIGINS` | Comma-separated list of allowed origins for CORS. | `https://claude.ai,http://localhost:3000` |
 
-## 2. Configurazione della Sicurezza (xs-security.json)
+## 2. Security Configuration (xs-security.json)
 
-Questo file è cruciale per definire il modello di sicurezza dell'applicazione in SAP BTP. Viene utilizzato dal servizio XSUAA per creare e validare i token JWT.
+This file is crucial for defining the application's security model in SAP BTP. It is used by the XSUAA service to create and validate JWTs.
 
-**Percorso**: `xs-security.json`
+**Path**: `xs-security.json`
 
-### Ambiti (Scopes)
+### Scopes
 
-Definiscono le autorizzazioni granulari. Ogni tool protetto richiederà uno o più di questi ambiti.
+Scopes define granular permissions. Each protected tool will require one or more of these scopes.
 
 ```json
 "scopes": [
@@ -51,9 +51,9 @@ Definiscono le autorizzazioni granulari. Ogni tool protetto richiederà uno o pi
 ]
 ```
 
-### Template di Ruolo (Role Templates)
+### Role Templates
 
-Aggregano più ambiti in un ruolo logico che può essere assegnato agli utenti.
+Role templates aggregate multiple scopes into a logical role that can be assigned to users.
 
 ```json
 "role-templates": [
@@ -70,25 +70,25 @@ Aggregano più ambiti in un ruolo logico che può essere assegnato agli utenti.
 ]
 ```
 
-### Collezioni di Ruoli (Role Collections)
+### Role Collections
 
-Nel **BTP Cockpit**, si creano le "Role Collections" basate su questi template e si assegnano agli utenti o ai gruppi di utenti. Questo è il passo finale che concede effettivamente i permessi.
+In the **BTP Cockpit**, you create "Role Collections" based on these templates and assign them to users or user groups. This is the final step that actually grants permissions.
 
-**Esempio in BTP Cockpit**:
-1.  Vai su **Security > Role Collections**.
-2.  Crea una nuova collezione, es. `App_Power_Users`.
-3.  Aggiungi i ruoli definiti nei template, es. `MCPEditor`.
-4.  Assegna la collezione `App_Power_Users` agli utenti desiderati.
+**Example in BTP Cockpit**:
+1.  Go to **Security > Role Collections**.
+2.  Create a new collection, e.g., `App_Power_Users`.
+3.  Add the roles defined in the templates, e.g., `MCPEditor`.
+4.  Assign the `App_Power_Users` collection to the desired users.
 
-## 3. Configurazione del Deployment (mta.yaml)
+## 3. Deployment Configuration (mta.yaml)
 
-Questo file definisce la struttura dell'applicazione multi-target e i servizi BTP di cui ha bisogno per funzionare.
+This file defines the structure of the multi-target application and the BTP services it needs to function.
 
-**Percorso**: `mta.yaml`
+**Path**: `mta.yaml`
 
-### Modulo Applicativo
+### Application Module
 
-Definisce le caratteristiche dell'applicazione Node.js, come memoria, comando di avvio e i servizi a cui si deve collegare.
+Defines the characteristics of the Node.js application, such as memory, start command, and the services it needs to bind to.
 
 ```yaml
 modules:
@@ -104,9 +104,9 @@ modules:
       - name: sap-mcp-xsuaa
 ```
 
-### Risorse (Servizi BTP)
+### Resources (BTP Services)
 
-Elenca i servizi che BTP deve fornire all'applicazione al momento del deploy. È fondamentale che questi servizi siano disponibili e configurati nel tuo subaccount BTP.
+Lists the services that BTP must provide to the application at deployment time. It is essential that these services are available and configured in your BTP subaccount.
 
 ```yaml
 resources:
@@ -126,4 +126,4 @@ resources:
 
 ---
 
-**Prossimi Passi**: [Guida al Deployment](./DEPLOYMENT.md) | [Guida Utente](./USER_GUIDE.md)
+**Next Steps**: [Deployment Guide](./DEPLOYMENT.md) | [User Guide](./USER_GUIDE.md)

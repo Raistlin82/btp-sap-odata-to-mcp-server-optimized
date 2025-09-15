@@ -1,18 +1,18 @@
-# Architettura di Sistema
+# System Architecture
 
-Questa architettura estende le fondamenta del progetto originale con miglioramenti enterprise, focalizzandosi su un modello a tool gerarchico e un routing intelligente per massimizzare l'efficienza e la semplicità d'uso.
+This architecture extends the foundations of the original project with enterprise enhancements, focusing on a hierarchical tool model and intelligent routing to maximize efficiency and ease of use.
 
-## Architettura Concettuale
+## Conceptual Architecture
 
 ```mermaid
 graph TD
     subgraph "Client Layer (Claude, etc.)"
-        A[Client MCP]
+        A[MCP Client]
     end
 
     subgraph "SAP MCP Server"
         B(sap-smart-query: Universal Router) --> C{Intelligent Routing Engine}
-        C --> D[Tool Gerarchici]
+        C --> D[Hierarchical Tools]
         D --> E[Authentication & Session Core]
         E --> F[SAP Connectivity Layer]
     end
@@ -22,57 +22,57 @@ graph TD
         H[Connectivity & Destination]
     end
 
-    subgraph "Sistemi SAP Backend"
+    subgraph "SAP Backend Systems"
         I[SAP S/4HANA, ECC, etc.]
     end
 
     A --> B
-    E -- "Verifica Ruoli/Ambiti" --> G
-    F -- "Recupera Destination" --> H
-    F -- "Inoltra Chiamata OData" --> I
+    E -- "Verify Roles/Scopes" --> G
+    F -- "Fetch Destination" --> H
+    F -- "Forward OData Call" --> I
 ```
 
-## Componenti Chiave
+## Key Components
 
-### 1. Il Modello a Tool Gerarchici
+### 1. The Hierarchical Tool Model
 
-Il problema della "tool explosion" (centinaia di tool per ogni entità e operazione) è risolto a livello architetturale. Invece di registrare un tool per ogni operazione CRUD, il sistema espone un **set limitato di tool di alto livello**:
+The "tool explosion" problem (hundreds of tools for each entity and operation) is solved at an architectural level. Instead of registering a tool for each CRUD operation, the system exposes a **limited set of high-level tools**:
 
--   **Tool di Discovery (Pubblici)**: `search-sap-services`, `discover-service-entities`, `get-entity-schema`.
--   **Tool di Esecuzione (Protetti)**: `execute-entity-operation`.
--   **Tool AI & Real-time**: `natural-query-builder`, `smart-data-analysis`, `realtime-data-stream`, etc.
+-   **Discovery Tools (Public)**: `search-sap-services`, `discover-service-entities`, `get-entity-schema`.
+-   **Execution Tools (Protected)**: `execute-entity-operation`.
+-   **AI & Real-time Tools**: `natural-query-builder`, `smart-data-analysis`, `realtime-data-stream`, etc.
 
-Questo approccio **riduce drasticamente il contesto** inviato al client (da migliaia a poche centinaia di token), migliora le performance e semplifica l'interazione per l'utente finale.
+This approach **drastically reduces the context** sent to the client (from thousands to a few hundred tokens), improves performance, and simplifies the interaction for the end-user.
 
-### 2. Il Router Universale `sap-smart-query`
+### 2. The `sap-smart-query` Universal Router
 
-Questo è **l'unico entry point** che l'utente dovrebbe usare. Il router agisce come un "cervello" che:
+This is the **only entry point** the user should ever use. The router acts as a "brain" that:
 
-1.  **Analizza la Richiesta**: Determina se la richiesta è in linguaggio naturale, una query OData diretta o un'intenzione specifica (es. "analizza performance").
-2.  **Orchestra il Workflow**: Seleziona e orchestra la sequenza di tool gerarchici necessari per soddisfare la richiesta.
-3.  **Semplifica l'Interazione**: L'utente non ha bisogno di conoscere quale tool specifico chiamare; il router lo fa per lui.
+1.  **Analyzes the Request**: Determines if the request is in natural language, a direct OData query, or a specific intent (e.g., "analyze performance").
+2.  **Orchestrates the Workflow**: Selects and orchestrates the sequence of hierarchical tools needed to fulfill the request.
+3.  **Simplifies Interaction**: The user does not need to know which specific tool to call; the router does it for them.
 
-### 3. Livello di Autenticazione e Sessioni
+### 3. Authentication and Session Layer
 
 -   **Location**: `src/middleware/auth.ts`, `src/services/auth-server.ts`
--   **Funzione**: Gestisce l'accesso sicuro tramite un flusso basato su sessioni che si integra con **SAP IAS** e **XSUAA**.
--   **Caratteristiche**: L'utente si autentica una sola volta per sessione. Il server mantiene il contesto di sicurezza per tutte le chiamate successive, utilizzando `PrincipalPropagation` dove configurato.
+-   **Function**: Manages secure access through a session-based flow that integrates with **SAP IAS** and **XSUAA**.
+-   **Features**: The user authenticates once per session. The server maintains the security context for all subsequent calls, using `PrincipalPropagation` where configured.
 
-### 4. Livello di Connettività SAP
+### 4. SAP Connectivity Layer
 
 -   **Location**: `src/services/destination-service.ts`, `src/services/sap-client.ts`
--   **Funzione**: Abstrae la complessità della connessione ai sistemi SAP backend.
--   **Caratteristiche**: Utilizza i servizi **Connectivity** e **Destination** di BTP per recuperare le configurazioni di connessione in modo sicuro e gestire il `Principal Propagation`.
+-   **Function**: Abstracts the complexity of connecting to backend SAP systems.
+-   **Features**: Uses the **Connectivity** and **Destination** services of BTP to securely retrieve connection configurations and manage `Principal Propagation`.
 
-## Flusso dei Dati: Esempio di Query in Linguaggio Naturale
+## Data Flow: Example of a Natural Language Query
 
-1.  **Utente**: Invia la richiesta "mostrami i clienti di Roma" al tool `sap-smart-query`.
-2.  **Smart Router**: Analizza la richiesta e determina che è necessaria una query.
-3.  **Natural Query Builder**: Il router invoca il tool `natural-query-builder`, che traduce la richiesta nella query OData `A_BusinessPartner?$filter=City eq 'Rome'`.
-4.  **Authentication Check**: Il router invoca `execute-entity-operation` con la query. Il middleware di autenticazione verifica che l'utente abbia una sessione valida e i permessi necessari (es. scope `read`).
-5.  **SAP Connectivity**: Il `SAPClient` recupera la destinazione dal servizio Destination di BTP e inoltra la richiesta OData al sistema SAP S/4HANA.
-6.  **Risposta**: I dati vengono restituiti al client, potenzialmente dopo un'ulteriore analisi da parte del tool `smart-data-analysis`.
+1.  **User**: Sends the request "show me customers from Rome" to the `sap-smart-query` tool.
+2.  **Smart Router**: Analyzes the request and determines that a query is needed.
+3.  **Natural Query Builder**: The router invokes the `natural-query-builder` tool, which translates the request into the OData query `A_BusinessPartner?$filter=City eq 'Rome'`.
+4.  **Authentication Check**: The router invokes `execute-entity-operation` with the query. The authentication middleware verifies that the user has a valid session and the necessary permissions (e.g., `read` scope).
+5.  **SAP Connectivity**: The `SAPClient` retrieves the destination from the BTP Destination service and forwards the OData request to the SAP S/4HANA system.
+6.  **Response**: The data is returned to the client, potentially after further analysis by the `smart-data-analysis` tool.
 
 ---
 
-**Prossimi Passi**: [Guida alla Configurazione](./CONFIGURATION.md) | [Guida al Deployment](./DEPLOYMENT.md)
+**Next Steps**: [Configuration Guide](./CONFIGURATION.md) | [Deployment Guide](./DEPLOYMENT.md)

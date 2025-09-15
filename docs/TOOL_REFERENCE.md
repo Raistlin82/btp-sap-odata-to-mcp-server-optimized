@@ -1,110 +1,110 @@
-# Riferimento ai Tool
+# Tool Reference
 
-Questa guida fornisce una documentazione dettagliata per ciascuno dei tool disponibili nel SAP MCP Server. I tool sono organizzati in categorie funzionali.
+This guide provides detailed documentation for each of the tools available in the SAP MCP Server. The tools are organized into functional categories.
 
-## Categoria 1: Entry Point e Autenticazione
+## Category 1: Entry Point and Authentication
 
-Questi tool sono il punto di partenza per qualsiasi interazione con il server.
+These tools are the starting point for any interaction with the server.
 
-### 1. `sap-smart-query` (Router Universale)
+### 1. `sap-smart-query` (Universal Router)
 
--   **Descrizione**: **Questo è l'unico tool che dovresti usare per tutte le tue richieste.** Agisce come un router intelligente che analizza la tua richiesta e invoca la sequenza di tool più appropriata per te.
--   **Quando usarlo**: Sempre. Per qualsiasi richiesta, sia in linguaggio naturale ("mostra clienti") sia come query OData diretta (`A_BusinessPartner?$filter=...`).
--   **Parametri**:
-    -   `userRequest` (string, required): La tua richiesta.
-    -   `context` (object, optional): Contesto aggiuntivo, come `serviceId` o `entityType` se già noti.
--   **Autenticazione**: Gestita automaticamente dai tool sottostanti invocati dal router.
+-   **Description**: **This is the only tool you should use for all your requests.** It acts as an intelligent router that analyzes your request and invokes the most appropriate tool sequence for you.
+-   **When to use it**: Always. For any request, whether in natural language ("show customers") or as a direct OData query (`A_BusinessPartner?$filter=...`).
+-   **Parameters**:
+    -   `userRequest` (string, required): Your request.
+    -   `context` (object, optional): Additional context, such as `serviceId` or `entityType` if already known.
+-   **Authentication**: Handled automatically by the underlying tools invoked by the router.
 
 ### 2. `check-sap-authentication`
 
--   **Descrizione**: Valida e associa la tua sessione di autenticazione. Viene chiamato automaticamente all'inizio di una conversazione, ma può essere usato manualmente per fornire un `session_id`.
--   **Quando usarlo**: Solo dopo aver completato il flusso di login nel browser per associare il `session_id` alla tua sessione MCP.
--   **Parametri**:
-    -   `session_id` (string, optional): L'ID di sessione ottenuto dal flusso di autenticazione via browser.
--   **Autenticazione**: Questo tool *gestisce* l'autenticazione.
+-   **Description**: Validates and associates your authentication session. It is called automatically at the beginning of a conversation but can be used manually to provide a `session_id`.
+-   **When to use it**: Only after completing the login flow in the browser to associate the `session_id` with your MCP session.
+-   **Parameters**:
+    -   `session_id` (string, optional): The session ID obtained from the browser-based authentication flow.
+-   **Authentication**: This tool *manages* authentication.
 
-## Categoria 2: Discovery dei Dati
+## Category 2: Data Discovery
 
-Questi tool ti aiutano a esplorare quali dati e servizi sono disponibili.
+These tools help you explore what data and services are available.
 
 ### 3. `search-sap-services`
 
--   **Descrizione**: Cerca e trova i servizi OData disponibili in base a parole chiave o categorie.
--   **Parametri**:
-    -   `query` (string, optional): Termine di ricerca.
-    -   `category` (enum, optional): Categoria per filtrare i servizi (es. `sales`, `finance`).
--   **Autenticazione**: Non richiesta.
+-   **Description**: Searches for and finds available OData services based on keywords or categories.
+-   **Parameters**:
+    -   `query` (string, optional): Search term.
+    -   `category` (enum, optional): Category to filter services (e.g., `sales`, `finance`).
+-   **Authentication**: Not required.
 
 ### 4. `discover-service-entities`
 
--   **Descrizione**: Elenca tutte le entità (insiemi di dati) disponibili all'interno di un specifico servizio OData.
--   **Parametri**:
-    -   `serviceId` (string, required): L'ID del servizio da esplorare.
--   **Autenticazione**: Non richiesta.
+-   **Description**: Lists all entities (datasets) available within a specific OData service.
+-   **Parameters**:
+    -   `serviceId` (string, required): The ID of the service to explore.
+-   **Authentication**: Not required.
 
 ### 5. `get-entity-schema`
 
--   **Descrizione**: Fornisce la struttura dettagliata (campi, tipi di dati, chiavi) di una specifica entità.
--   **Parametri**:
-    -   `serviceId` (string, required): L'ID del servizio.
-    -   `entityName` (string, required): Il nome dell'entità.
--   **Autenticazione**: Non richiesta.
+-   **Description**: Provides the detailed structure (fields, data types, keys) of a specific entity.
+-   **Parameters**:
+    -   `serviceId` (string, required): The ID of the service.
+    -   `entityName` (string, required): The name of the entity.
+-   **Authentication**: Not required.
 
-## Categoria 3: Esecuzione e Analisi Dati
+## Category 3: Data Execution and Analysis
 
-Questi tool eseguono operazioni sui dati e forniscono analisi.
+These tools perform operations on data and provide analysis.
 
 ### 6. `execute-entity-operation`
 
--   **Descrizione**: Esegue operazioni CRUD (Create, Read, Update, Delete) su un'entità. **Attenzione**: da usare solo con sintassi OData precisa. Per il linguaggio naturale, affidarsi a `sap-smart-query`.
--   **Parametri**:
-    -   `serviceId` (string, required): L'ID del servizio.
-    -   `entityName` (string, required): Il nome dell'entità.
+-   **Description**: Performs CRUD (Create, Read, Update, Delete) operations on an entity. **Warning**: Use only with precise OData syntax. For natural language, rely on `sap-smart-query`.
+-   **Parameters**:
+    -   `serviceId` (string, required): The ID of the service.
+    -   `entityName` (string, required): The name of the entity.
     -   `operation` (enum, required): `read`, `create`, `update`, `delete`.
-    -   `parameters` (object, optional): Dati per le operazioni (es. il corpo per `create`/`update` o le chiavi per `delete`).
-    -   `queryOptions` (object, optional): Opzioni OData come `$filter`, `$select`, `$top`.
--   **Autenticazione**: **Richiesta**.
+    -   `parameters` (object, optional): Data for operations (e.g., the body for `create`/`update` or keys for `delete`).
+    -   `queryOptions` (object, optional): OData options like `$filter`, `$select`, `$top`.
+-   **Authentication**: **Required**.
 
 ### 7. `natural-query-builder`
 
--   **Descrizione**: Traduce una richiesta in linguaggio naturale (es. "clienti di Roma") in una query OData valida. Viene tipicamente invocato in automatico dallo `sap-smart-query`.
--   **Parametri**:
-    -   `naturalQuery` (string, required): La richiesta in linguaggio naturale.
-    -   `entityType` (string, required): L'entità target.
--   **Autenticazione**: Non richiesta.
+-   **Description**: Translates a natural language request (e.g., "customers from Rome") into a valid OData query. It is typically invoked automatically by `sap-smart-query`.
+-   **Parameters**:
+    -   `naturalQuery` (string, required): The natural language request.
+    -   `entityType` (string, required): The target entity.
+-   **Authentication**: Not required.
 
 ### 8. `smart-data-analysis`
 
--   **Descrizione**: Analizza un set di dati per identificare trend, anomalie e generare insight di business tramite AI.
--   **Parametri**:
-    -   `data` (array, required): Un array di oggetti JSON da analizzare.
+-   **Description**: Analyzes a dataset to identify trends, anomalies, and generate business insights using AI.
+-   **Parameters**:
+    -   `data` (array, required): An array of JSON objects to analyze.
     -   `analysisType` (enum, required): `trend`, `anomaly`, `forecast`.
--   **Autenticazione**: **Richiesta**.
+-   **Authentication**: **Required**.
 
-## Categoria 4: Funzionalità AI e Real-Time
+## Category 4: AI and Real-Time Capabilities
 
-Tool avanzati per l'ottimizzazione, l'analisi di processi e il monitoraggio in tempo reale.
+Advanced tools for optimization, process analysis, and real-time monitoring.
 
 ### 9. `query-performance-optimizer`
 
--   **Descrizione**: Analizza una query OData lenta e suggerisce ottimizzazioni.
--   **Autenticazione**: **Richiesta**.
+-   **Description**: Analyzes a slow OData query and suggests optimizations.
+-   **Authentication**: **Required**.
 
 ### 10. `business-process-insights`
 
--   **Descrizione**: Analizza dati transazionali per identificare colli di bottiglia e inefficienze nei processi di business.
--   **Autenticazione**: **Richiesta**.
+-   **Description**: Analyzes transactional data to identify bottlenecks and inefficiencies in business processes.
+-   **Authentication**: **Required**.
 
 ### 11. `realtime-data-stream`
 
--   **Descrizione**: Apre un canale WebSocket per lo streaming di dati in tempo reale.
--   **Autenticazione**: Non richiesta per avviare lo stream, ma potrebbe essere richiesta per accedere a dati specifici.
+-   **Description**: Opens a WebSocket channel for real-time data streaming.
+-   **Authentication**: Not required to start the stream, but may be required to access specific data.
 
 ### 12. `kpi-dashboard-builder`
 
--   **Descrizione**: Crea e gestisce dashboard con KPI (Key Performance Indicators) basati su dati SAP.
--   **Autenticazione**: **Richiesta**.
+-   **Description**: Creates and manages dashboards with Key Performance Indicators (KPIs) based on SAP data.
+-   **Authentication**: **Required**.
 
 ---
 
-**Prossimi Passi**: [Guida Utente](./USER_GUIDE.md) | [Guida alla Configurazione](./CONFIGURATION.md)
+**Next Steps**: [User Guide](./USER_GUIDE.md) | [Configuration Guide](./CONFIGURATION.md)

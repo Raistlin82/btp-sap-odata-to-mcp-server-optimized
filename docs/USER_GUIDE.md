@@ -1,15 +1,15 @@
-# Guida Utente
+# User Guide
 
-Questa guida è pensata per gli utenti che devono interagire con il server per interrogare i dati SAP. Illustra il flusso di autenticazione e fornisce esempi pratici di utilizzo.
+This guide is intended for users who need to interact with the server to query SAP data. It illustrates the authentication flow and provides practical usage examples.
 
-## Flusso di Autenticazione Step-by-Step
+## Step-by-Step Authentication Flow
 
-L'autenticazione è basata su sessioni e richiede un'unica autenticazione all'inizio di una conversazione. Una volta autenticati, tutti i tool che richiedono accesso ai dati funzioneranno senza ulteriori interruzioni.
+Authentication is session-based and requires a single sign-on at the beginning of a conversation. Once authenticated, all tools that require data access will work without further interruption.
 
-**Passo 1: Avvio della Sessione e Autenticazione Iniziale**
+**Step 1: Session Start and Initial Authentication**
 
-1.  **Inizio Conversazione**: Quando inizi una nuova conversazione con il client (es. Claude), il server MCP crea una nuova sessione.
-2.  **Prima Chiamata (Automatica)**: Il client dovrebbe chiamare automaticamente il tool `check-sap-authentication`. Se non sei autenticato, il tool risponderà con un link.
+1.  **Start Conversation**: When you start a new conversation with the client (e.g., Claude), the MCP server creates a new session.
+2.  **First Call (Automatic)**: The client should automatically call the `check-sap-authentication` tool. If you are not authenticated, the tool will respond with a link.
 
     ```json
     {
@@ -20,83 +20,83 @@ L'autenticazione è basata su sessioni e richiede un'unica autenticazione all'in
     }
     ```
 
-3.  **Login via Browser**: Visita l'`auth_url` in un browser. Effettua il login con le tue credenziali SAP (IAS).
-4.  **Ottieni il `session_id`**: Dopo il login, la pagina mostrerà un `session_id`. Copialo.
+3.  **Login via Browser**: Visit the `auth_url` in a browser. Log in with your SAP credentials (IAS).
+4.  **Get the `session_id`**: After logging in, the page will display a `session_id`. Copy it.
 
-**Passo 2: Associazione della Sessione**
+**Step 2: Session Association**
 
-1.  **Fornire il `session_id`**: Esegui di nuovo il tool `check-sap-authentication`, questa volta fornendo il `session_id` che hai copiato.
+1.  **Provide the `session_id`**: Run the `check-sap-authentication` tool again, this time providing the `session_id` you copied.
 
     ```
-    check-sap-authentication({ session_id: "<il-tuo-session-id>" })
+    check-sap-authentication({ session_id: "<your-session-id>" })
     ```
 
-2.  **Conferma**: Il tool confermerà che la sessione è stata autenticata e associata.
+2.  **Confirmation**: The tool will confirm that the session has been authenticated and associated.
 
     ```json
     {
       "status": "authenticated",
       "message": "✅ Authentication successful! Session associated.",
-      "user": "nome.utente@example.com"
+      "user": "user.name@example.com"
     }
     ```
 
-**Passo 3: Utilizzo dei Tool**
+**Step 3: Using the Tools**
 
-Da questo momento in poi, puoi usare qualsiasi tool senza dover specificare nuovamente il `session_id`. Il server gestirà automaticamente il contesto di sicurezza per te. **Si consiglia di usare sempre il tool `sap-smart-query` per tutte le richieste.**
+From this point on, you can use any tool without having to specify the `session_id` again. The server will automatically manage the security context for you. **It is always recommended to use the `sap-smart-query` tool for all requests.**
 
-## Esempi di Workflow
+## Workflow Examples
 
-Ecco alcuni scenari d'uso comuni che mostrano come interagire con il server dopo l'autenticazione.
+Here are some common use-case scenarios that show how to interact with the server after authentication.
 
-### Esempio 1: Trovare un Cliente e Visualizzare i suoi Dettagli
+### Example 1: Finding a Customer and Viewing its Details
 
-**Obiettivo**: Trovare un Business Partner specifico e ottenere i dettagli del suo schema.
+**Objective**: Find a specific Business Partner and get its schema details.
 
-1.  **Ricerca del servizio**: Inizia cercando il servizio corretto.
+1.  **Service Search**: Start by searching for the correct service.
 
-    > **Tu**: "Usa `sap-smart-query` per trovare i servizi relativi ai business partner."
+    > **You**: "Use `sap-smart-query` to find services related to business partners."
 
-    Il router intelligente eseguirà `search-sap-services` e restituirà i servizi pertinenti, come `API_BUSINESS_PARTNER`.
+    The smart router will execute `search-sap-services` and return relevant services, such as `API_BUSINESS_PARTNER`.
 
-2.  **Esplorazione delle entità**: Scopri quali entità sono disponibili nel servizio.
+2.  **Entity Exploration**: Discover which entities are available in the service.
 
-    > **Tu**: "Usa `sap-smart-query` per esplorare le entità nel servizio `API_BUSINESS_PARTNER`."
+    > **You**: "Use `sap-smart-query` to explore entities in the `API_BUSINESS_PARTNER` service."
 
-    Il router eseguirà `discover-service-entities` e mostrerà entità come `A_BusinessPartner`.
+    The router will execute `discover-service-entities` and show entities like `A_BusinessPartner`.
 
-3.  **Ottenere lo schema**: Visualizza la struttura dell'entità.
+3.  **Get Schema**: View the entity's structure.
 
-    > **Tu**: "Usa `sap-smart-query` per ottenere lo schema dell'entità `A_BusinessPartner` nel servizio `API_BUSINESS_PARTNER`."
+    > **You**: "Use `sap-smart-query` to get the schema for the `A_BusinessPartner` entity in the `API_BUSINESS_PARTNER` service."
 
-    Il router eseguirà `get-entity-schema`, fornendoti tutti i campi, i tipi e le chiavi.
+    The router will execute `get-entity-schema`, providing you with all the fields, types, and keys.
 
-### Esempio 2: Interrogazione in Linguaggio Naturale
+### Example 2: Natural Language Query
 
-**Obiettivo**: Trovare tutti i clienti creati nell'ultimo mese.
+**Objective**: Find all customers created in the last month.
 
-1.  **Richiesta diretta**: Dopo esserti autenticato, fai la tua richiesta in linguaggio naturale.
+1.  **Direct Request**: After authenticating, make your request in natural language.
 
-    > **Tu**: "Usa `sap-smart-query` per mostrarmi tutti i business partner creati nell'ultimo mese."
+    > **You**: "Use `sap-smart-query` to show me all business partners created in the last month."
 
-2.  **Workflow Automatico del Router**:
-    *   Il `sap-smart-query` rileva che è una richiesta in linguaggio naturale.
-    *   Esegue `natural-query-builder` per tradurre la tua richiesta in una query OData (es. `A_BusinessPartner?$filter=CreationDate ge ...`).
-    *   Esegue `execute-entity-operation` con la query OData generata, recuperando i dati.
-    *   (Opzionale) Esegue `smart-data-analysis` per fornire un'analisi dei risultati.
+2.  **Router's Automatic Workflow**:
+    *   `sap-smart-query` detects that it is a natural language request.
+    *   It executes `natural-query-builder` to translate your request into an OData query (e.g., `A_BusinessPartner?$filter=CreationDate ge ...`).
+    *   It executes `execute-entity-operation` with the generated OData query, retrieving the data.
+    *   (Optional) It executes `smart-data-analysis` to provide an analysis of the results.
 
-3.  **Risultato**: Riceverai l'elenco dei business partner che soddisfano i criteri, senza dover conoscere la sintassi OData.
+3.  **Result**: You will receive the list of business partners that meet the criteria, without needing to know OData syntax.
 
-### Esempio 3: Esecuzione di una Query OData Diretta
+### Example 3: Executing a Direct OData Query
 
-**Obiettivo**: Se sei uno sviluppatore e conosci già la query OData, puoi eseguirla direttamente.
+**Objective**: If you are a developer and already know the OData query, you can execute it directly.
 
-1.  **Richiesta con query OData**:
+1.  **Request with OData Query**:
 
-    > **Tu**: "Usa `sap-smart-query` per eseguire la query `A_BusinessPartnerAddress?$filter=Country eq 'IT'&$top=5` nel servizio `API_BUSINESS_PARTNER`."
+    > **You**: "Use `sap-smart-query` to execute the query `A_BusinessPartnerAddress?$filter=Country eq 'IT'&$top=5` in the `API_BUSINESS_PARTNER` service."
 
-2.  **Esecuzione Diretta del Router**:
-    *   Il `sap-smart-query` rileva la sintassi OData.
-    *   Esegue direttamente `execute-entity-operation` con la tua query.
+2.  **Router's Direct Execution**:
+    *   `sap-smart-query` detects the OData syntax.
+    *   It directly executes `execute-entity-operation` with your query.
 
-3.  **Risultato**: Ottieni immediatamente i primi 5 indirizzi di business partner in Italia.
+3.  **Result**: You immediately get the top 5 business partner addresses in Italy.
