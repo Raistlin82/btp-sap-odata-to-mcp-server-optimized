@@ -345,7 +345,7 @@ export class AuthServer {
           token: access_token.startsWith('Bearer ') ? access_token : `Bearer ${access_token}`,
           user: user,
           scopes: scopes,
-          expiresAt: Date.now() + (3600 * 1000), // Assume 1 hour expiration
+          expiresAt: Date.now() + (8 * 3600 * 1000), // 8 hours for better MCP client experience
           refreshToken: undefined
         };
 
@@ -849,7 +849,7 @@ export class AuthServer {
             token: `Bearer ${access_token}`,
             user: userInfo.getLogonName(),
             scopes: grantedScopes,
-            expiresAt: Date.now() + (3600 * 1000) // 1 hour
+            expiresAt: Date.now() + (8 * 3600 * 1000) // 8 hours for better MCP experience
           };
           
           await this.tokenStore.set(tokenData, undefined, 'global_user_auth');

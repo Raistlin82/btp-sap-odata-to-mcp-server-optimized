@@ -464,15 +464,15 @@ export class HierarchicalSAPToolRegistry {
             "sap-smart-query",
             {
                 title: "SAP Smart Query Router",
-                description: "🧠 PRIMARY ENTRY POINT: Universal router for ALL SAP requests! Automatically routes to the optimal tool sequence. Supports natural language, direct OData queries, analytics, real-time streaming, and more. ALWAYS use this tool for any SAP-related task after authentication!",
+                description: "Routes SAP requests to optimal tool",
                 inputSchema: {
-                    userRequest: z.string().describe("Your request in natural language or direct query (e.g., 'show me customers from last month', 'BusinessPartnerSet?$filter=...', 'analyze slow queries')"),
+                    userRequest: z.string(),
                     context: z.object({
                         serviceId: z.string().optional(),
                         entityType: z.string().optional(),
-                        previousTools: z.array(z.string()).optional().describe("Previously used tools in this session"),
+                        previousTools: z.array(z.string()).optional(),
                         preferredLanguage: z.enum(['italian', 'english']).optional()
-                    }).optional().describe("Additional context for better routing")
+                    }).optional()
                 }
             },
             async (args: Record<string, unknown>) => {
@@ -495,37 +495,33 @@ export class HierarchicalSAPToolRegistry {
                     // Get suggested workflow sequence
                     const fullWorkflow = this.intelligentRouter.getSuggestedWorkflow(routingResult, !context.serviceId);
                     
-                    // Prepare response with routing decision and guidance
-                    const response = {
+                    // Prepare response with essential fields for tool compatibility
+                    const response: any = {
                         routing: {
                             selectedTool: routingResult.selectedTool,
                             confidence: routingResult.confidence,
                             reason: routingResult.reason
                         },
                         suggestedWorkflow: {
-                            immediate: routingResult.selectedTool,
-                            fullSequence: fullWorkflow,
-                            nextSteps: routingResult.suggestedSequence
+                            immediate: fullWorkflow[0],
+                            nextSteps: fullWorkflow.slice(1, 3)
                         },
                         guidance: {
-                            message: `Based on your request "${userRequest}", I recommend using the '${routingResult.selectedTool}' tool.`, 
-                            reason: routingResult.reason,
-                            nextAction: fullWorkflow.length > 1 ? 
-                                `After using ${routingResult.selectedTool}, consider: ${fullWorkflow.slice(1, 3).join(' → ')}` :
-                                'This tool should provide the complete answer to your request.',
-                            workflowValidation: undefined as any
-                        },
-                        routingStats: this.intelligentRouter.getRoutingStats()
+                            message: `Use ${routingResult.selectedTool} tool`,
+                            nextAction: fullWorkflow[0]
+                        }
                     };
-                    
-                    // Add workflow validation if previous tools were used
+
+                    // Only add validation if there's an issue
                     if (context.previousTools && context.previousTools.length > 0) {
                         const validation = this.intelligentRouter.validateWorkflowSequence(
                             routingResult.selectedTool,
                             context.previousTools,
                             userRequest
                         );
-                        response.guidance.workflowValidation = validation;
+                        if (!validation.isOptimal && validation.recommendation) {
+                            response.warning = validation.recommendation;
+                        }
                     }
                     
                     return {
@@ -575,11 +571,11 @@ export class HierarchicalSAPToolRegistry {
             "natural-query-builder",
             {
                 title: "Natural Query Builder",
-                description: "Convert natural language requests into optimized SAP OData queries using AI intelligence. Works with any MCP client (Claude, GPT, etc.)",
+                description: "Convert natural language to OData queries",
                 inputSchema: {
-                    naturalQuery: z.string().describe("Natural language query (e.g. 'show business partners from last month', 'analyze sales trends', 'find pending invoices')"),
-                    entityType: z.string().describe("Target SAP entity type (use discover-service-entities first if unknown)"),
-                    serviceId: z.string().describe("SAP service identifier (use search-sap-services first if unknown)"),
+                    naturalQuery: z.string(),
+                    entityType: z.string(),
+                    serviceId: z.string(),
                     userContext: z.object({
                         role: z.string().optional(),
                         businessContext: z.string().optional(),
@@ -620,7 +616,11 @@ export class HierarchicalSAPToolRegistry {
                 title: "Smart Data Analysis", 
                 description: "Analyze SAP data patterns, trends, and generate actionable business insights with AI-powered statistical analysis. Provides automated data exploration and visualization recommendations.",
                 inputSchema: {
-                    data: z.array(z.any()).describe("Array of data records to analyze"),
+                    data: z.array(z.object({
+                        id: z.string().optional().describe("Record identifier"),
+                        name: z.string().optional().describe("Record name"),
+                        value: z.union([z.string(), z.number(), z.boolean()]).optional().describe("Record value")
+                    }).passthrough()).describe("Array of data records to analyze - each record is a key-value object"),
                     analysisType: z.enum(['trend', 'anomaly', 'forecast', 'correlation']).describe("Type of analysis to perform"),
                     businessContext: z.string().optional().describe("Business context for the analysis"),
                     entityType: z.string().describe("Type of SAP entity being analyzed")
@@ -803,10 +803,23 @@ export class HierarchicalSAPToolRegistry {
                             this.logger.info(`✅ User authenticated for ${tool.name}`);
                         }
                         
-                        // CTM: De-structure session_id from tool arguments to avoid passing it to the tool
-                        const { session_id, ...toolArgs } = args;
-                        
-                        const result = await tool.execute(toolArgs as any);
+                        // Validate ALL arguments with Zod schema first to catch extra properties like session_id
+                        const validationResult = tool.inputSchema.safeParse(args);
+                        if (!validationResult.success) {
+                            return {
+                                content: [{
+                                    type: "text" as const,
+                                    text: JSON.stringify({
+                                        error: 'Invalid arguments for tool ' + tool.name,
+                                        details: validationResult.error.issues,
+                                        message: 'Your input to the tool was invalid (must NOT have additional properties)'
+                                    }, null, 2)
+                                }],
+                                isError: true
+                            };
+                        }
+
+                        const result = await tool.execute(validationResult.data as any);
                         return { 
                             content: [{ 
                                 type: "text" as const, 
@@ -1347,39 +1360,8 @@ export class HierarchicalSAPToolRegistry {
     public registerServiceMetadataResources(): void {
         this.logger.info('📜 Registering MCP resources for document grounding');
         
-        // Register tool routing rules as efficient document grounding resource
-        this.mcpServer.registerResource(
-            "sap-routing-rules",
-            "sap://routing-rules",
-            {
-                title: "SAP Tool Routing Rules",
-                description: "Complete routing and workflow rules for SAP MCP tools",
-                mimeType: "application/json"
-            },
-            async () => {
-                try {
-                    const routingRulesPath = path.join(process.cwd(), 'config', 'tool-routing-rules.json');
-                    const routingRulesContent = fs.readFileSync(routingRulesPath, 'utf-8');
-
-                    return {
-                        contents: [{
-                            uri: "sap://routing-rules",
-                            mimeType: "application/json",
-                            text: routingRulesContent
-                        }]
-                    };
-                } catch (error) {
-                    this.logger.warn('Failed to read tool-routing-rules.json:', error);
-                    return {
-                        contents: [{
-                            uri: "sap://routing-rules",
-                            mimeType: "application/json",
-                            text: '{"error": "Tool routing rules not available"}'
-                        }]
-                    };
-                }
-            }
-        );
+        // Routing rules removed from document grounding - now loaded internally only
+        // This saves ~3,100 tokens per session
 
         this.mcpServer.registerResource(
             "sap-service-metadata",

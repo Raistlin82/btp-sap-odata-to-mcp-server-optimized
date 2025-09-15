@@ -34,18 +34,21 @@ export class TokenStore {
 
   /**
    * Store a new token with generated or custom session ID
-   * Implements single active session per client logic
+   * For MCP clients, allow multiple sessions per user to prevent frequent re-authentication
    */
   async set(tokenData: TokenData, clientInfo?: any, customSessionId?: string): Promise<string> {
     const sessionId = customSessionId || randomUUID();
-    
-    // SINGLE SESSION PER CLIENT: Remove previous sessions for this user+client combination
-    if (clientInfo?.clientId) {
+
+    // For MCP clients, don't remove previous sessions to avoid frequent re-authentication issues
+    // Only clean up when sessions are actually expired to improve user experience
+    const isMCPClient = clientInfo?.userAgent?.toLowerCase().includes('mcp') ||
+                       clientInfo?.clientId?.toLowerCase().includes('mcp') ||
+                       clientInfo?.userAgent?.toLowerCase().includes('claude') ||
+                       clientInfo?.userAgent?.toLowerCase().includes('copilot');
+
+    if (!isMCPClient && clientInfo?.clientId) {
+      // Only for non-MCP clients, maintain single session per client
       await this.removePreviousClientSessions(tokenData.user, clientInfo.clientId);
-    } else {
-      // If no clientId, use userAgent as fallback identifier
-      const clientIdentifier = clientInfo?.userAgent || 'unknown';
-      await this.removePreviousClientSessions(tokenData.user, clientIdentifier);
     }
     
     const storedTokenData: StoredTokenData = {
