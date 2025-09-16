@@ -9,6 +9,7 @@ import { TokenStore, StoredTokenData } from './token-store.js';
 import { authMiddleware, AuthenticatedRequest, requireAdmin } from '../middleware/auth.js';
 import xssec from '@sap/xssec';
 import xsenv from '@sap/xsenv';
+import { SESSION_LIFETIMES } from '../constants/timeouts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -345,7 +346,7 @@ export class AuthServer {
           token: access_token.startsWith('Bearer ') ? access_token : `Bearer ${access_token}`,
           user: user,
           scopes: scopes,
-          expiresAt: Date.now() + (8 * 3600 * 1000), // 8 hours for better MCP client experience
+          expiresAt: Date.now() + SESSION_LIFETIMES.AUTH_TOKEN_EXPIRY, // 8 hours for better MCP client experience
           refreshToken: undefined
         };
 
@@ -849,7 +850,7 @@ export class AuthServer {
             token: `Bearer ${access_token}`,
             user: userInfo.getLogonName(),
             scopes: grantedScopes,
-            expiresAt: Date.now() + (8 * 3600 * 1000) // 8 hours for better MCP experience
+            expiresAt: Date.now() + SESSION_LIFETIMES.AUTH_TOKEN_EXPIRY // 8 hours for better MCP experience
           };
           
           await this.tokenStore.set(tokenData, undefined, 'global_user_auth');

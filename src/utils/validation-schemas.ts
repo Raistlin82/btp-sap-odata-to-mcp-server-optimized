@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { VALIDATION_LIMITS } from '../constants/timeouts.js';
 
 /**
  * Validation schemas for MCP tool inputs to prevent injection attacks
@@ -6,7 +7,7 @@ import { z } from 'zod';
  */
 
 // Common validation patterns
-const safeString = z.string().min(1).max(1000).regex(/^[a-zA-Z0-9_\-.\s\(\)\/\$@\[\]]*$/, 'Invalid characters detected');
+const safeString = z.string().min(1).max(VALIDATION_LIMITS.MAX_STRING_LENGTH).regex(/^[a-zA-Z0-9_\-.\s\(\)\/\$@\[\]]*$/, 'Invalid characters detected');
 const entitySetName = z.string().min(1).max(100).regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Invalid entity set name');
 const serviceName = z.string().min(1).max(200).regex(/^[a-zA-Z0-9_\-\.\/]*$/, 'Invalid service name');
 const sessionId = z.string().uuid('Invalid session ID format');
@@ -15,8 +16,8 @@ const keyValue = z.string().min(1).max(500).regex(/^[a-zA-Z0-9_\-'.\s]*$/, 'Inva
 
 // OData specific patterns
 const odataFilter = z.string().max(2000).regex(/^[a-zA-Z0-9_\s\(\)\'\-=<>!and or eq ne gt lt ge le contains startswith endswith,]*$/, 'Invalid OData filter');
-const odataSelect = z.string().max(1000).regex(/^[a-zA-Z0-9_,\s]*$/, 'Invalid OData select');
-const odataExpand = z.string().max(1000).regex(/^[a-zA-Z0-9_,\s\/]*$/, 'Invalid OData expand');
+const odataSelect = z.string().max(VALIDATION_LIMITS.MAX_STRING_LENGTH).regex(/^[a-zA-Z0-9_,\s]*$/, 'Invalid OData select');
+const odataExpand = z.string().max(VALIDATION_LIMITS.MAX_STRING_LENGTH).regex(/^[a-zA-Z0-9_,\s\/]*$/, 'Invalid OData expand');
 const odataOrderBy = z.string().max(500).regex(/^[a-zA-Z0-9_,\s]+(?:\s+(asc|desc))?(?:,\s*[a-zA-Z0-9_]+(?:\s+(asc|desc))?)*$/, 'Invalid OData orderBy');
 
 /**
@@ -59,7 +60,7 @@ export const EntityReadSchema = z.object({
   $select: odataSelect.optional(),
   $expand: odataExpand.optional(),
   $orderby: odataOrderBy.optional(),
-  $top: z.number().int().min(1).max(1000).optional(),
+  $top: z.number().int().min(1).max(VALIDATION_LIMITS.MAX_STRING_LENGTH).optional(),
   $skip: z.number().int().min(0).max(10000).optional(),
   session_id: sessionId.optional()
 });
@@ -115,7 +116,7 @@ export const EntityOperationSchema = z.object({
     $select: odataSelect.optional(),
     $expand: odataExpand.optional(),
     $orderby: odataOrderBy.optional(),
-    $top: z.number().int().min(1).max(1000).optional(),
+    $top: z.number().int().min(1).max(VALIDATION_LIMITS.MAX_STRING_LENGTH).optional(),
     $skip: z.number().int().min(0).max(10000).optional()
   }).optional(),
   session_id: sessionId.optional()
@@ -285,7 +286,7 @@ function validateBasicInput(input: unknown, context?: string): ValidationResult 
 /**
  * Sanitize string input to prevent XSS and injection attacks
  */
-export function sanitizeString(input: string, maxLength = 1000): string {
+export function sanitizeString(input: string, maxLength = VALIDATION_LIMITS.DEFAULT_SANITIZE_LENGTH): string {
   return input
     .slice(0, maxLength) // Truncate if too long
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove scripts

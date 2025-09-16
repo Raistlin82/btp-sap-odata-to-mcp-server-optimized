@@ -8,6 +8,9 @@ import { aiIntegration } from '../services/ai-integration.js';
 import { aiQueryBuilder } from '../services/ai-query-builder.js';
 import { EntityType } from '../types/sap-types.js';
 import { NaturalQueryResult, QueryContext } from '../services/ai-query-builder.js';
+import { Logger } from '../utils/logger.js';
+
+const logger = new Logger('AIEnhancedTools');
 
 /**
  * Natural Language Query Builder Tool
@@ -49,7 +52,7 @@ export class NaturalQueryBuilderTool implements Tool {
 
     async execute(params: any): Promise<any> {
         try {
-            console.log('Processing natural language query:', {
+            logger.debug('Processing natural language query', {
                 query: params.naturalQuery,
                 entityType: params.entityType
             });
@@ -69,7 +72,7 @@ export class NaturalQueryBuilderTool implements Tool {
                 'Specify fields you need to optimize data transfer'
             ];
 
-            console.log('Successfully generated natural query:', {
+            logger.info('Successfully generated natural query', {
                 originalQuery: params.naturalQuery,
                 optimizedUrl: result.optimizedQuery.url,
                 confidence: result.optimizedQuery.confidence
@@ -84,7 +87,7 @@ export class NaturalQueryBuilderTool implements Tool {
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            console.error('Natural query builder failed:', errorMessage);
+            logger.error('Natural query builder failed', { error: errorMessage });
             
             return {
                 success: false,
@@ -197,7 +200,7 @@ export class SmartDataAnalysisTool implements Tool {
 
     async execute(params: any): Promise<any> {
         try {
-            console.log('Starting smart data analysis:', {
+            logger.info('Starting smart data analysis', {
                 recordCount: params.data.length,
                 analysisType: params.analysisType,
                 entityType: params.entityType
@@ -229,7 +232,7 @@ export class SmartDataAnalysisTool implements Tool {
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            console.error('Smart data analysis failed:', errorMessage);
+            logger.error('Smart data analysis failed', { error: errorMessage });
             
             return {
                 success: false,
@@ -280,7 +283,7 @@ export class QueryPerformanceOptimizerTool implements Tool {
 
     async execute(params: any): Promise<any> {
         try {
-            console.log('Optimizing query performance:', {
+            logger.info('Optimizing query performance', {
                 originalQuery: params.query,
                 entityType: params.entityType,
                 goals: params.optimizationGoals
@@ -310,7 +313,7 @@ export class QueryPerformanceOptimizerTool implements Tool {
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            console.error('Query optimization failed:', errorMessage);
+            logger.error('Query optimization failed', { error: errorMessage });
             
             return {
                 success: false,
@@ -383,7 +386,7 @@ export class BusinessProcessInsightsTool implements Tool {
 
     async execute(params: any): Promise<any> {
         try {
-            console.log('Analyzing business process:', {
+            logger.info('Analyzing business process', {
                 processType: params.processType,
                 dataPoints: params.processData.length,
                 timeframe: params.timeframe
@@ -421,7 +424,7 @@ export class BusinessProcessInsightsTool implements Tool {
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            console.error('Business process analysis failed:', errorMessage);
+            logger.error('Business process analysis failed', { error: errorMessage });
             
             return {
                 success: false,

@@ -22,6 +22,7 @@ import { ODataService } from './types/sap-types.js';
 import { ServiceDiscoveryConfigService } from './services/service-discovery-config.js';
 import { AuthServer } from './services/auth-server.js';
 import { aiIntegration } from './services/ai-integration.js';
+import { SESSION_LIFETIMES, TIME_UNITS } from './constants/timeouts.js';
 
 /**
  * Modern Express server hosting SAP MCP Server with session management
@@ -433,7 +434,7 @@ export function getCurrentUserSessionId(): string | undefined {
  */
 function cleanupExpiredSessions(): void {
     const now = new Date();
-    const maxAge = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    const maxAge = SESSION_LIFETIMES.SESSION_MAX_AGE; // 24 hours in milliseconds
 
     for (const [sessionId, session] of sessions.entries()) {
         if (now.getTime() - session.createdAt.getTime() > maxAge) {
@@ -1138,7 +1139,7 @@ export function createApp(): express.Application {
     });
 
     // Clean up expired sessions every hour - register with shutdown manager
-    const cleanupInterval = setInterval(cleanupExpiredSessions, 60 * 60 * 1000);
+    const cleanupInterval = setInterval(cleanupExpiredSessions, SESSION_LIFETIMES.SESSION_CLEANUP);
     shutdownManager.registerInterval(cleanupInterval, 'session-cleanup');
 
     return app;

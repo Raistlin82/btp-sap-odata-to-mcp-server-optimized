@@ -1,5 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { Logger } from './logger.js';
+
+const logger = new Logger('WorkflowConfigLoader');
 
 export interface ToolSelectionRules {
     naturalLanguagePatterns: {
@@ -48,7 +51,7 @@ export class WorkflowConfigLoader {
             this.config = JSON.parse(configContent) as WorkflowConfig;
             return this.config;
         } catch (error) {
-            console.warn('Failed to load workflow config, using defaults:', error);
+            logger.warn('Failed to load workflow config, using defaults', { error: error instanceof Error ? error.message : String(error) });
             this.config = this.getDefaultConfig();
             return this.config;
         }
@@ -64,7 +67,7 @@ export class WorkflowConfigLoader {
             this.workflowGuide = fs.readFileSync(guidePath, 'utf-8');
             return this.workflowGuide;
         } catch (error) {
-            console.warn('Failed to load workflow guide, using default:', error);
+            logger.warn('Failed to load workflow guide, using default', { error: error instanceof Error ? error.message : String(error) });
             return this.getDefaultWorkflowGuide();
         }
     }
