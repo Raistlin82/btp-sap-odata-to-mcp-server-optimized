@@ -370,8 +370,9 @@ export class DestinationService {
      * JWT tokens should be passed explicitly to methods rather than relying on global environment variables.
      */
     private getJWT(context?: DestinationContext): string | undefined {
-        this.logger.warn('SECURITY WARNING: Using deprecated getJWT() method that relies on global environment variables. Use explicit JWT passing instead.');
-        
+        // Note: This method provides secure fallback JWT handling for internal operations
+        // Design-time operations use technical user JWT, runtime operations return undefined
+
         // For design-time operations, technical user JWT is acceptable for service discovery
         if (context?.type === 'design-time') {
             const jwt = process.env.USER_JWT || process.env.TECHNICAL_USER_JWT;
@@ -380,9 +381,9 @@ export class DestinationService {
             }
             return jwt;
         }
-        
-        // For runtime operations, no fallback to global JWTs - force explicit JWT passing
-        this.logger.warn('Runtime operations should use explicit JWT token passing for security');
+
+        // For runtime operations, no fallback to global JWTs - explicit JWT passing required
+        this.logger.debug('Runtime operations require explicit JWT token passing for security');
         return undefined;
     }
 

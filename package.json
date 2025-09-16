@@ -42,7 +42,7 @@
     "@sap-cloud-sdk/odata-v4": "^4.x",
     "@sap-cloud-sdk/resilience": "^4.x",
     "@sap/logging": "^6.0.0",
-    "@sap/xsenv": "^4.0.0",
+    "@sap/xsenv": "^6.0.0",
     "@sap/xssec": "^3.6.1",
     "@types/sap__xsenv": "^3.3.2",
     "@types/uuid": "^10.0.0",

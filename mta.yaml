@@ -25,7 +25,6 @@ modules:
       keep-existing-routes: true
       health-check-type: http
       health-check-http-endpoint: /health
-      timeout: 180
     properties:
       LOG_LEVEL: debug
       # Dual Destination Configuration
