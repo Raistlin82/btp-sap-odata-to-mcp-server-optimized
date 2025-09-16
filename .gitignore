@@ -13,6 +13,9 @@ default-env.json
 .vscode/
 .idea/
 
+# Claude Code
+.claude/
+
 # Logs
 *.log
 npm-debug.log*
