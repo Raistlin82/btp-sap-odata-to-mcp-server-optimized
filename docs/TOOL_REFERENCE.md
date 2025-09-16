@@ -8,11 +8,12 @@ These tools are the starting point for any interaction with the server.
 
 ### 1. `sap-smart-query` (Universal Router)
 
--   **Description**: **This is the only tool you should use for all your requests.** It acts as an intelligent router that analyzes your request and invokes the most appropriate tool sequence for you.
--   **When to use it**: Always. For any request, whether in natural language ("show customers") or as a direct OData query (`A_BusinessPartner?$filter=...`).
+-   **Description**: **This is the primary and recommended tool for all interactions.** It functions as an intelligent, universal router that analyzes your request and orchestrates the most effective sequence of underlying tools to achieve your goal. It is designed to handle ambiguity and complex, multi-step requests.
+-   **When to use it**: Always. It is the single entry point for any request, whether it's a simple question in natural language (e.g., "show me customers in Germany"), a precise OData query (`A_BusinessPartner?$filter=...`), or a complex command (e.g., "analyze sales trends for product X and find anomalies").
+-   **How it Works**: It uses the `IntelligentToolRouterModule` to parse the `userRequest`. Based on routing rules, it can chain multiple tools together, for example: `natural-query-builder` -> `execute-entity-operation` -> `smart-data-analysis`.
 -   **Parameters**:
-    -   `userRequest` (string, required): Your request.
-    -   `context` (object, optional): Additional context, such as `serviceId` or `entityType` if already known.
+    -   `userRequest` (string, required): Your request in natural language or OData syntax.
+    -   `context` (object, optional): Additional context to guide the router, such as `serviceId` or `entityType` if you already know them.
 -   **Authentication**: Handled automatically by the underlying tools invoked by the router.
 
 ### 2. `check-sap-authentication`
@@ -83,26 +84,37 @@ These tools perform operations on data and provide analysis.
 
 ## Category 4: AI and Real-Time Capabilities
 
-Advanced tools for optimization, process analysis, and real-time monitoring.
+These advanced tools provide deeper insights and live data monitoring. They are typically orchestrated by the `sap-smart-query` router.
 
 ### 9. `query-performance-optimizer`
 
--   **Description**: Analyzes a slow OData query and suggests optimizations.
+-   **Description**: Analyzes a slow or inefficient OData query and suggests optimizations. For example, it might recommend using `$select` to limit columns or adding a missing `$filter`.
+-   **Parameters**: 
+    - `query` (string, required): The OData query to analyze.
 -   **Authentication**: **Required**.
 
 ### 10. `business-process-insights`
 
--   **Description**: Analyzes transactional data to identify bottlenecks and inefficiencies in business processes.
+-   **Description**: Analyzes a stream of transactional data (e.g., sales orders over time) to identify process bottlenecks, inefficiencies, or deviation from norms.
+-   **Parameters**:
+    - `data` (array, required): A time-series array of transactional data.
+    - `processType` (string, required): The business process to analyze (e.g., "OrderToCash").
 -   **Authentication**: **Required**.
 
 ### 11. `realtime-data-stream`
 
--   **Description**: Opens a WebSocket channel for real-time data streaming.
--   **Authentication**: Not required to start the stream, but may be required to access specific data.
+-   **Description**: Establishes a WebSocket connection to provide a live stream of data from an SAP entity. Useful for building real-time dashboards or monitoring critical events.
+-   **Parameters**:
+    - `serviceId` (string, required): The ID of the service.
+    - `entityName` (string, required): The name of the entity to stream.
+    - `filter` (string, optional): An OData filter to apply to the stream.
+-   **Authentication**: **Required**.
 
 ### 12. `kpi-dashboard-builder`
 
--   **Description**: Creates and manages dashboards with Key Performance Indicators (KPIs) based on SAP data.
+-   **Description**: A high-level tool that generates a complete dashboard configuration for a specific business KPI. It identifies the right entities, queries, and visualizations.
+-   **Parameters**:
+    - `kpiName` (string, required): The name of the KPI to build a dashboard for (e.g., "Monthly Recurring Revenue").
 -   **Authentication**: **Required**.
 
 ---
