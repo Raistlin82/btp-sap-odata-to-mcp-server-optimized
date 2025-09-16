@@ -182,6 +182,9 @@ export class HierarchicalSAPToolRegistry {
         
         // Register AI-Enhanced Tools for intelligent data processing (temporarily disabled)
         await this.registerAIEnhancedTools();
+
+        // Register UI Tools for interactive form generation and visualization
+        await this.registerUITools();
     }
 
     /**
@@ -1432,6 +1435,32 @@ export class HierarchicalSAPToolRegistry {
         );
         
         this.logger.info('✅ MCP Document Grounding Resources registered: sap://routing-rules, sap://service/{id}/metadata, sap://services');
+    }
+
+    /**
+     * Register UI Tools for interactive form generation and visualization
+     */
+    private async registerUITools(): Promise<void> {
+        try {
+            // Import UI tools dynamically
+            const { UIFormGeneratorTool } = await import('./ui/ui-form-generator-tool.js');
+
+            // Initialize UI Form Generator
+            const formGeneratorTool = new UIFormGeneratorTool(
+                this.mcpServer,
+                this.sapClient,
+                this.logger
+            );
+
+            // Register the tool
+            await formGeneratorTool.register();
+
+            this.logger.info('✅ UI Tools registered successfully: ui-form-generator');
+
+        } catch (error) {
+            this.logger.error('❌ Failed to register UI tools', error as Error);
+            // Don't throw - allow server to continue without UI tools
+        }
     }
 
 }
