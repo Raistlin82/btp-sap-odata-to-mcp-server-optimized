@@ -32,6 +32,17 @@ Environment variables are the primary method for configuring the application. Th
 | `LOG_LEVEL` | The level of detail for logs. | `info`, `debug`, `warn`, `error` |
 | `SESSION_TIMEOUT` | Duration of a user session in milliseconds. | `3600000` (1 hour) |
 | `CORS_ORIGINS` | Comma-separated list of allowed origins for CORS. | `https://claude.ai,http://localhost:3000` |
+| `ENABLE_CACHING` | If `true`, enables in-memory caching for discovered services. | `true` |
+| `CACHE_TTL` | Time-to-live for cache entries in milliseconds. | `1800000` (30 minutes) |
+
+### AI & Analytics Configuration
+
+| Variable | Description | Example |
+| :--- | :--- | :--- |
+| `AI_FEATURES_ENABLED` | Master switch to enable or disable AI-powered features. | `true` |
+| `AI_CONFIDENCE_THRESHOLD` | Minimum confidence level for the AI to act on a query. | `0.75` |
+| `MAX_DATA_POINTS_FOR_ANALYSIS` | Max data points to use in AI analysis to prevent performance issues. | `1000` |
+| `STREAMING_POLL_INTERVAL` | Interval in ms for polling in real-time data streams. | `5000` |
 
 ## 2. Security Configuration (xs-security.json)
 
