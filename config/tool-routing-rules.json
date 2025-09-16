@@ -69,7 +69,23 @@
     "processPatterns": [
       {"pattern": "workflow|sequence", "tool": "generate-workflow-sequence", "confidence": 0.9},
       {"pattern": "batch|bulk", "tool": "generate-workflow-sequence", "confidence": 0.85}
-    ]
+    ],
+    "uiPatterns": {
+      "italian": [
+        {"pattern": "form|modulo|scheda", "tool": "ui-form-generator", "confidence": 0.9, "requiredScope": "ui.forms"},
+        {"pattern": "griglia|tabella|elenco", "tool": "ui-data-grid", "confidence": 0.9, "requiredScope": "ui.grids"},
+        {"pattern": "dashboard|cruscotto|pannello", "tool": "ui-dashboard-composer", "confidence": 0.9, "requiredScope": "ui.dashboards"},
+        {"pattern": "flusso|processo|workflow visuale", "tool": "ui-workflow-builder", "confidence": 0.9, "requiredScope": "ui.workflows"},
+        {"pattern": "report|rapporto|analisi visuale", "tool": "ui-report-builder", "confidence": 0.9, "requiredScope": "ui.reports"}
+      ],
+      "english": [
+        {"pattern": "form|input|entry", "tool": "ui-form-generator", "confidence": 0.9, "requiredScope": "ui.forms"},
+        {"pattern": "grid|table|list view", "tool": "ui-data-grid", "confidence": 0.9, "requiredScope": "ui.grids"},
+        {"pattern": "dashboard|panel|widget", "tool": "ui-dashboard-composer", "confidence": 0.9, "requiredScope": "ui.dashboards"},
+        {"pattern": "workflow|process|visual flow", "tool": "ui-workflow-builder", "confidence": 0.9, "requiredScope": "ui.workflows"},
+        {"pattern": "report|visual analysis|chart", "tool": "ui-report-builder", "confidence": 0.9, "requiredScope": "ui.reports"}
+      ]
+    }
   },
   "workflowSequences": {
     "sessionInitialization": [
@@ -93,6 +109,30 @@
       {"step": 2, "tool": "get-entity-schema", "auth": false},
       {"step": 3, "tool": "natural-query-builder", "auth": false},
       {"step": 4, "tool": "execute-entity-operation", "auth": true}
+    ],
+    "uiFormCreation": [
+      {"step": 0, "tool": "search-sap-services", "auth": false},
+      {"step": 1, "tool": "discover-service-entities", "auth": false},
+      {"step": 2, "tool": "get-entity-schema", "auth": false},
+      {"step": 3, "tool": "ui-form-generator", "auth": true, "requiredScope": "ui.forms"}
+    ],
+    "uiDataGrid": [
+      {"step": 0, "tool": "execute-entity-operation", "auth": true},
+      {"step": 1, "tool": "ui-data-grid", "auth": true, "requiredScope": "ui.grids"}
+    ],
+    "uiDashboard": [
+      {"step": 0, "tool": "execute-entity-operation", "auth": true},
+      {"step": 1, "tool": "smart-data-analysis", "auth": true},
+      {"step": 2, "tool": "ui-dashboard-composer", "auth": true, "requiredScope": "ui.dashboards"}
+    ],
+    "uiWorkflow": [
+      {"step": 0, "tool": "discover-service-entities", "auth": false},
+      {"step": 1, "tool": "ui-workflow-builder", "auth": true, "requiredScope": "ui.workflows"}
+    ],
+    "uiReport": [
+      {"step": 0, "tool": "execute-entity-operation", "auth": true},
+      {"step": 1, "tool": "smart-data-analysis", "auth": true},
+      {"step": 2, "tool": "ui-report-builder", "auth": true, "requiredScope": "ui.reports"}
     ]
   }
 }
