@@ -5,6 +5,7 @@
 
 import WebSocket, { WebSocketServer } from 'ws';
 import { EventEmitter } from 'events';
+import { Logger } from '../utils/logger.js';
 import {
     StreamingDataPoint,
     WebSocketConnection,
@@ -20,6 +21,7 @@ import {
     AnalyzerType,
     InsightType
 } from '../types/realtime-types.js';
+import { NETWORK_TIMEOUTS, ANALYTICS_INTERVALS, DATA_RETENTION, ALERT_THRESHOLDS, TIME_UNITS } from '../constants/timeouts.js';
 
 export class RealtimeAnalyticsService extends EventEmitter {
     private wsServer: WebSocketServer | null = null;
@@ -30,12 +32,14 @@ export class RealtimeAnalyticsService extends EventEmitter {
     private biEngine: BusinessIntelligenceEngine;
     private config: RealtimeConfig;
     private isInitialized = false;
+    private logger: Logger;
 
     constructor(config?: Partial<RealtimeConfig>) {
         super();
+        this.logger = new Logger('RealtimeAnalyticsService');
         this.config = this.mergeConfig(config);
         this.biEngine = this.initializeBI();
-        console.log('info: Realtime Analytics Service initialized');
+        this.logger.info('Realtime Analytics Service initialized');
     }
 
     private mergeConfig(userConfig?: Partial<RealtimeConfig>): RealtimeConfig {
@@ -43,7 +47,7 @@ export class RealtimeAnalyticsService extends EventEmitter {
             websocket: {
                 port: 8081,
                 path: '/realtime',
-                heartbeatInterval: 30000,
+                heartbeatInterval: NETWORK_TIMEOUTS.WEBSOCKET_HEARTBEAT,
                 maxConnections: 100,
                 compressionEnabled: true
             },
@@ -51,13 +55,13 @@ export class RealtimeAnalyticsService extends EventEmitter {
                 bufferSize: 1000,
                 batchSize: 50,
                 maxRetries: 3,
-                retryDelay: 1000
+                retryDelay: TIME_UNITS.SECOND
             },
             kpi: {
                 maxDashboards: 50,
                 maxWidgetsPerDashboard: 20,
-                defaultRefreshInterval: 30000,
-                cacheTimeout: 300000
+                defaultRefreshInterval: ANALYTICS_INTERVALS.DASHBOARD_REFRESH,
+                cacheTimeout: DATA_RETENTION.CACHE_DEFAULT
             },
             analytics: {
                 maxAnalyzers: 10,
@@ -113,10 +117,10 @@ export class RealtimeAnalyticsService extends EventEmitter {
         setInterval(this.performHeartbeat.bind(this), this.config.websocket.heartbeatInterval);
 
         // Start analytics processing
-        setInterval(this.processAnalytics.bind(this), 5000);
+        setInterval(this.processAnalytics.bind(this), ANALYTICS_INTERVALS.REALTIME_PROCESSING);
 
         this.isInitialized = true;
-        console.log(`info: WebSocket server started on port ${serverPort}`);
+        this.logger.info(`WebSocket server started on port ${serverPort}`);
         this.emit('server:started', { port: serverPort });
     }
 
@@ -152,7 +156,7 @@ export class RealtimeAnalyticsService extends EventEmitter {
             timestamp: new Date().toISOString()
         });
 
-        console.log(`info: New WebSocket connection established: ${connectionId}`);
+        this.logger.info(`New WebSocket connection established: ${connectionId}`);
         this.emit('connection:new', { connectionId, clientId });
     }
 
@@ -211,7 +215,7 @@ export class RealtimeAnalyticsService extends EventEmitter {
             subscription
         });
 
-        console.log(`info: New subscription created: ${subscriptionId} for ${payload.entityType}`);
+        this.logger.info(`New subscription created: ${subscriptionId} for ${payload.entityType}`);
         this.emit('subscription:created', { subscriptionId, entityType: payload.entityType });
     }
 
@@ -234,7 +238,7 @@ export class RealtimeAnalyticsService extends EventEmitter {
             subscriptionId: payload.subscriptionId
         });
 
-        console.log(`info: Subscription removed: ${payload.subscriptionId}`);
+        this.logger.info(`Subscription removed: ${payload.subscriptionId}`);
     }
 
     // ===== KPI DASHBOARD MANAGEMENT =====
@@ -278,7 +282,7 @@ export class RealtimeAnalyticsService extends EventEmitter {
             dashboard
         });
 
-        console.log(`info: KPI Dashboard created: ${dashboardId} with ${dashboard.kpis.length} widgets`);
+        this.logger.info(`KPI Dashboard created: ${dashboardId} with ${dashboard.kpis.length} widgets`);
         this.emit('dashboard:created', { dashboardId, widgetCount: dashboard.kpis.length });
     }
 
@@ -296,7 +300,7 @@ export class RealtimeAnalyticsService extends EventEmitter {
             prediction
         });
 
-        console.log(`info: Prediction generated: ${predictionId} for ${payload.entityType}`);
+        this.logger.info(`Prediction generated: ${predictionId} for ${payload.entityType}`);
     }
 
     private generatePrediction(payload: any): any {
@@ -384,10 +388,10 @@ export class RealtimeAnalyticsService extends EventEmitter {
         const lastUpdate = subscription.lastUpdate.getTime();
         
         const intervals = {
-            realtime: 1000,    // 1 second
-            high: 5000,        // 5 seconds
-            medium: 15000,     // 15 seconds
-            low: 60000         // 1 minute
+            realtime: TIME_UNITS.SECOND,    // 1 second
+            high: ALERT_THRESHOLDS.RESPONSE_TIME_HIGH,        // 5 seconds
+            medium: ALERT_THRESHOLDS.RESPONSE_TIME_MEDIUM,     // 15 seconds
+            low: ANALYTICS_INTERVALS.HEALTH_CHECK         // 1 minute
         };
         
         return now - lastUpdate >= intervals[subscription.frequency];
@@ -476,7 +480,7 @@ export class RealtimeAnalyticsService extends EventEmitter {
                     field,
                     value,
                     threshold: value > 0 ? 10000 : -1000,
-                    severity: value > 50000 || value < -5000 ? 'high' : 'medium'
+                    severity: value > 50000 || value < ALERT_THRESHOLDS.ANOMALY_THRESHOLD ? 'high' : 'medium'
                 };
             }
         }
@@ -498,7 +502,7 @@ export class RealtimeAnalyticsService extends EventEmitter {
                 'Consider adjusting thresholds or scaling resources if trend continues'
             ],
             generated: new Date(),
-            expires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+            expires: new Date(Date.now() + DATA_RETENTION.INSIGHTS_SHORT) // 24 hours
         };
     }
 
@@ -517,7 +521,7 @@ export class RealtimeAnalyticsService extends EventEmitter {
                 'Consider updating anomaly detection thresholds'
             ],
             generated: new Date(),
-            expires: new Date(Date.now() + 72 * 60 * 60 * 1000) // 72 hours
+            expires: new Date(Date.now() + DATA_RETENTION.ANALYTICS_LONG) // 72 hours
         };
     }
 
@@ -533,7 +537,7 @@ export class RealtimeAnalyticsService extends EventEmitter {
         }
 
         this.biEngine.performanceMetrics.generatedInsights++;
-        console.log(`info: Business insight generated and broadcast: ${insight.insightId}`);
+        this.logger.info(`Business insight generated and broadcast: ${insight.insightId}`);
     }
 
     private processAnalytics(): void {
@@ -605,13 +609,13 @@ export class RealtimeAnalyticsService extends EventEmitter {
             });
             
             this.connections.delete(connectionId);
-            console.log(`info: WebSocket connection closed: ${connectionId}`);
+            this.logger.info(`WebSocket connection closed: ${connectionId}`);
             this.emit('connection:closed', { connectionId });
         }
     }
 
     private handleServerError(error: Error): void {
-        console.error('WebSocket server error:', error);
+        this.logger.error('WebSocket server error:', error);
         this.emit('server:error', error);
     }
 
@@ -634,7 +638,7 @@ export class RealtimeAnalyticsService extends EventEmitter {
         this.connections.clear();
         this.subscriptions.clear();
         this.isInitialized = false;
-        console.log('info: Realtime Analytics Service stopped');
+        this.logger.info('Realtime Analytics Service stopped');
     }
 
     public getStatus(): any {

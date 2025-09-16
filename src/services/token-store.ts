@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Logger } from '../utils/logger.js';
 import { TokenData } from './ias-auth-service.js';
+import { SESSION_LIFETIMES } from '../constants/timeouts.js';
 
 export interface StoredTokenData extends TokenData {
   sessionId: string;
@@ -29,7 +30,7 @@ export class TokenStore {
     // Clean up expired tokens every 5 minutes
     this.cleanupInterval = setInterval(() => {
       this.cleanupExpiredTokens();
-    }, 5 * 60 * 1000);
+    }, SESSION_LIFETIMES.TOKEN_CLEANUP_INTERVAL);
   }
 
   /**

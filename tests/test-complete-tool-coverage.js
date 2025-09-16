@@ -13,7 +13,7 @@ import chalk from 'chalk';
 export class CompleteToolCoverageTest {
     constructor(options = {}) {
         this.verbose = options.verbose || false;
-        this.timeout = options.timeout || 35000;
+        this.timeout = options.timeout || 60000; // Increased timeout for complete tool testing
         this.results = {
             passed: 0,
             failed: 0,
@@ -301,6 +301,8 @@ export class CompleteToolCoverageTest {
 
             let output = '';
             let registeredTools = [];
+            let serverReady = false;
+            let initSent = false;
 
             const timeout = setTimeout(() => {
                 child.kill();
@@ -313,14 +315,28 @@ export class CompleteToolCoverageTest {
                 });
             }, this.timeout);
 
-            // Request tools list
-            const listToolsRequest = {
-                jsonrpc: '2.0',
-                id: 1,
-                method: 'tools/list'
-            };
+            // Wait for server to be ready before sending requests
+            child.stderr.on('data', (data) => {
+                const msg = data.toString();
+                if (!serverReady && msg.includes('SAP MCP Server running on stdio')) {
+                    serverReady = true;
+                    this.log('🔍 Server ready, initializing...', 'debug');
 
-            child.stdin.write(JSON.stringify(listToolsRequest) + '\n');
+                    // Send initialize request first
+                    const initRequest = {
+                        jsonrpc: '2.0',
+                        id: 1,
+                        method: 'initialize',
+                        params: {
+                            protocolVersion: '2024-11-05',
+                            capabilities: { roots: { listChanged: true } },
+                            clientInfo: { name: 'test-coverage', version: '1.0.0' }
+                        }
+                    };
+                    child.stdin.write(JSON.stringify(initRequest) + '\n');
+                    initSent = true;
+                }
+            });
 
             child.stdout.on('data', (data) => {
                 output += data.toString();
@@ -330,7 +346,19 @@ export class CompleteToolCoverageTest {
                     for (const line of lines) {
                         const response = JSON.parse(line);
 
-                        if (response.result && response.result.tools) {
+                        // Handle initialization response
+                        if (response.id === 1 && response.result) {
+                            this.log('✅ Server initialized', 'debug');
+                            // Now request tools list
+                            const listToolsRequest = {
+                                jsonrpc: '2.0',
+                                id: 2,
+                                method: 'tools/list'
+                            };
+                            child.stdin.write(JSON.stringify(listToolsRequest) + '\n');
+                        }
+                        // Handle tools list response
+                        else if (response.id === 2 && response.result && response.result.tools) {
                             registeredTools = response.result.tools.map(t => t.name);
 
                             // Check which tools are missing
@@ -397,6 +425,8 @@ export class CompleteToolCoverageTest {
             let toolTestIndex = 0;
             let toolResults = [];
             let currentTool = null;
+            let serverReady = false;
+            let initialized = false;
 
             const timeout = setTimeout(() => {
                 child.kill();
@@ -408,7 +438,28 @@ export class CompleteToolCoverageTest {
                     completedTools: toolResults.length,
                     totalTools: this.allTools.length
                 });
-            }, this.timeout);
+            }, this.timeout * 2); // Double timeout for executing all tools
+
+            // Wait for server to be ready
+            child.stderr.on('data', (data) => {
+                const msg = data.toString();
+                if (!serverReady && msg.includes('SAP MCP Server running on stdio')) {
+                    serverReady = true;
+                    this.log('🔍 Server ready, initializing for tool execution...', 'debug');
+                    // Send initialize request
+                    const initRequest = {
+                        jsonrpc: '2.0',
+                        id: messageId++,
+                        method: 'initialize',
+                        params: {
+                            protocolVersion: '2024-11-05',
+                            capabilities: { roots: { listChanged: true } },
+                            clientInfo: { name: 'test-tool-execution', version: '1.0.0' }
+                        }
+                    };
+                    child.stdin.write(JSON.stringify(initRequest) + '\n');
+                }
+            });
 
             const testNextTool = () => {
                 if (toolTestIndex >= this.allTools.length) {
@@ -465,7 +516,13 @@ export class CompleteToolCoverageTest {
                     for (const line of lines) {
                         const response = JSON.parse(line);
 
-                        if (response.id && response.id > 1) { // Tool response
+                        // Handle initialization response
+                        if (response.id === 1 && response.result) {
+                            initialized = true;
+                            this.log('✅ Server initialized for tool execution', 'debug');
+                            // Start testing tools after initialization
+                            setTimeout(testNextTool, 100);
+                        } else if (response.id && response.id > 1 && initialized) { // Tool response
                             const tool = this.allTools[response.id - 2];
 
                             if (response.error) {

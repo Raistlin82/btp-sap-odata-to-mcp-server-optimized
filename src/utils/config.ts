@@ -1,8 +1,11 @@
 import xsenv from '@sap/xsenv';
+import { Logger } from './logger.js';
 import { DestinationConfig, DestinationValidationResult, DestinationType } from '../types/destination-types.js';
+import { NETWORK_TIMEOUTS } from '../constants/timeouts.js';
 
 export class Config {
     private config: Map<string, unknown> = new Map();
+    private logger = new Logger('Config');
 
     constructor() {
         this.loadConfiguration();
@@ -20,7 +23,7 @@ export class Config {
     private loadConfiguration(): void {
         // Load from environment variables
         this.loadDestinationConfig();
-        this.config.set('request.timeout', parseInt(process.env.REQUEST_TIMEOUT || '30000'));
+        this.config.set('request.timeout', parseInt(process.env.REQUEST_TIMEOUT || String(NETWORK_TIMEOUTS.REQUEST_TIMEOUT)));
         this.config.set('request.retries', parseInt(process.env.REQUEST_RETRIES || '3'));
         this.config.set('log.level', process.env.LOG_LEVEL || 'info');
         this.config.set('node.env', process.env.NODE_ENV || 'development');
@@ -37,7 +40,7 @@ export class Config {
             const vcapServices = process.env.VCAP_SERVICES ? JSON.parse(process.env.VCAP_SERVICES) : {};
             this.config.set('vcap.services', vcapServices);
         } catch (error) {
-            console.warn('Failed to load VCAP services:', error);
+            this.logger.warn('Failed to load VCAP services', { error: error instanceof Error ? error.message : String(error) });
         }
     }
 
@@ -101,10 +104,11 @@ export class Config {
 
         // Log configuration for debugging (only in development)
         if (process.env.NODE_ENV === 'development' || process.env.LOG_LEVEL === 'debug') {
-            console.log('🔗 Destination Configuration:');
-            console.log(`  Design-Time: ${designTimeDestination}`);
-            console.log(`  Runtime: ${runtimeDestination}`);
-            console.log(`  Single Destination Mode: ${useSingleDestination}`);
+            this.logger.debug('Destination Configuration', {
+                designTime: designTimeDestination,
+                runtime: runtimeDestination,
+                singleDestinationMode: useSingleDestination
+            });
         }
     }
 
@@ -175,11 +179,11 @@ export class Config {
                     this.config.set('sap.useSingleDestination', creds.SAP_USE_SINGLE_DESTINATION === 'true');
                 }
 
-                console.log('✅ Loaded OData and Destination configuration from CF user-provided service');
+                this.logger.info('Loaded OData and Destination configuration from CF user-provided service');
             }
         } catch (error) {
             // CF services not available or not configured - use environment variables
-            console.log('ℹ️  CF user-provided services not available, using environment variables');
+            this.logger.info('CF user-provided services not available, using environment variables');
         }
     }
 
@@ -257,7 +261,7 @@ export class Config {
                 const regex = new RegExp(pattern.slice(1, -1), 'i');
                 return regex.test(value);
             } catch (error) {
-                console.warn(`Invalid regex pattern: ${pattern}`, error);
+                this.logger.warn('Invalid regex pattern', { pattern, error: error instanceof Error ? error.message : String(error) });
                 return false;
             }
         }
@@ -272,7 +276,7 @@ export class Config {
             const regex = new RegExp(`^${regexPattern}$`, 'i');
             return regex.test(value);
         } catch (error) {
-            console.warn(`Invalid glob pattern: ${pattern}`, error);
+            this.logger.warn('Invalid glob pattern', { pattern, error: error instanceof Error ? error.message : String(error) });
             return false;
         }
     }
@@ -385,16 +389,14 @@ export class Config {
         // Validate the new configuration
         const validation = this.validateDestinationConfig();
         if (validation.warnings.length > 0) {
-            console.warn('⚠️ Destination configuration warnings:');
-            validation.warnings.forEach(warning => console.warn(`  - ${warning}`));
+            this.logger.warn('Destination configuration warnings', { warnings: validation.warnings });
         }
         
         if (!validation.isValid) {
-            console.error('❌ Destination configuration errors:');
-            validation.errors.forEach(error => console.error(`  - ${error}`));
+            this.logger.error('Destination configuration errors', { errors: validation.errors });
             throw new Error('Invalid destination configuration');
         }
 
-        console.log('✅ Destination configuration reloaded successfully');
+        this.logger.info('Destination configuration reloaded successfully');
     }
 }

@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod';
+import { Logger } from '../utils/logger.js';
 import { RealtimeAnalyticsService } from '../services/realtime-analytics.js';
 import {
     StreamSubscriptionSchema,
@@ -12,9 +13,11 @@ import {
     StreamingDataPoint,
     KPIDashboard
 } from '../types/realtime-types.js';
+import { DATA_RETENTION, ANALYTICS_INTERVALS } from '../constants/timeouts.js';
 
 // Global instance of the real-time analytics service
 let realtimeService: RealtimeAnalyticsService | null = null;
+const logger = new Logger('RealtimeTools');
 
 function getRealtimeService(): RealtimeAnalyticsService {
     if (!realtimeService) {
@@ -43,7 +46,7 @@ export class RealTimeDataStreamTool {
     [key: string]: unknown;
 
     public async execute(args: z.infer<typeof this.inputSchema>): Promise<any> {
-        console.log('Starting real-time data streaming:', args);
+        logger.info('Starting real-time data streaming', { args });
         
         const service = getRealtimeService();
         
@@ -129,7 +132,7 @@ export class RealTimeDataStreamTool {
                     throw new Error(`Unknown action: ${args.action}`);
             }
         } catch (error: any) {
-            console.error('Real-time streaming error:', error);
+            logger.error('Real-time streaming error', { error: error.message });
             return {
                 success: false,
                 error: error.message,
@@ -161,7 +164,7 @@ export class KPIDashboardBuilderTool {
     [key: string]: unknown;
 
     public async execute(args: z.infer<typeof this.inputSchema>): Promise<any> {
-        console.log('Managing KPI dashboard:', { action: args.action, dashboardId: args.dashboardId });
+        logger.info('Managing KPI dashboard', { action: args.action, dashboardId: args.dashboardId });
         
         const service = getRealtimeService();
         
@@ -271,7 +274,7 @@ export class KPIDashboardBuilderTool {
                     throw new Error(`Unknown action: ${args.action}`);
             }
         } catch (error: any) {
-            console.error('KPI Dashboard error:', error);
+            logger.error('KPI Dashboard error', { error: error.message });
             return {
                 success: false,
                 error: error.message,
@@ -341,7 +344,7 @@ export class KPIDashboardBuilderTool {
                 }
             ],
             layout: { columns: 12, rows: 4, theme: 'sap_horizon' },
-            refreshInterval: 30000,
+            refreshInterval: ANALYTICS_INTERVALS.DASHBOARD_REFRESH,
             lastUpdated: new Date().toISOString()
         };
     }
@@ -386,7 +389,7 @@ export class PredictiveAnalyticsEngineTool {
     [key: string]: unknown;
 
     public async execute(args: z.infer<typeof this.inputSchema>): Promise<any> {
-        console.log('Running predictive analytics:', { action: args.action, entityType: args.entityType, targetMetric: args.targetMetric });
+        logger.info('Running predictive analytics', { action: args.action, entityType: args.entityType, targetMetric: args.targetMetric });
         
         try {
             switch (args.action) {
@@ -483,7 +486,7 @@ export class PredictiveAnalyticsEngineTool {
                     throw new Error(`Unknown action: ${args.action}`);
             }
         } catch (error: any) {
-            console.error('Predictive analytics error:', error);
+            logger.error('Predictive analytics error', { error: error.message });
             return {
                 success: false,
                 error: error.message,
@@ -665,7 +668,7 @@ export class BusinessIntelligenceInsightsTool {
     [key: string]: unknown;
 
     public async execute(args: z.infer<typeof this.inputSchema>): Promise<any> {
-        console.log('Generating business intelligence insights:', { action: args.action, analysisType: args.analysisType });
+        logger.info('Generating business intelligence insights', { action: args.action, analysisType: args.analysisType });
         
         const service = getRealtimeService();
         
@@ -760,7 +763,7 @@ export class BusinessIntelligenceInsightsTool {
                     throw new Error(`Unknown action: ${args.action}`);
             }
         } catch (error: any) {
-            console.error('Business intelligence error:', error);
+            logger.error('Business intelligence error', { error: error.message });
             return {
                 success: false,
                 error: error.message,
@@ -822,7 +825,7 @@ export class BusinessIntelligenceInsightsTool {
                     'Prepare marketing campaigns to sustain growth'
                 ],
                 generated: new Date(),
-                expires: new Date(Date.now() + 48 * 60 * 60 * 1000) // 48 hours
+                expires: new Date(Date.now() + DATA_RETENTION.INSIGHTS_MEDIUM) // 48 hours
             }
         ];
     }
@@ -848,7 +851,7 @@ export class BusinessIntelligenceInsightsTool {
                     'Review recent product or policy changes'
                 ],
                 generated: new Date(),
-                expires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+                expires: new Date(Date.now() + DATA_RETENTION.INSIGHTS_SHORT) // 24 hours
             }
         ];
     }
@@ -873,7 +876,7 @@ export class BusinessIntelligenceInsightsTool {
                     'Plan seasonal marketing campaigns'
                 ],
                 generated: new Date(),
-                expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+                expires: new Date(Date.now() + DATA_RETENTION.INSIGHTS_LONG) // 7 days
             }
         ];
     }
@@ -898,7 +901,7 @@ export class BusinessIntelligenceInsightsTool {
                     'Review supplier lead times and reliability'
                 ],
                 generated: new Date(),
-                expires: new Date(Date.now() + 72 * 60 * 60 * 1000) // 72 hours
+                expires: new Date(Date.now() + DATA_RETENTION.ANALYTICS_LONG) // 72 hours
             }
         ];
     }

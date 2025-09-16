@@ -1,4 +1,5 @@
 import { Logger } from './logger.js';
+import { NETWORK_TIMEOUTS } from '../constants/timeouts.js';
 
 /**
  * Graceful shutdown manager to prevent memory leaks and ensure clean resource cleanup
@@ -102,7 +103,7 @@ export class ShutdownManager {
     this.shutdownTimeout = setTimeout(() => {
       this.logger.error('Graceful shutdown timeout exceeded, forcing exit');
       process.exit(1);
-    }, 30000); // 30 seconds timeout
+    }, NETWORK_TIMEOUTS.SHUTDOWN_TIMEOUT); // 30 seconds timeout
 
     try {
       // Clear all tracked intervals

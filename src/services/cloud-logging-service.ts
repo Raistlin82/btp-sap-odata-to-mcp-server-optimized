@@ -6,7 +6,7 @@ let SAPLogging: any;
 try {
   SAPLogging = require('@sap/logging');
 } catch (e) {
-  console.warn('SAP Logging not available, using fallback');
+  // SAP Logging not available, using fallback - logged at class initialization
   SAPLogging = null;
 }
 
