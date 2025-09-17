@@ -107,13 +107,18 @@
     },
     {
       "name": "MCPAdmin",
-      "description": "Full administrative access to MCP server",
+      "description": "Full administrative access to MCP server including all UI tools",
       "scope-references": [
         "$XSAPPNAME.read",
         "$XSAPPNAME.write",
         "$XSAPPNAME.delete",
         "$XSAPPNAME.admin",
-        "$XSAPPNAME.discover"
+        "$XSAPPNAME.discover",
+        "$XSAPPNAME.ui.forms",
+        "$XSAPPNAME.ui.grids",
+        "$XSAPPNAME.ui.dashboards",
+        "$XSAPPNAME.ui.workflows",
+        "$XSAPPNAME.ui.reports"
       ]
     }
   ],

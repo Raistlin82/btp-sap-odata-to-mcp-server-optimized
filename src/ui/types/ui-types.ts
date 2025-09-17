@@ -166,6 +166,19 @@ export interface WidgetConfig {
     dataKey?: string;
 }
 
+export interface DashboardWidget {
+    id: string;
+    type: 'chart' | 'metric' | 'table' | 'gauge';
+    title: string;
+    config: WidgetConfig;
+    position: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    };
+}
+
 export interface DataSourceMapping {
     widgetId: string;
     query: string;
@@ -183,7 +196,7 @@ export interface WorkflowStep {
 }
 
 export interface WorkflowAction {
-    type: 'validate' | 'save' | 'execute' | 'navigate';
+    type: 'validate' | 'save' | 'execute' | 'navigate' | 'approve' | 'notify' | 'reject';
     target?: string;
     condition?: string;
 }
@@ -198,7 +211,7 @@ export interface WorkflowConfig {
     workflowType: string;
     steps: WorkflowStep[];
     transitions?: TransitionRules;
-    persistence?: 'localStorage' | 'sessionStorage' | 'server';
+    persistence?: 'localStorage' | 'sessionStorage' | 'server' | 'sap';
 }
 
 export interface TransitionRules {
@@ -233,4 +246,39 @@ export interface UIError {
     message: string;
     details?: any;
     component?: string;
+}
+
+// Report-specific types
+export interface ReportConfig {
+    entityType: string;
+    reportType: 'summary' | 'detailed' | 'analytical' | 'custom';
+    dimensions: string[];
+    measures: string[];
+    filters?: ReportFilter[];
+    drillDownLevels?: DrillDownLevel[];
+    exportFormats?: string[];
+    schedulingEnabled?: boolean;
+    visualizations?: ReportChart[];
+}
+
+export interface ReportFilter {
+    field: string;
+    operator: 'eq' | 'ne' | 'gt' | 'ge' | 'lt' | 'le' | 'contains' | 'startswith' | 'endswith';
+    value: string | number | boolean;
+}
+
+export interface DrillDownLevel {
+    field: string;
+    targetEntity?: string;
+    navigationProperty?: string;
+    enabled: boolean;
+}
+
+export interface ReportChart {
+    type: 'bar' | 'line' | 'pie' | 'scatter' | 'area' | 'table';
+    title: string;
+    xAxis: string;
+    yAxis: string;
+    groupBy?: string;
+    config?: any;
 }

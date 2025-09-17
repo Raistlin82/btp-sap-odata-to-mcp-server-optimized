@@ -22,3 +22,10 @@ export interface MCPResponse {
     }>;
     isError?: boolean;
 }
+
+export interface MCPToolHandler {
+    name: string;
+    description: string;
+    inputSchema: any;
+    handle(args: any, context?: any): Promise<MCPResponse>;
+}
