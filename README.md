@@ -5,6 +5,13 @@ This repository is an experimental and optimized environment based on the origin
 ## ✨ Key Features
 
 -   **🧠 Hierarchical Tools & Smart Router**: Instead of hundreds of tools, the interface is simplified to a few intelligent tools. The `sap-smart-query` tool acts as a universal router that interprets requests (in natural language or OData) and orchestrates the optimal workflow.
+-   **🎨 Interactive UI Tools Suite**: 5 integrated UI tools for creating interactive experiences:
+    - **ui-form-generator** - Dynamic SAP Fiori forms with validation
+    - **ui-data-grid** - Interactive tables with sorting, filtering & export
+    - **ui-dashboard-composer** - KPI dashboards with real-time charts
+    - **ui-workflow-builder** - Visual workflow processes with approvals
+    - **ui-report-builder** - Analytical reports with drill-down capabilities
+-   **🔄 End-to-End Workflow Integration**: UI tools are automatically suggested in context after SAP operations, creating seamless data-to-UI workflows.
 -   **🔐 Enterprise Authentication**: Native integration with SAP BTP via XSUAA, with a session-based authentication flow and role management.
 -   **🤖 AI and Real-time Capabilities**: Includes tools for natural language to OData conversion, data analysis, query optimization, and real-time analytics.
 -   **☁️ Cloud-Native Optimized**: Designed for deployment on SAP BTP, Cloud Foundry, with structured logging, health checks, and lifecycle management.

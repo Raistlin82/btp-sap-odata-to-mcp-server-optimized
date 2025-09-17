@@ -2,11 +2,12 @@
   "name": "btp-sap-odata-to-mcp-server",
   "version": "1.0.0",
   "description": "Node.js MCP server for SAP OData services integration",
+  "//": "NOTE: @sap/xsenv@5.6.1 warning from @sap-cloud-sdk/connectivity is non-critical - Node.js 24 works fine with backward compatibility",
   "license": "MIT",
   "main": "dist/index.js",
   "type": "module",
   "engines": {
-    "node": ">=18.0.0",
+    "node": "18.x || 20.x || 22.x || 24.x",
     "npm": ">=8.0.0"
   },
   "scripts": {
@@ -41,7 +42,7 @@
     "@sap-cloud-sdk/odata-v2": "^4.x",
     "@sap-cloud-sdk/odata-v4": "^4.x",
     "@sap-cloud-sdk/resilience": "^4.x",
-    "@sap/logging": "^6.0.0",
+    "@sap/logging": "^9.0.0",
     "@sap/xsenv": "^6.0.0",
     "@sap/xssec": "^3.6.1",
     "@types/sap__xsenv": "^3.3.2",
@@ -77,5 +78,10 @@
     "prettier": "^3.6.2",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.41.0"
+  },
+  "optionalDependencies": {
+    "bufferutil": "^4.0.8",
+    "node-notifier": "^10.0.1",
+    "utf-8-validate": "^6.0.5"
   }
 }
