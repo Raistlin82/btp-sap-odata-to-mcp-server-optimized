@@ -21,6 +21,26 @@
     {
       "name": "$XSAPPNAME.discover",
       "description": "Service discovery and metadata access"
+    },
+    {
+      "name": "$XSAPPNAME.ui.forms",
+      "description": "Generate and render interactive forms for SAP entities"
+    },
+    {
+      "name": "$XSAPPNAME.ui.grids",
+      "description": "Create and display data grids with sorting and filtering"
+    },
+    {
+      "name": "$XSAPPNAME.ui.dashboards",
+      "description": "Compose and render interactive dashboards"
+    },
+    {
+      "name": "$XSAPPNAME.ui.workflows",
+      "description": "Build and execute visual workflows"
+    },
+    {
+      "name": "$XSAPPNAME.ui.reports",
+      "description": "Generate interactive reports with drill-down capabilities"
     }
   ],
   "role-templates": [
@@ -42,6 +62,40 @@
       ]
     },
     {
+      "name": "MCPUIUser",
+      "description": "Access to UI tools for forms and grids",
+      "scope-references": [
+        "$XSAPPNAME.read",
+        "$XSAPPNAME.discover",
+        "$XSAPPNAME.ui.forms",
+        "$XSAPPNAME.ui.grids"
+      ]
+    },
+    {
+      "name": "MCPUIAnalyst",
+      "description": "Access to UI analytics tools",
+      "scope-references": [
+        "$XSAPPNAME.read",
+        "$XSAPPNAME.discover",
+        "$XSAPPNAME.ui.dashboards",
+        "$XSAPPNAME.ui.reports"
+      ]
+    },
+    {
+      "name": "MCPUIDesigner",
+      "description": "Full access to all UI tools",
+      "scope-references": [
+        "$XSAPPNAME.read",
+        "$XSAPPNAME.write",
+        "$XSAPPNAME.discover",
+        "$XSAPPNAME.ui.forms",
+        "$XSAPPNAME.ui.grids",
+        "$XSAPPNAME.ui.dashboards",
+        "$XSAPPNAME.ui.workflows",
+        "$XSAPPNAME.ui.reports"
+      ]
+    },
+    {
       "name": "MCPManager",
       "description": "Full access including delete operations",
       "scope-references": [
@@ -53,13 +107,18 @@
     },
     {
       "name": "MCPAdmin",
-      "description": "Full administrative access to MCP server",
+      "description": "Full administrative access to MCP server including all UI tools",
       "scope-references": [
         "$XSAPPNAME.read",
         "$XSAPPNAME.write",
         "$XSAPPNAME.delete",
         "$XSAPPNAME.admin",
-        "$XSAPPNAME.discover"
+        "$XSAPPNAME.discover",
+        "$XSAPPNAME.ui.forms",
+        "$XSAPPNAME.ui.grids",
+        "$XSAPPNAME.ui.dashboards",
+        "$XSAPPNAME.ui.workflows",
+        "$XSAPPNAME.ui.reports"
       ]
     }
   ],
@@ -87,9 +146,30 @@
     },
     {
       "name": "MCPViewer",
-      "description": "Read-only access to SAP MCP OData Server", 
+      "description": "Read-only access to SAP MCP OData Server",
       "role-template-references": [
         "$XSAPPNAME.MCPViewer"
+      ]
+    },
+    {
+      "name": "MCPUIUser",
+      "description": "Access to UI form and grid tools",
+      "role-template-references": [
+        "$XSAPPNAME.MCPUIUser"
+      ]
+    },
+    {
+      "name": "MCPUIAnalyst",
+      "description": "Access to UI analytics and reporting tools",
+      "role-template-references": [
+        "$XSAPPNAME.MCPUIAnalyst"
+      ]
+    },
+    {
+      "name": "MCPUIDesigner",
+      "description": "Full access to all UI design and workflow tools",
+      "role-template-references": [
+        "$XSAPPNAME.MCPUIDesigner"
       ]
     }
   ],

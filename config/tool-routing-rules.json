@@ -29,47 +29,59 @@
   "toolSelectionRules": {
     "naturalLanguagePatterns": {
       "italian": [
-        {"pattern": "mostra|visualizza|elenca", "tool": "execute-entity-operation", "confidence": 0.85},
-        {"pattern": "cerca|trova|filtra", "tool": "execute-entity-operation", "confidence": 0.85},
+        {"pattern": "mostra.*prodotti|visualizza.*clienti|elenca.*ordini", "tool": "natural-query-builder", "confidence": 0.85},
+        {"pattern": "cerca|trova|filtra", "tool": "natural-query-builder", "confidence": 0.85},
         {"pattern": "crea|aggiungi|inserisci", "tool": "execute-entity-operation", "confidence": 0.8},
         {"pattern": "aggiorna|modifica", "tool": "execute-entity-operation", "confidence": 0.8},
         {"pattern": "elimina|cancella|rimuovi", "tool": "execute-entity-operation", "confidence": 0.8},
-        {"pattern": "servizi|catalogo", "tool": "search-sap-services", "confidence": 0.9},
-        {"pattern": "entità|schema|campi", "tool": "discover-service-entities", "confidence": 0.9},
-        {"pattern": "performance|lento", "tool": "monitor-query-performance", "confidence": 0.85},
+        {"pattern": "quali servizi.*disponibili|servizi SAP|catalogo servizi", "tool": "search-sap-services", "confidence": 0.95},
+        {"pattern": "entità.*servizio|schema|campi.*entity", "tool": "discover-service-entities", "confidence": 0.95},
         {"pattern": "tempo reale|streaming", "tool": "realtime-data-stream", "confidence": 0.9},
-        {"pattern": "dashboard|kpi", "tool": "kpi-dashboard-builder", "confidence": 0.9},
         {"pattern": "previsioni|predittivo", "tool": "predictive-analytics-engine", "confidence": 0.9}
       ],
       "english": [
-        {"pattern": "show|display|list|get", "tool": "execute-entity-operation", "confidence": 0.85},
-        {"pattern": "search|find|filter", "tool": "execute-entity-operation", "confidence": 0.85},
+        {"pattern": "show.*products|display.*customers|get.*from", "tool": "natural-query-builder", "confidence": 0.85},
+        {"pattern": "search|find|filter", "tool": "natural-query-builder", "confidence": 0.85},
         {"pattern": "create|add|insert", "tool": "execute-entity-operation", "confidence": 0.8},
         {"pattern": "update|modify", "tool": "execute-entity-operation", "confidence": 0.8},
         {"pattern": "delete|remove", "tool": "execute-entity-operation", "confidence": 0.8},
-        {"pattern": "services|catalog", "tool": "search-sap-services", "confidence": 0.9},
-        {"pattern": "entities|schema|fields", "tool": "discover-service-entities", "confidence": 0.9},
-        {"pattern": "performance|slow", "tool": "monitor-query-performance", "confidence": 0.85},
-        {"pattern": "real.?time|streaming", "tool": "realtime-data-stream", "confidence": 0.9},
-        {"pattern": "dashboard|kpi", "tool": "kpi-dashboard-builder", "confidence": 0.9},
-        {"pattern": "forecast|predict", "tool": "predictive-analytics-engine", "confidence": 0.9}
+        {"pattern": "available.*services|SAP services|service catalog", "tool": "search-sap-services", "confidence": 0.95},
+        {"pattern": "entity.*fields|schema|what fields", "tool": "discover-service-entities", "confidence": 0.95},
+        {"pattern": "real.?time.*streaming|streaming.*updates", "tool": "realtime-data-stream", "confidence": 0.95},
+        {"pattern": "forecast|predict.*sales|prediction", "tool": "predictive-analytics-engine", "confidence": 0.95}
       ]
     },
     "directQueryPatterns": [
-      {"pattern": "\\$filter", "tool": "execute-entity-operation", "confidence": 0.95},
-      {"pattern": "\\$select", "tool": "execute-entity-operation", "confidence": 0.95},
-      {"pattern": "\\$expand", "tool": "execute-entity-operation", "confidence": 0.95},
-      {"pattern": "\\$orderby", "tool": "execute-entity-operation", "confidence": 0.95},
-      {"pattern": "\\$top", "tool": "execute-entity-operation", "confidence": 0.95}
+      "\\$filter",
+      "\\$select",
+      "\\$expand",
+      "\\$orderby",
+      "\\$top"
     ],
     "performancePatterns": [
-      {"pattern": "slow|performance|optimize", "tool": "monitor-query-performance", "confidence": 0.9},
-      {"pattern": "timeout|error", "tool": "monitor-query-performance", "confidence": 0.85}
+      {"pattern": "query.*lenta|query.*lento|query.*slow|performance issue|timeout|error", "tool": "monitor-query-performance", "confidence": 0.9},
+      {"pattern": "ottimizza.*query|optimize.*query|query.*optimization", "tool": "monitor-query-performance", "confidence": 0.85}
     ],
     "processPatterns": [
       {"pattern": "workflow|sequence", "tool": "generate-workflow-sequence", "confidence": 0.9},
       {"pattern": "batch|bulk", "tool": "generate-workflow-sequence", "confidence": 0.85}
-    ]
+    ],
+    "uiPatterns": {
+      "italian": [
+        {"pattern": "crea.*form|form.*per|modulo.*per|scheda.*per", "tool": "sap-smart-query", "confidence": 0.95, "uiIntent": "ui-form-generator", "requiredScope": "ui.forms"},
+        {"pattern": "visualizza.*lista|mostra.*griglia|tabella.*per|elenco.*di", "tool": "sap-smart-query", "confidence": 0.95, "uiIntent": "ui-data-grid", "requiredScope": "ui.grids"},
+        {"pattern": "dashboard.*per|cruscotto.*di|pannello.*analytics|dashboard.*KPI", "tool": "sap-smart-query", "confidence": 0.95, "uiIntent": "ui-dashboard-composer", "requiredScope": "ui.dashboards"},
+        {"pattern": "workflow.*per|processo.*visuale|flusso.*di", "tool": "sap-smart-query", "confidence": 0.95, "uiIntent": "ui-workflow-builder", "requiredScope": "ui.workflows"},
+        {"pattern": "report.*per|rapporto.*di|analisi.*visuale", "tool": "sap-smart-query", "confidence": 0.95, "uiIntent": "ui-report-builder", "requiredScope": "ui.reports"}
+      ],
+      "english": [
+        {"pattern": "create.*form|form.*for|generate.*form", "tool": "sap-smart-query", "confidence": 0.95, "uiIntent": "ui-form-generator", "requiredScope": "ui.forms"},
+        {"pattern": "display.*list|show.*grid|table.*for|list.*of", "tool": "sap-smart-query", "confidence": 0.95, "uiIntent": "ui-data-grid", "requiredScope": "ui.grids"},
+        {"pattern": "dashboard.*for|panel.*for|widget.*showing", "tool": "sap-smart-query", "confidence": 0.95, "uiIntent": "ui-dashboard-composer", "requiredScope": "ui.dashboards"},
+        {"pattern": "workflow.*for|process.*visual|visual.*flow", "tool": "sap-smart-query", "confidence": 0.95, "uiIntent": "ui-workflow-builder", "requiredScope": "ui.workflows"},
+        {"pattern": "report.*for|visual.*analysis|chart.*showing", "tool": "sap-smart-query", "confidence": 0.95, "uiIntent": "ui-report-builder", "requiredScope": "ui.reports"}
+      ]
+    }
   },
   "workflowSequences": {
     "sessionInitialization": [
@@ -93,6 +105,30 @@
       {"step": 2, "tool": "get-entity-schema", "auth": false},
       {"step": 3, "tool": "natural-query-builder", "auth": false},
       {"step": 4, "tool": "execute-entity-operation", "auth": true}
+    ],
+    "uiFormCreation": [
+      {"step": 0, "tool": "search-sap-services", "auth": false},
+      {"step": 1, "tool": "discover-service-entities", "auth": false},
+      {"step": 2, "tool": "get-entity-schema", "auth": false},
+      {"step": 3, "tool": "ui-form-generator", "auth": true, "requiredScope": "ui.forms"}
+    ],
+    "uiDataGrid": [
+      {"step": 0, "tool": "execute-entity-operation", "auth": true},
+      {"step": 1, "tool": "ui-data-grid", "auth": true, "requiredScope": "ui.grids"}
+    ],
+    "uiDashboard": [
+      {"step": 0, "tool": "execute-entity-operation", "auth": true},
+      {"step": 1, "tool": "smart-data-analysis", "auth": true},
+      {"step": 2, "tool": "ui-dashboard-composer", "auth": true, "requiredScope": "ui.dashboards"}
+    ],
+    "uiWorkflow": [
+      {"step": 0, "tool": "discover-service-entities", "auth": false},
+      {"step": 1, "tool": "ui-workflow-builder", "auth": true, "requiredScope": "ui.workflows"}
+    ],
+    "uiReport": [
+      {"step": 0, "tool": "execute-entity-operation", "auth": true},
+      {"step": 1, "tool": "smart-data-analysis", "auth": true},
+      {"step": 2, "tool": "ui-report-builder", "auth": true, "requiredScope": "ui.reports"}
     ]
   }
 }

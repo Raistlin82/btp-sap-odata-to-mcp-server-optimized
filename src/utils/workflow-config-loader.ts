@@ -12,6 +12,10 @@ export interface ToolSelectionRules {
     directQueryPatterns: string[];
     performancePatterns: string[];
     processPatterns: string[];
+    uiPatterns?: {
+        italian: any[];
+        english: any[];
+    };
 }
 
 export interface WorkflowConfig {

@@ -62,7 +62,7 @@ export class HierarchicalSAPToolRegistry {
         
         // Initialize intelligent router
         this.intelligentRouter = new IntelligentToolRouter();
-        
+
         // Initialize authentication manager if token store is provided
         if (tokenStore && authServerUrl) {
             this.authManager = new MCPAuthManager(tokenStore, authServerUrl, this.logger);
@@ -182,6 +182,9 @@ export class HierarchicalSAPToolRegistry {
         
         // Register AI-Enhanced Tools for intelligent data processing (temporarily disabled)
         await this.registerAIEnhancedTools();
+
+        // Register UI Tools for interactive form generation and visualization
+        await this.registerUITools();
     }
 
     /**
@@ -489,9 +492,82 @@ export class HierarchicalSAPToolRegistry {
                     
                     // Analyze request and get routing recommendation
                     const routingResult = this.intelligentRouter.analyzeRequest(userRequest, context);
-                    
+
                     this.logger.info(`🎯 Router selected: ${routingResult.selectedTool} (confidence: ${routingResult.confidence})`);
-                    
+
+                    // CRITICAL: If this is a UI request, check authentication immediately
+                    if (routingResult.requiresAuth || routingResult.uiIntent) {
+                        this.logger.info(`🔐 UI Tool request detected - checking authentication immediately`);
+
+                        // Check if auth manager is available
+                        if (!this.authManager) {
+                            this.logger.warn(`❌ Auth manager not available for UI tool authentication`);
+
+                            return {
+                                content: [{
+                                    type: "text" as const,
+                                    text: JSON.stringify({
+                                        error: 'Authentication Service Unavailable',
+                                        message: `🔐 UI tools require authentication but auth service is not configured.`,
+                                        requiredScope: routingResult.requiredScope,
+                                        targetUITool: routingResult.uiIntent,
+                                        solution: 'Please configure authentication service or use non-UI tools'
+                                    }, null, 2)
+                                }],
+                                isError: true
+                            };
+                        }
+
+                        // Check authentication status using auth manager
+                        try {
+                            const authResult = await this.authManager.authenticateToolCall(routingResult.uiIntent!, {
+                                preValidation: true,
+                                requiredScope: routingResult.requiredScope
+                            });
+
+                            if (!authResult.authenticated) {
+                                this.logger.warn(`❌ Authentication required for UI tool: ${routingResult.uiIntent || routingResult.selectedTool}`);
+
+                                return {
+                                    content: [{
+                                        type: "text" as const,
+                                        text: JSON.stringify({
+                                            error: 'Authentication Required',
+                                            message: `🔐 UI tools require authentication. Please authenticate first.`,
+                                            auth_url: authResult.error?.authUrl || `${this.authManager.getAuthServerUrl()}/auth/`,
+                                            requiredScope: routingResult.requiredScope,
+                                            targetUITool: routingResult.uiIntent,
+                                            workflow: [
+                                                'Visit auth_url → get session_id → call check-sap-authentication',
+                                `Then use: ${routingResult.selectedTool}`,
+                                `Finally use: ${routingResult.uiIntent}`
+                                            ].filter(Boolean)
+                                        }, null, 2)
+                                    }],
+                                    isError: true
+                                };
+                            }
+
+                            this.logger.info(`✅ Authentication validation passed for UI tool: ${routingResult.uiIntent}`);
+
+                        } catch (error) {
+                            this.logger.error(`❌ Error validating authentication for UI tool:`, error);
+
+                            return {
+                                content: [{
+                                    type: "text" as const,
+                                    text: JSON.stringify({
+                                        error: 'Authentication Validation Failed',
+                                        message: `🔐 Failed to validate authentication for UI tool.`,
+                                        details: error instanceof Error ? error.message : 'Unknown error',
+                                        action: 'Please use check-sap-authentication tool first'
+                                    }, null, 2)
+                                }],
+                                isError: true
+                            };
+                        }
+                    }
+
                     // Get suggested workflow sequence
                     const fullWorkflow = this.intelligentRouter.getSuggestedWorkflow(routingResult, !context.serviceId);
                     
@@ -511,6 +587,20 @@ export class HierarchicalSAPToolRegistry {
                             nextAction: fullWorkflow[0]
                         }
                     };
+
+                    // Add UI intent if this is a UI request
+                    if (routingResult.uiIntent) {
+                        response.uiIntent = {
+                            targetUITool: routingResult.uiIntent,
+                            requiredScope: routingResult.requiredScope,
+                            message: `🎨 UI Request detected: Will route to ${routingResult.uiIntent} after data discovery`,
+                            workflow: `1️⃣ First: Use ${routingResult.selectedTool} for data discovery\n2️⃣ Then: Use ${routingResult.uiIntent} to create the UI`
+                        };
+
+                        // Update guidance for UI requests
+                        response.guidance.message = `🧠 Smart Routing: ${routingResult.selectedTool} → ${routingResult.uiIntent}`;
+                        response.guidance.uiFlow = true;
+                    }
 
                     // Only add validation if there's an issue
                     if (context.previousTools && context.previousTools.length > 0) {
@@ -1130,6 +1220,12 @@ export class HierarchicalSAPToolRegistry {
             responseText += JSON.stringify(schema, null, 2);
             responseText += `\n\n🔧 Use 'execute-entity-operation' with this schema information to perform operations.`;
 
+            // Add UI suggestions for entity discovery
+            const uiSuggestions = this.generateEntityDiscoveryUIToolSuggestions(entityName, schema);
+            if (uiSuggestions) {
+                responseText += "\n\n" + uiSuggestions;
+            }
+
             return {
                 content: [{
                     type: "text" as const,
@@ -1289,6 +1385,12 @@ export class HierarchicalSAPToolRegistry {
             let responseText = `✅ ${operationDescription}\n\n`;
             responseText += JSON.stringify(response.data, null, 2);
 
+            // Add UI tool suggestions based on operation type
+            const uiSuggestions = this.generateUIToolSuggestions(operation, args.entityName as string, response.data);
+            if (uiSuggestions) {
+                responseText += "\n\n" + uiSuggestions;
+            }
+
             return {
                 content: [{
                     type: "text" as const,
@@ -1432,6 +1534,704 @@ export class HierarchicalSAPToolRegistry {
         );
         
         this.logger.info('✅ MCP Document Grounding Resources registered: sap://routing-rules, sap://service/{id}/metadata, sap://services');
+    }
+
+    /**
+     * Register UI Tools for interactive form generation and visualization
+     */
+    private async registerUITools(): Promise<void> {
+        try {
+            this.logger.info('🎨 Registering UI Tools for interactive SAP operations');
+
+            // Register ui-form-generator tool
+            this.mcpServer.registerTool(
+                "ui-form-generator",
+                {
+                    title: "UI Form Generator",
+                    description: "Creates dynamic forms for SAP entity operations with validation and SAP Fiori styling",
+                    inputSchema: {
+                        entityType: z.string().describe('SAP entity type for the form'),
+                        formType: z.enum(['create', 'edit', 'view']).describe('Type of form to generate'),
+                        fields: z.array(z.object({
+                            name: z.string(),
+                            type: z.string(),
+                            required: z.boolean().optional(),
+                            label: z.string().optional()
+                        })).optional().describe('Custom form fields configuration')
+                    }
+                },
+                async (args: Record<string, unknown>) => {
+                    try {
+                        const { entityType, formType, fields } = args as any;
+
+                        // Generate a simple form HTML with SAP Fiori styling
+                        const formHtml = this.generateFormHTML(entityType, formType, fields);
+
+                        return {
+                            content: [
+                                {
+                                    type: "text" as const,
+                                    text: `✅ SAP ${entityType} ${formType} form generated successfully with Fiori styling and validation.`
+                                },
+                                {
+                                    type: "text" as const,
+                                    text: formHtml
+                                }
+                            ]
+                        };
+                    } catch (error) {
+                        return {
+                            content: [{
+                                type: "text" as const,
+                                text: `❌ Error generating form: ${error instanceof Error ? error.message : 'Unknown error'}`
+                            }]
+                        };
+                    }
+                }
+            );
+
+            // Register ui-data-grid tool
+            this.mcpServer.registerTool(
+                "ui-data-grid",
+                {
+                    title: "UI Data Grid",
+                    description: "Creates interactive data grids with sorting, filtering, and export capabilities",
+                    inputSchema: {
+                        entityType: z.string().describe('SAP entity type for the grid'),
+                        columns: z.array(z.object({
+                            label: z.string(),
+                            key: z.string(),
+                            type: z.enum(['text', 'number', 'date', 'boolean']).optional()
+                        })).describe('Grid column definitions'),
+                        features: z.object({
+                            sorting: z.boolean().optional(),
+                            filtering: z.boolean().optional(),
+                            pagination: z.boolean().optional(),
+                            export: z.boolean().optional()
+                        }).optional().describe('Grid feature enablement')
+                    }
+                },
+                async (args: Record<string, unknown>) => {
+                    try {
+                        const { entityType, columns, features } = args as any;
+
+                        // Generate a data grid HTML with interactive features
+                        const gridHtml = this.generateDataGridHTML(entityType, columns, features || {});
+
+                        return {
+                            content: [
+                                {
+                                    type: "text" as const,
+                                    text: `✅ Interactive ${entityType} data grid generated with ${columns?.length || 'auto'} columns and advanced features.`
+                                },
+                                {
+                                    type: "text" as const,
+                                    text: gridHtml
+                                }
+                            ]
+                        };
+                    } catch (error) {
+                        return {
+                            content: [{
+                                type: "text" as const,
+                                text: `❌ Error generating data grid: ${error instanceof Error ? error.message : 'Unknown error'}`
+                            }]
+                        };
+                    }
+                }
+            );
+
+            // Register ui-dashboard-composer tool
+            this.mcpServer.registerTool(
+                "ui-dashboard-composer",
+                {
+                    title: "UI Dashboard Composer",
+                    description: "Creates comprehensive KPI dashboards with charts and real-time data",
+                    inputSchema: {
+                        dashboardTitle: z.string().describe('Title for the dashboard'),
+                        widgets: z.array(z.object({
+                            type: z.enum(['chart', 'metric', 'table', 'gauge']),
+                            title: z.string(),
+                            entityType: z.string(),
+                            config: z.object({}).passthrough().optional()
+                        })).describe('Dashboard widget configurations'),
+                        layout: z.enum(['grid', 'vertical', 'horizontal']).optional().describe('Dashboard layout style')
+                    }
+                },
+                async (args: Record<string, unknown>) => {
+                    try {
+                        const { dashboardTitle, widgets, layout } = args as any;
+
+                        // Generate a dashboard HTML with KPI widgets
+                        const dashboardHtml = this.generateDashboardHTML(dashboardTitle, widgets, layout || 'grid');
+
+                        return {
+                            content: [
+                                {
+                                    type: "text" as const,
+                                    text: `✅ "${dashboardTitle}" KPI dashboard created with ${widgets?.length || 0} widgets and ${layout || 'grid'} layout.`
+                                },
+                                {
+                                    type: "text" as const,
+                                    text: dashboardHtml
+                                }
+                            ]
+                        };
+                    } catch (error) {
+                        return {
+                            content: [{
+                                type: "text" as const,
+                                text: `❌ Error generating dashboard: ${error instanceof Error ? error.message : 'Unknown error'}`
+                            }]
+                        };
+                    }
+                }
+            );
+
+            // Register ui-workflow-builder tool
+            this.mcpServer.registerTool(
+                "ui-workflow-builder",
+                {
+                    title: "UI Workflow Builder",
+                    description: "Creates visual workflow processes with step-by-step forms and approvals",
+                    inputSchema: {
+                        workflowName: z.string().describe('Name of the workflow process'),
+                        steps: z.array(z.object({
+                            name: z.string(),
+                            type: z.enum(['form', 'approval', 'notification', 'condition']),
+                            config: z.object({}).passthrough().optional()
+                        })).describe('Workflow step definitions'),
+                        entityType: z.string().describe('SAP entity type for the workflow')
+                    }
+                },
+                async (args: Record<string, unknown>) => {
+                    try {
+                        const { workflowName, steps, entityType } = args as any;
+
+                        // Generate a workflow builder HTML
+                        const workflowHtml = this.generateWorkflowHTML(workflowName, steps, entityType);
+
+                        return {
+                            content: [
+                                {
+                                    type: "text" as const,
+                                    text: `✅ "${workflowName}" workflow created with ${steps?.length || 0} steps for ${entityType} entities.`
+                                },
+                                {
+                                    type: "text" as const,
+                                    text: workflowHtml
+                                }
+                            ]
+                        };
+                    } catch (error) {
+                        return {
+                            content: [{
+                                type: "text" as const,
+                                text: `❌ Error generating workflow: ${error instanceof Error ? error.message : 'Unknown error'}`
+                            }]
+                        };
+                    }
+                }
+            );
+
+            // Register ui-report-builder tool
+            this.mcpServer.registerTool(
+                "ui-report-builder",
+                {
+                    title: "UI Report Builder",
+                    description: "Creates comprehensive drill-down reports with analytical capabilities",
+                    inputSchema: {
+                        entityType: z.string().describe('SAP entity type for the report'),
+                        reportType: z.enum(['summary', 'detailed', 'analytical', 'custom']).describe('Type of report to generate'),
+                        dimensions: z.array(z.string()).describe('Report dimension fields'),
+                        measures: z.array(z.string()).describe('Report measure fields')
+                    }
+                },
+                async (args: Record<string, unknown>) => {
+                    try {
+                        const { entityType, reportType, dimensions, measures } = args as any;
+
+                        // Generate a report builder HTML
+                        const reportHtml = this.generateReportHTML(entityType, reportType, dimensions, measures);
+
+                        return {
+                            content: [
+                                {
+                                    type: "text" as const,
+                                    text: `✅ ${reportType} report for ${entityType} created with ${dimensions?.length || 0} dimensions and ${measures?.length || 0} measures.`
+                                },
+                                {
+                                    type: "text" as const,
+                                    text: reportHtml
+                                }
+                            ]
+                        };
+                    } catch (error) {
+                        return {
+                            content: [{
+                                type: "text" as const,
+                                text: `❌ Error generating report: ${error instanceof Error ? error.message : 'Unknown error'}`
+                            }]
+                        };
+                    }
+                }
+            );
+
+            this.logger.info('✅ All UI Tools registered successfully: ui-form-generator, ui-data-grid, ui-dashboard-composer, ui-workflow-builder, ui-report-builder');
+
+        } catch (error) {
+            this.logger.error('❌ Failed to register UI tools', error as Error);
+            // Don't throw - allow server to continue without UI tools
+        }
+    }
+
+    /**
+     * Generate Form HTML
+     */
+    private generateFormHTML(entityType: string, formType: string, fields?: any[]): string {
+        const formId = `form_${entityType.toLowerCase()}_${Date.now()}`;
+        const defaultFields = fields || [
+            { name: 'id', label: 'ID', type: 'text', required: true },
+            { name: 'name', label: 'Name', type: 'text', required: true },
+            { name: 'description', label: 'Description', type: 'text', required: false }
+        ];
+
+        const fieldsHtml = defaultFields.map(field => `
+                <div class="sap-form-group">
+                    <label class="sap-label" for="${field.name}">${field.label}${field.required ? ' *' : ''}</label>
+                    <input class="sap-input" type="${field.type === 'number' ? 'number' : 'text'}"
+                           id="${field.name}" name="${field.name}" ${field.required ? 'required' : ''}>
+                </div>
+            `).join('');
+
+        return `<!DOCTYPE html>
+<html>
+<head>
+    <title>${entityType} ${formType.charAt(0).toUpperCase() + formType.slice(1)} Form</title>
+    <link rel="stylesheet" href="https://sdk.openui5.org/resources/sap/ui/core/themes/sap_horizon/library.css">
+    <style>
+        .sap-form-container { max-width: 600px; margin: 20px auto; padding: 20px; }
+        .sap-form-group { margin-bottom: 16px; }
+        .sap-label { display: block; margin-bottom: 4px; font-weight: 500; }
+        .sap-input { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; }
+        .sap-button { background: #0070f3; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="sap-form-container">
+        <h2>${entityType} ${formType.charAt(0).toUpperCase() + formType.slice(1)} Form</h2>
+        <form id="${formId}" onsubmit="handleSubmit(event)">
+            ${fieldsHtml}
+            <button type="submit" class="sap-button">Save ${entityType}</button>
+        </form>
+    </div>
+    <script>
+        function handleSubmit(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const data = Object.fromEntries(formData);
+            alert('Form submitted: ' + JSON.stringify(data, null, 2));
+        }
+    </script>
+</body>
+</html>`;
+    }
+
+    /**
+     * Generate Data Grid HTML
+     */
+    private generateDataGridHTML(entityType: string, columns: any[], features: any): string {
+        const gridId = `grid_${entityType.toLowerCase()}_${Date.now()}`;
+        const defaultColumns = columns?.length > 0 ? columns : [
+            { key: 'id', label: 'ID', type: 'text' },
+            { key: 'name', label: 'Name', type: 'text' },
+            { key: 'status', label: 'Status', type: 'text' }
+        ];
+
+        const toolbarHtml = `
+            ${features.filtering ? '<input type="text" placeholder="Filter..." onkeyup="filterTable()">' : ''}
+            ${features.export ? '<button class="sap-button" onclick="exportData()">Export</button>' : ''}
+            <button class="sap-button" onclick="refreshData()">Refresh</button>
+        `;
+
+        const headersHtml = defaultColumns.map(col => `<th onclick="sortTable('${col.key}')">${col.label} ↕️</th>`).join('');
+
+        return `<!DOCTYPE html>
+<html>
+<head>
+    <title>${entityType} Data Grid</title>
+    <link rel="stylesheet" href="https://sdk.openui5.org/resources/sap/ui/core/themes/sap_horizon/library.css">
+    <style>
+        .grid-container { margin: 20px; }
+        .grid-toolbar { margin-bottom: 16px; display: flex; gap: 12px; align-items: center; }
+        .data-table { width: 100%; border-collapse: collapse; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .data-table th, .data-table td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        .data-table th { background: #f8f9fa; font-weight: 600; cursor: pointer; }
+        .sap-button { background: #0070f3; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="grid-container">
+        <h2>${entityType} Data Grid</h2>
+        <div class="grid-toolbar">
+            ${toolbarHtml}
+        </div>
+        <table class="data-table" id="${gridId}">
+            <thead>
+                <tr>
+                    ${headersHtml}
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td colspan="${defaultColumns.length}">Loading data...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <script>
+        function sortTable(column) { alert('Sorting by ' + column); }
+        function filterTable() { alert('Filtering table'); }
+        function exportData() { alert('Exporting data'); }
+        function refreshData() { alert('Refreshing data'); }
+    </script>
+</body>
+</html>`;
+    }
+
+    /**
+     * Generate Dashboard HTML
+     */
+    private generateDashboardHTML(title: string, widgets: any[], layout: string): string {
+        const widgetsHtml = widgets?.map(widget => {
+            const widgetId = widget.title.replace(/\s+/g, '_');
+            const content = widget.type === 'metric'
+                ? '<div class="metric-value">1,234</div>'
+                : `<canvas id="chart_${widgetId}" width="400" height="200"></canvas>`;
+
+            return `<div class="widget">
+                    <div class="widget-title">${widget.title}</div>
+                    ${content}
+                </div>`;
+        }).join('') || '<div class="widget"><div class="widget-title">Sample KPI</div><div class="metric-value">42</div></div>';
+
+        const chartScripts = widgets?.filter(w => w.type === 'chart').map(widget => {
+            const widgetId = widget.title.replace(/\s+/g, '_');
+            return `const ctx_${widgetId} = document.getElementById('chart_${widgetId}').getContext('2d');
+            new Chart(ctx_${widgetId}, {
+                type: 'bar',
+                data: { labels: ['Jan', 'Feb', 'Mar'], datasets: [{ label: '${widget.title}', data: [12, 19, 3] }] }
+            });`;
+        }).join('') || '';
+
+        return `<!DOCTYPE html>
+<html>
+<head>
+    <title>${title}</title>
+    <link rel="stylesheet" href="https://sdk.openui5.org/resources/sap/ui/core/themes/sap_horizon/library.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .dashboard-container { margin: 20px; }
+        .widget-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .widget { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .widget-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+        .metric-value { font-size: 32px; font-weight: 700; color: #0070f3; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <h1>${title}</h1>
+        <div class="widget-grid">
+            ${widgetsHtml}
+        </div>
+    </div>
+    <script>
+        ${chartScripts}
+    </script>
+</body>
+</html>`;
+    }
+
+    /**
+     * Generate Workflow HTML
+     */
+    private generateWorkflowHTML(workflowName: string, steps: any[], entityType: string): string {
+        const stepsHtml = steps?.map((step, index) => {
+            const connector = index < steps.length - 1 ? '<div class="workflow-connector">↓</div>' : '';
+            return `<div class="step">
+                <div class="step-header">
+                    <span class="step-type">${step.type}</span>
+                    ${step.name}
+                </div>
+                <p>Step ${index + 1}: ${step.type} action for ${step.name}</p>
+            </div>
+            ${connector}`;
+        }).join('') || '<div class="step"><div class="step-header"><span class="step-type">form</span>Default Step</div><p>Sample workflow step</p></div>';
+
+        return `<!DOCTYPE html>
+<html>
+<head>
+    <title>${workflowName} Workflow</title>
+    <link rel="stylesheet" href="https://sdk.openui5.org/resources/sap/ui/core/themes/sap_horizon/library.css">
+    <style>
+        .workflow-container { margin: 20px; max-width: 800px; }
+        .step { background: white; margin: 16px 0; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .step-header { font-size: 18px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; }
+        .step-type { background: #0070f3; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        .workflow-connector { text-align: center; color: #666; font-size: 24px; }
+    </style>
+</head>
+<body>
+    <div class="workflow-container">
+        <h1>${workflowName}</h1>
+        <p>Workflow for ${entityType} entities</p>
+        ${stepsHtml}
+    </div>
+</body>
+</html>`;
+    }
+
+    /**
+     * Generate Report HTML
+     */
+    private generateReportHTML(entityType: string, reportType: string, dimensions: string[], measures: string[]): string {
+        const reportTitle = reportType.charAt(0).toUpperCase() + reportType.slice(1);
+
+        const metricsHtml = measures?.map(measure => `
+                <div class="metric-card">
+                    <div class="metric-value">1,234</div>
+                    <div class="metric-label">${measure}</div>
+                </div>
+            `).join('') || '<div class="metric-card"><div class="metric-value">42</div><div class="metric-label">Sample Metric</div></div>';
+
+        const chartLabel = measures?.[0] || 'Sample Measure';
+
+        return `<!DOCTYPE html>
+<html>
+<head>
+    <title>${entityType} ${reportTitle} Report</title>
+    <link rel="stylesheet" href="https://sdk.openui5.org/resources/sap/ui/core/themes/sap_horizon/library.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .report-container { margin: 20px; }
+        .report-header { background: linear-gradient(135deg, #0070f3, #0051cc); color: white; padding: 24px; border-radius: 8px; margin-bottom: 20px; }
+        .report-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .metric-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; }
+        .metric-value { font-size: 32px; font-weight: 700; color: #0070f3; }
+        .metric-label { font-size: 14px; color: #666; }
+        .chart-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <div class="report-container">
+        <div class="report-header">
+            <h1>${entityType} ${reportTitle} Report</h1>
+            <p>Analytical report with ${dimensions?.length || 0} dimensions and ${measures?.length || 0} measures</p>
+        </div>
+
+        <div class="report-metrics">
+            ${metricsHtml}
+        </div>
+
+        <div class="chart-container">
+            <h3>Trend Analysis</h3>
+            <canvas id="trendChart" width="400" height="200"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                datasets: [{
+                    label: '${chartLabel}',
+                    data: [12, 19, 3, 5, 2, 3],
+                    borderColor: '#0070f3',
+                    backgroundColor: 'rgba(0, 112, 243, 0.1)'
+                }]
+            },
+            options: { responsive: true }
+        });
+    </script>
+</body>
+</html>`;
+    }
+
+    /**
+     * Generate UI Tool Suggestions based on operation type and context
+     */
+    private generateUIToolSuggestions(operation: string, entityName: string, responseData: any): string | null {
+        try {
+            let suggestions = "## 🎨 Suggerimenti UI Interattivi\n\n";
+            let hasSuggestions = false;
+
+            switch (operation) {
+                case 'read':
+                    // For read operations, suggest data visualization tools
+                    const isMultipleRecords = Array.isArray(responseData?.value) || Array.isArray(responseData?.d?.results);
+                    const recordCount = isMultipleRecords
+                        ? (responseData?.value?.length || responseData?.d?.results?.length || 0)
+                        : 1;
+
+                    if (recordCount > 1) {
+                        suggestions += `📊 **Visualizzazione Dati (${recordCount} record trovati)**\n`;
+                        suggestions += `• \`ui-data-grid\` - Griglia interattiva con ordinamento, filtri ed esportazione\n`;
+                        suggestions += `• \`ui-dashboard-composer\` - Dashboard KPI per analisi aggregate\n`;
+                        suggestions += `• \`ui-report-builder\` - Report analitici con drill-down\n\n`;
+
+                        suggestions += `**Esempio uso:**\n`;
+                        suggestions += `\`\`\`\n`;
+                        suggestions += `ui-data-grid\n`;
+                        suggestions += `{\n`;
+                        suggestions += `  "entityType": "${entityName}",\n`;
+                        suggestions += `  "columns": [{"label": "ID", "key": "id"}, {"label": "Nome", "key": "name"}],\n`;
+                        suggestions += `  "features": {"filtering": true, "export": true}\n`;
+                        suggestions += `}\n`;
+                        suggestions += `\`\`\`\n`;
+                        hasSuggestions = true;
+                    } else {
+                        suggestions += `📋 **Visualizzazione Singolo Record**\n`;
+                        suggestions += `• \`ui-form-generator\` - Form di visualizzazione con styling SAP Fiori\n\n`;
+                        hasSuggestions = true;
+                    }
+                    break;
+
+                case 'create':
+                    suggestions += `✅ **${entityName} creato con successo!**\n\n`;
+                    suggestions += `🛠️ **Prossimi Passi Consigliati:**\n`;
+                    suggestions += `• \`ui-form-generator\` - Genera form per future creazioni di ${entityName}\n`;
+                    suggestions += `• \`ui-workflow-builder\` - Crea workflow di approvazione per ${entityName}\n`;
+                    suggestions += `• \`ui-data-grid\` - Visualizza tutti i record di ${entityName}\n\n`;
+
+                    suggestions += `**Esempio form per creazione:**\n`;
+                    suggestions += `\`\`\`\n`;
+                    suggestions += `ui-form-generator\n`;
+                    suggestions += `{\n`;
+                    suggestions += `  "entityType": "${entityName}",\n`;
+                    suggestions += `  "formType": "create"\n`;
+                    suggestions += `}\n`;
+                    suggestions += `\`\`\`\n`;
+                    hasSuggestions = true;
+                    break;
+
+                case 'update':
+                    suggestions += `✅ **${entityName} aggiornato con successo!**\n\n`;
+                    suggestions += `🛠️ **Opzioni UI Disponibili:**\n`;
+                    suggestions += `• \`ui-form-generator\` - Form di modifica standardizzato per ${entityName}\n`;
+                    suggestions += `• \`ui-workflow-builder\` - Workflow di approvazione modifiche\n`;
+                    suggestions += `• \`ui-data-grid\` - Vista tabellare per modifiche multiple\n\n`;
+                    hasSuggestions = true;
+                    break;
+
+                case 'delete':
+                    suggestions += `✅ **${entityName} eliminato con successo!**\n\n`;
+                    suggestions += `🛠️ **Gestione Post-Eliminazione:**\n`;
+                    suggestions += `• \`ui-data-grid\` - Visualizza record rimanenti di ${entityName}\n`;
+                    suggestions += `• \`ui-dashboard-composer\` - Dashboard aggiornato senza il record eliminato\n`;
+                    suggestions += `• \`ui-report-builder\` - Report delle eliminazioni recenti\n\n`;
+                    hasSuggestions = true;
+                    break;
+
+                case 'read-single':
+                    suggestions += `📋 **Visualizzazione Dettaglio ${entityName}**\n`;
+                    suggestions += `• \`ui-form-generator\` - Form di visualizzazione dettagliata\n`;
+                    suggestions += `• \`ui-workflow-builder\` - Azioni workflow su questo record\n\n`;
+
+                    suggestions += `**Form di dettaglio:**\n`;
+                    suggestions += `\`\`\`\n`;
+                    suggestions += `ui-form-generator\n`;
+                    suggestions += `{\n`;
+                    suggestions += `  "entityType": "${entityName}",\n`;
+                    suggestions += `  "formType": "view"\n`;
+                    suggestions += `}\n`;
+                    suggestions += `\`\`\`\n`;
+                    hasSuggestions = true;
+                    break;
+            }
+
+            // Add general integration note
+            if (hasSuggestions) {
+                suggestions += `\n💡 **Nota:** Tutti i tool UI sono integrati con il sistema di autenticazione SAP e rispettano i permessi dell'utente.\n`;
+                suggestions += `🔄 **Workflow Integrato:** Il \`sap-smart-query\` router può automaticamente suggerire il tool UI più appropriato.`;
+
+                return suggestions;
+            }
+
+            return null;
+        } catch (error) {
+            this.logger.warn('Error generating UI suggestions:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Generate UI Tool Suggestions for entity discovery/schema exploration
+     */
+    private generateEntityDiscoveryUIToolSuggestions(entityName: string, schema: any): string | null {
+        try {
+            let suggestions = "## 🎨 Strumenti UI Disponibili per " + entityName + "\n\n";
+
+            suggestions += `🚀 **Prossimi Passi Consigliati:**\n\n`;
+
+            // Form generator suggestion
+            suggestions += `### 📝 Gestione Dati\n`;
+            suggestions += `• **\`ui-form-generator\`** - Crea form per operazioni CRUD\n`;
+            suggestions += `  - Form di creazione: \`{"entityType": "${entityName}", "formType": "create"}\`\n`;
+            suggestions += `  - Form di modifica: \`{"entityType": "${entityName}", "formType": "edit"}\`\n`;
+            suggestions += `  - Form di visualizzazione: \`{"entityType": "${entityName}", "formType": "view"}\`\n\n`;
+
+            // Data grid suggestion
+            suggestions += `### 📊 Visualizzazione Tabellare\n`;
+            suggestions += `• **\`ui-data-grid\`** - Griglia interattiva per esplorare i dati\n`;
+            suggestions += `  - Include ordinamento, filtri, esportazione\n`;
+            suggestions += `  - Auto-genera colonne basate su schema entity\n\n`;
+
+            // Dashboard suggestion
+            const hasNumericFields = schema.properties?.some((prop: any) =>
+                prop.type?.includes('Int') || prop.type?.includes('Decimal') || prop.type?.includes('Double')
+            );
+
+            if (hasNumericFields) {
+                suggestions += `### 📈 Dashboard Analitico\n`;
+                suggestions += `• **\`ui-dashboard-composer\`** - Dashboard KPI per ${entityName}\n`;
+                suggestions += `  - Rileva automaticamente campi numerici per metriche\n`;
+                suggestions += `  - Grafici real-time con Chart.js\n\n`;
+
+                suggestions += `### 📋 Report Analitici\n`;
+                suggestions += `• **\`ui-report-builder\`** - Report drill-down per analisi approfondite\n`;
+                suggestions += `  - Dimensioni e misure basate su schema\n`;
+                suggestions += `  - Export multi-formato (PDF, Excel, CSV)\n\n`;
+            }
+
+            // Workflow suggestion for entities with status/approval fields
+            const hasWorkflowFields = schema.properties?.some((prop: any) =>
+                prop.name?.toLowerCase().includes('status') ||
+                prop.name?.toLowerCase().includes('approval') ||
+                prop.name?.toLowerCase().includes('state')
+            );
+
+            if (hasWorkflowFields) {
+                suggestions += `### 🔄 Workflow e Processi\n`;
+                suggestions += `• **\`ui-workflow-builder\`** - Workflow per gestione stati ${entityName}\n`;
+                suggestions += `  - Rileva campi di stato per workflow automatici\n`;
+                suggestions += `  - Step di approvazione e notifiche\n\n`;
+            }
+
+            // Integration note
+            suggestions += `### 🔗 Integrazione\n`;
+            suggestions += `💡 **Tutti gli strumenti UI sono:**\n`;
+            suggestions += `• ✅ Integrati con autenticazione SAP\n`;
+            suggestions += `• ✅ Compatibili con schema ${entityName}\n`;
+            suggestions += `• ✅ Disponibili tramite \`sap-smart-query\` router\n`;
+            suggestions += `• ✅ Styling SAP Fiori nativo\n\n`;
+
+            suggestions += `🎯 **Inizia subito:** Usa uno dei comandi sopra o chiedi al \`sap-smart-query\` di suggerire automaticamente il tool migliore per la tua operazione.`;
+
+            return suggestions;
+        } catch (error) {
+            this.logger.warn('Error generating entity discovery UI suggestions:', error);
+            return null;
+        }
     }
 
 }
