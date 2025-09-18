@@ -240,38 +240,72 @@ export class JWTValidator {
   private mapGroupsToScopes(groups: string[]): string[] {
     const xsappname = this.xsuaaCredentials?.xsappname || process.env.XSUAA_XSAPPNAME || 'btp-sap-odata-to-mcp-server';
     const scopes: string[] = [];
-    
+
     // Map role collections to scopes based on xs-security.json configuration
     // Role collections can be configured via ROLE_COLLECTIONS environment variable
-    const roleCollections = (process.env.ROLE_COLLECTIONS || 'MCPAdministrator,MCPUser,MCPManager,MCPViewer').split(',');
-    
+    const roleCollections = (process.env.ROLE_COLLECTIONS || 'MCPAdministrator,MCPUser,MCPManager,MCPViewer,MCPUIUser,MCPUIAnalyst,MCPUIDesigner').split(',');
+
     for (const group of groups) {
       switch (group) {
         case 'MCPAdministrator':
-          scopes.push(`${xsappname}.admin`);
+          // Maps to MCPAdmin role template - Full administrative access including all UI tools
           scopes.push(`${xsappname}.read`);
           scopes.push(`${xsappname}.write`);
           scopes.push(`${xsappname}.delete`);
+          scopes.push(`${xsappname}.admin`);
+          scopes.push(`${xsappname}.discover`);
+          scopes.push(`${xsappname}.ui.forms`);
+          scopes.push(`${xsappname}.ui.grids`);
+          scopes.push(`${xsappname}.ui.dashboards`);
+          scopes.push(`${xsappname}.ui.workflows`);
+          scopes.push(`${xsappname}.ui.reports`);
+          break;
+        case 'MCPUser':
+          // Maps to MCPEditor role template - Read and write access to MCP services
+          scopes.push(`${xsappname}.read`);
+          scopes.push(`${xsappname}.write`);
           scopes.push(`${xsappname}.discover`);
           break;
         case 'MCPManager':
+          // Maps to MCPManager role template - Full access including delete operations
           scopes.push(`${xsappname}.read`);
           scopes.push(`${xsappname}.write`);
           scopes.push(`${xsappname}.delete`);
           scopes.push(`${xsappname}.discover`);
           break;
-        case 'MCPUser':
+        case 'MCPViewer':
+          // Maps to MCPViewer role template - Read-only access to MCP services and discovery
+          scopes.push(`${xsappname}.read`);
+          scopes.push(`${xsappname}.discover`);
+          break;
+        case 'MCPUIUser':
+          // Maps to MCPUIUser role template - Access to UI tools for forms and grids
+          scopes.push(`${xsappname}.read`);
+          scopes.push(`${xsappname}.discover`);
+          scopes.push(`${xsappname}.ui.forms`);
+          scopes.push(`${xsappname}.ui.grids`);
+          break;
+        case 'MCPUIAnalyst':
+          // Maps to MCPUIAnalyst role template - Access to UI analytics tools
+          scopes.push(`${xsappname}.read`);
+          scopes.push(`${xsappname}.discover`);
+          scopes.push(`${xsappname}.ui.dashboards`);
+          scopes.push(`${xsappname}.ui.reports`);
+          break;
+        case 'MCPUIDesigner':
+          // Maps to MCPUIDesigner role template - Full access to all UI tools
           scopes.push(`${xsappname}.read`);
           scopes.push(`${xsappname}.write`);
           scopes.push(`${xsappname}.discover`);
-          break;
-        case 'MCPViewer':
-          scopes.push(`${xsappname}.read`);
-          scopes.push(`${xsappname}.discover`);
+          scopes.push(`${xsappname}.ui.forms`);
+          scopes.push(`${xsappname}.ui.grids`);
+          scopes.push(`${xsappname}.ui.dashboards`);
+          scopes.push(`${xsappname}.ui.workflows`);
+          scopes.push(`${xsappname}.ui.reports`);
           break;
       }
     }
-    
+
     return scopes;
   }
 
