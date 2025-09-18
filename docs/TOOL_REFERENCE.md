@@ -89,7 +89,7 @@ These advanced tools provide deeper insights and live data monitoring. They are 
 ### 9. `query-performance-optimizer`
 
 -   **Description**: Analyzes a slow or inefficient OData query and suggests optimizations. For example, it might recommend using `$select` to limit columns or adding a missing `$filter`.
--   **Parameters**: 
+-   **Parameters**:
     - `query` (string, required): The OData query to analyze.
 -   **Authentication**: **Required**.
 
@@ -115,6 +115,61 @@ These advanced tools provide deeper insights and live data monitoring. They are 
 -   **Description**: A high-level tool that generates a complete dashboard configuration for a specific business KPI. It identifies the right entities, queries, and visualizations.
 -   **Parameters**:
     - `kpiName` (string, required): The name of the KPI to build a dashboard for (e.g., "Monthly Recurring Revenue").
+-   **Authentication**: **Required**.
+
+## Category 5: UI and User Experience Tools
+
+These tools generate interactive user interfaces and forms for enhanced user experience with SAP data.
+
+### 13. `ui-form-generator`
+
+-   **Description**: Generates interactive forms for SAP entities with validation and data binding. Creates HTML forms with SAP UI5 styling for create, update, or search operations.
+-   **Parameters**:
+    - `entityType` (string, required): SAP entity type (e.g., 'Customer', 'Product', 'Order').
+    - `operation` (enum, required): Form operation type ('create', 'update', 'search').
+    - `customFields` (array, optional): Custom field configurations with validation rules.
+    - `layout` (enum, optional): Form layout type ('vertical', 'horizontal', 'grid').
+    - `theme` (enum, optional): SAP UI theme ('sap_horizon', 'sap_fiori_3').
+-   **Authentication**: **Required**.
+
+### 14. `ui-workflow-builder`
+
+-   **Description**: Creates multi-step workflow interfaces for complex business processes. Generates step-by-step wizards with navigation and validation.
+-   **Parameters**:
+    - `processType` (string, required): Business process type (e.g., 'OrderToCash', 'ProcureToPay').
+    - `steps` (array, required): Array of workflow steps with configurations.
+    - `theme` (enum, optional): UI theme for consistent styling.
+    - `validation` (object, optional): Cross-step validation rules.
+-   **Authentication**: **Required**.
+
+### 15. `ui-dashboard-composer`
+
+-   **Description**: Composes interactive dashboards with charts, tables, and KPIs. Creates responsive layouts with real-time data visualization.
+-   **Parameters**:
+    - `dashboardConfig` (object, required): Dashboard configuration with widgets and layout.
+    - `dataSource` (string, required): Primary data source for dashboard.
+    - `refreshInterval` (number, optional): Auto-refresh interval in seconds.
+    - `filters` (array, optional): Dashboard-wide filters.
+-   **Authentication**: **Required**.
+
+### 16. `ui-data-grid`
+
+-   **Description**: Generates advanced data grids with sorting, filtering, pagination, and inline editing capabilities for SAP entities.
+-   **Parameters**:
+    - `entityType` (string, required): SAP entity type to display.
+    - `columns` (array, optional): Column configurations and display options.
+    - `features` (object, optional): Grid features like sorting, filtering, editing.
+    - `pageSize` (number, optional): Number of rows per page.
+-   **Authentication**: **Required**.
+
+### 17. `ui-report-builder`
+
+-   **Description**: Creates formatted reports with charts, tables, and export capabilities. Supports PDF, Excel, and CSV export formats.
+-   **Parameters**:
+    - `reportType` (string, required): Type of report to generate.
+    - `dataQuery` (string, required): OData query for report data.
+    - `format` (enum, optional): Output format ('html', 'pdf', 'excel', 'csv').
+    - `template` (string, optional): Report template name.
 -   **Authentication**: **Required**.
 
 ---

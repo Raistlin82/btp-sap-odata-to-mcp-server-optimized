@@ -1,8 +1,8 @@
 # Documentation Hub
 
-Welcome to the complete documentation for the **SAP OData to AI-Powered MCP Server**.
+Welcome to the complete documentation for the **SAP OData to AI-Powered MCP Server with UI Tools Integration**.
 
-This documentation is structured to guide you through the key concepts, usage, administration, and development of this enhanced application.
+This documentation is structured to guide you through the key concepts, usage, administration, and development of this enhanced application that now includes interactive UI generation capabilities.
 
 ## 1. Key Concepts
 
@@ -16,8 +16,8 @@ To fully grasp the power of this server, it is essential to understand two main 
 This section is for those who need to interact with the server to query SAP data.
 
 -   **[Authentication Flow](./USER_GUIDE.md#step-by-step-authentication-flow)**: A step-by-step guide on how to authenticate and manage sessions.
--   **[Tool Reference](./TOOL_REFERENCE.md)**: Detailed documentation for all available tools, with examples and parameters.
--   **[Workflow Examples](./USER_GUIDE.md#workflow-examples)**: Common usage scenarios, such as "find a customer and view their orders".
+-   **[Tool Reference](./TOOL_REFERENCE.md)**: Detailed documentation for all available tools, including new UI tools, with examples and parameters.
+-   **[Workflow Examples](./USER_GUIDE.md#workflow-examples)**: Common usage scenarios, including UI generation and interactive dashboard creation.
 
 ## 3. Administrator Guide
 
