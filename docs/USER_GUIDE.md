@@ -100,3 +100,33 @@ Here are some common use-case scenarios that show how to interact with the serve
     *   It directly executes `execute-entity-operation` with your query.
 
 3.  **Result**: You immediately get the top 5 business partner addresses in Italy.
+
+### Example 4: Using UI Tools for Interactive Forms
+
+**Objective**: Generate an interactive form for creating new customers.
+
+1.  **Request Form Generation**:
+
+    > **You**: "Use `ui-form-generator` to create a customer registration form for the `A_BusinessPartner` entity."
+
+2.  **UI Tool Workflow**:
+    *   `ui-form-generator` analyzes the entity schema.
+    *   Generates an HTML form with SAP UI5 styling and validation.
+    *   Returns an interactive form with proper field types and validation rules.
+
+3.  **Result**: You receive a complete HTML form that can be embedded in web applications for customer data entry.
+
+### Example 5: Building Interactive Dashboards
+
+**Objective**: Create a sales dashboard with real-time data visualization.
+
+1.  **Dashboard Request**:
+
+    > **You**: "Use `ui-dashboard-composer` to create a sales performance dashboard showing monthly revenue and top products."
+
+2.  **Dashboard Generation**:
+    *   Tool identifies relevant sales entities and KPIs.
+    *   Creates responsive layout with charts and data tables.
+    *   Sets up real-time data refresh capabilities.
+
+3.  **Result**: Interactive dashboard with live sales metrics, charts, and filtering capabilities.
