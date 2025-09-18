@@ -39,10 +39,13 @@ With the services ready, you can proceed with the deployment.
 # 1. Install project dependencies
 npm install
 
-# 2. Build the TypeScript source code for BTP
+# 2. Build the TypeScript source code and copy UI assets
+npm run build
+
+# 3. Build the MTA archive for BTP deployment
 npm run build:btp
 
-# 3. Deploy to Cloud Foundry
+# 4. Deploy to Cloud Foundry
 # The deploy command will use the configurations defined in mta.yaml
 npm run deploy:btp
 ```
