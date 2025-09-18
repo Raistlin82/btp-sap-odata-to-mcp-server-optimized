@@ -582,18 +582,25 @@ export class MCPAuthManager {
       'sap_odata_read_entity': 'read',
       'sap_odata_query_entities': 'read',
       'sap_odata_get_metadata': 'read',
-      
+
       // Write operations
       'sap_odata_create_entity': 'write',
       'sap_odata_update_entity': 'write',
       'sap_odata_patch_entity': 'write',
-      
+
       // Delete operations
       'sap_odata_delete_entity': 'delete',
-      
+
       // Admin operations
       'sap_admin_*': 'admin',
-      'system_admin_*': 'admin'
+      'system_admin_*': 'admin',
+
+      // UI Tools - require specific UI scopes
+      'ui-form-generator': 'ui.forms',
+      'ui-data-grid': 'ui.grids',
+      'ui-dashboard-composer': 'ui.dashboards',
+      'ui-workflow-builder': 'ui.workflows',
+      'ui-report-builder': 'ui.reports'
     };
 
     // Check for exact match first
@@ -625,9 +632,18 @@ export class MCPAuthManager {
       return true;
     }
 
-    // Check for exact scope match
+    // Check for exact scope match (including full scope names with prefix)
     if (userScopes.includes(requiredScope)) {
       return true;
+    }
+
+    // For UI scopes, also check with full scope prefix
+    if (requiredScope.startsWith('ui.')) {
+      const xsappname = process.env.XSUAA_XSAPPNAME || 'btp-sap-odata-to-mcp-server';
+      const fullScopeName = `${xsappname}.${requiredScope}`;
+      if (userScopes.includes(fullScopeName)) {
+        return true;
+      }
     }
 
     // Check scope hierarchy (write includes read, delete includes write and read)
@@ -635,11 +651,31 @@ export class MCPAuthManager {
       'read': ['read'],
       'write': ['read', 'write'],
       'delete': ['read', 'write', 'delete'],
-      'admin': ['read', 'write', 'delete', 'admin', 'discover']
+      'admin': ['read', 'write', 'delete', 'admin', 'discover', 'ui.forms', 'ui.grids', 'ui.dashboards', 'ui.workflows', 'ui.reports']
     };
 
     for (const userScope of userScopes) {
-      const allowedScopes = scopeHierarchy[userScope] || [userScope];
+      // Handle full scope names with prefix (including complex BTP formats)
+      let scopeToCheck = userScope;
+
+      // Handle BTP scope format: app-name-space!tenant.scope or app-name.scope
+      // Extract the scope part after the last occurrence of app name
+      const lastDotIndex = userScope.lastIndexOf('.');
+      if (lastDotIndex !== -1) {
+        const afterLastDot = userScope.substring(lastDotIndex + 1);
+
+        // Check if this looks like a UI scope (contains ui prefix in the remaining part)
+        if (userScope.includes('.ui.')) {
+          // For UI scopes like "app.ui.forms", extract "ui.forms"
+          const uiIndex = userScope.indexOf('.ui.');
+          scopeToCheck = userScope.substring(uiIndex + 1); // +1 to skip the first dot
+        } else {
+          // For simple scopes like "app.read", extract "read"
+          scopeToCheck = afterLastDot;
+        }
+      }
+
+      const allowedScopes = scopeHierarchy[scopeToCheck] || [scopeToCheck];
       if (allowedScopes.includes(requiredScope)) {
         return true;
       }
