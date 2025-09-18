@@ -18,6 +18,7 @@ import { AuthenticationTest } from './test-authentication.js';
 import { ToolExecutionTest } from './test-tool-execution.js';
 import { AdvancedFeaturesTest } from './test-advanced-features.js';
 import CompleteToolCoverageTest from './test-complete-tool-coverage.js';
+import { ScopeMappingTest } from './test-scope-mapping.js';
 import chalk from 'chalk';
 
 class TestRunner {
@@ -47,6 +48,7 @@ class TestRunner {
 
             if (this.suite === 'all' || this.suite === 'auth') {
                 await this.runAuthTests();
+                await this.runScopeTests();
             }
 
             if (this.suite === 'all' || this.suite === 'tools') {
@@ -120,6 +122,19 @@ class TestRunner {
 
         const results = await authTest.runTest();
         this.addSuiteResults('Authentication', results);
+        console.log('');
+    }
+
+    async runScopeTests() {
+        console.log(chalk.bold('🔑 Running Scope Mapping Tests'));
+        console.log(chalk.gray('--------------------------------'));
+
+        const scopeTest = new ScopeMappingTest({
+            verbose: this.verbose
+        });
+
+        const results = await scopeTest.runTests();
+        this.addSuiteResults('Scope Mapping', results);
         console.log('');
     }
 
