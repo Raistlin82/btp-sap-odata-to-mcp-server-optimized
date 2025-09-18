@@ -44,6 +44,26 @@ Environment variables are the primary method for configuring the application. Th
 | `MAX_DATA_POINTS_FOR_ANALYSIS` | Max data points to use in AI analysis to prevent performance issues. | `1000` |
 | `STREAMING_POLL_INTERVAL` | Interval in ms for polling in real-time data streams. | `5000` |
 
+### UI Tools Configuration
+
+| Variable | Description | Example |
+| :--- | :--- | :--- |
+| `UI_TOOLS_ENABLED` | Enable or disable UI generation tools. | `true` |
+| `UI_DEFAULT_THEME` | Default SAP UI theme for generated interfaces. | `sap_horizon` |
+| `UI_FORM_VALIDATION_STRICT` | Enable strict validation for generated forms. | `true` |
+| `UI_DASHBOARD_REFRESH_INTERVAL` | Default refresh interval for dashboards in seconds. | `30` |
+| `UI_MAX_GRID_ROWS` | Maximum rows per page in data grids. | `100` |
+| `UI_REPORT_TIMEOUT` | Timeout for report generation in milliseconds. | `30000` |
+
+### Cloud Logging Configuration
+
+| Variable | Description | Example |
+| :--- | :--- | :--- |
+| `CLOUD_LOGGING_ENABLED` | Enable structured cloud logging. | `true` |
+| `LOG_CORRELATION_ID_HEADER` | Header name for request correlation ID. | `x-correlation-id` |
+| `CLOUD_LOG_LEVEL` | Cloud logging level (separate from console logs). | `info` |
+| `PERFORMANCE_METRICS_ENABLED` | Enable performance metrics collection. | `true` |
+
 ## 2. Security Configuration (xs-security.json)
 
 This file is crucial for defining the application's security model in SAP BTP. It is used by the XSUAA service to create and validate JWTs.
