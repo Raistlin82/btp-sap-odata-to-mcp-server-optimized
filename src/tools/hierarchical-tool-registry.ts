@@ -9,6 +9,8 @@ import { DestinationContext, OperationType } from "../types/destination-types.js
 import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 // Direct import approach to avoid TypeScript issues
 import { NaturalQueryBuilderTool, SmartDataAnalysisTool, QueryPerformanceOptimizerTool, BusinessProcessInsightsTool } from "./ai-enhanced-tools.js";
 import { realtimeAnalyticsTools } from "./realtime-tools.js";
@@ -41,11 +43,29 @@ import { IntelligentToolRouter } from "../middleware/intelligent-tool-router.js"
  * This reduces context from 200+ tools to just 12 intelligent tools, with AI and real-time
  * capabilities that work across any MCP client (Claude, GPT, Gemini, local models, etc.).
  */
+// Get current file path for loading configuration
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+interface ProcessCategory {
+    name: string;
+    description: string;
+    subprocesses: string[];
+    keywords: string[];
+}
+
+interface ProcessClassification {
+    processCategories: Record<string, ProcessCategory>;
+    crossFunctionalProcesses: Record<string, Omit<ProcessCategory, 'subprocesses'>>;
+    industrySpecific: Record<string, { name: string; keywords: string[] }>;
+}
+
 export class HierarchicalSAPToolRegistry {
     private serviceCategories = new Map<string, string[]>();
     private authManager?: MCPAuthManager;
     private errorHandler: SecureErrorHandler;
     private intelligentRouter: IntelligentToolRouter;
+    private processClassification?: ProcessClassification;
 
     constructor(
         private mcpServer: McpServer,
@@ -55,6 +75,8 @@ export class HierarchicalSAPToolRegistry {
         tokenStore?: TokenStore,
         authServerUrl?: string
     ) {
+        // Load SAP Signavio process classification
+        this.loadProcessClassification();
         this.categorizeServices();
         
         // Initialize security middlewares
@@ -1019,7 +1041,68 @@ export class HierarchicalSAPToolRegistry {
 
 
     /**
-     * Categorize services for better discovery using intelligent pattern matching
+     * Load SAP Signavio process classification - Ultra-compact token-optimized version
+     */
+    private loadProcessClassification(): void {
+        // Ultra-compact classification: only essential keywords, no descriptions/subprocesses
+        // Lazy-loaded patterns for maximum token efficiency
+        this.processClassification = {
+            processCategories: {
+                'source-to-pay': {
+                    name: 'Source-to-Pay',
+                    description: '',
+                    subprocesses: [],
+                    keywords: ['purchase', 'procurement', 'supplier', 'vendor', 'po_', 'material']
+                },
+                'order-to-cash': {
+                    name: 'Order-to-Cash',
+                    description: '',
+                    subprocesses: [],
+                    keywords: ['sales', 'order', 'customer', 'billing', 'invoice', 'delivery']
+                },
+                'plan-to-produce': {
+                    name: 'Plan-to-Produce',
+                    description: '',
+                    subprocesses: [],
+                    keywords: ['production', 'manufacturing', 'bom', 'routing', 'quality']
+                },
+                'record-to-report': {
+                    name: 'Record-to-Report',
+                    description: '',
+                    subprocesses: [],
+                    keywords: ['finance', 'accounting', 'gl_', 'cost', 'ledger']
+                },
+                'hire-to-retire': {
+                    name: 'Hire-to-Retire',
+                    description: '',
+                    subprocesses: [],
+                    keywords: ['hr_', 'employee', 'payroll', 'personnel']
+                }
+            },
+            crossFunctionalProcesses: {
+                'master-data': {
+                    name: 'Master Data',
+                    description: '',
+                    keywords: ['business_partner', 'bp_', 'material', 'product']
+                },
+                'integration': {
+                    name: 'Integration',
+                    description: '',
+                    keywords: ['integration', 'workflow', 'api_', 'interface']
+                }
+            },
+            industrySpecific: {
+                'utilities': { name: 'Utilities', keywords: ['utility', 'meter', 'energy'] },
+                'retail': { name: 'Retail', keywords: ['retail', 'store', 'pos_'] },
+                'manufacturing': { name: 'Manufacturing', keywords: ['shop_floor', 'mes_', 'batch'] }
+            }
+        };
+
+        this.logger.info('⚡ Ultra-compact SAP Signavio classification loaded (token-optimized)');
+    }
+
+    /**
+     * Categorize services using SAP Signavio process-based classification
      */
     private categorizeServices(): void {
         for (const service of this.discoveredServices) {
@@ -1027,42 +1110,60 @@ export class HierarchicalSAPToolRegistry {
             const id = service.id.toLowerCase();
             const title = service.title.toLowerCase();
             const desc = service.description.toLowerCase();
+            const searchText = `${id} ${title} ${desc}`;
 
-            // Business Partner related
-            if (id.includes('business_partner') || id.includes('bp_') || id.includes('customer') || id.includes('supplier') ||
-                title.includes('business partner') || title.includes('customer') || title.includes('supplier')) {
-                categories.push('business-partner');
-            }
+            if (this.processClassification) {
+                // Check against process categories
+                for (const [categoryKey, category] of Object.entries(this.processClassification.processCategories)) {
+                    if (this.matchesKeywords(searchText, category.keywords)) {
+                        categories.push(categoryKey);
+                    }
+                }
 
-            // Sales related
-            if (id.includes('sales') || id.includes('order') || id.includes('quotation') || id.includes('opportunity') ||
-                title.includes('sales') || title.includes('order') || desc.includes('sales')) {
-                categories.push('sales');
-            }
+                // Check against cross-functional processes
+                for (const [categoryKey, category] of Object.entries(this.processClassification.crossFunctionalProcesses)) {
+                    if (this.matchesKeywords(searchText, category.keywords)) {
+                        categories.push(categoryKey);
+                    }
+                }
 
-            // Finance related
-            if (id.includes('finance') || id.includes('accounting') || id.includes('payment') || id.includes('invoice') ||
-                id.includes('gl_') || id.includes('ar_') || id.includes('ap_') || title.includes('finance') ||
-                title.includes('accounting') || title.includes('payment')) {
-                categories.push('finance');
-            }
+                // Check against industry-specific processes
+                for (const [categoryKey, category] of Object.entries(this.processClassification.industrySpecific)) {
+                    if (this.matchesKeywords(searchText, category.keywords)) {
+                        categories.push(categoryKey);
+                    }
+                }
+            } else {
+                // Fallback to basic categorization if configuration not loaded
+                // Business Partner related
+                if (id.includes('business_partner') || id.includes('bp_') || id.includes('customer') || id.includes('supplier')) {
+                    categories.push('business-partner');
+                }
 
-            // Procurement related
-            if (id.includes('purchase') || id.includes('procurement') || id.includes('vendor') || id.includes('po_') ||
-                title.includes('procurement') || title.includes('purchase') || title.includes('vendor')) {
-                categories.push('procurement');
-            }
+                // Sales related
+                if (id.includes('sales') || id.includes('order') || id.includes('quotation') || id.includes('opportunity')) {
+                    categories.push('sales');
+                }
 
-            // HR related
-            if (id.includes('employee') || id.includes('hr_') || id.includes('personnel') || id.includes('payroll') ||
-                title.includes('employee') || title.includes('human') || title.includes('personnel')) {
-                categories.push('hr');
-            }
+                // Finance related
+                if (id.includes('finance') || id.includes('accounting') || id.includes('payment') || id.includes('invoice')) {
+                    categories.push('finance');
+                }
 
-            // Logistics related
-            if (id.includes('logistics') || id.includes('warehouse') || id.includes('inventory') || id.includes('material') ||
-                id.includes('wm_') || id.includes('mm_') || title.includes('logistics') || title.includes('material')) {
-                categories.push('logistics');
+                // Procurement related
+                if (id.includes('purchase') || id.includes('procurement') || id.includes('vendor') || id.includes('po_')) {
+                    categories.push('procurement');
+                }
+
+                // HR related
+                if (id.includes('employee') || id.includes('hr_') || id.includes('personnel') || id.includes('payroll')) {
+                    categories.push('hr');
+                }
+
+                // Logistics related
+                if (id.includes('logistics') || id.includes('warehouse') || id.includes('inventory') || id.includes('material')) {
+                    categories.push('logistics');
+                }
             }
 
             // Default category if none matched
@@ -1073,7 +1174,19 @@ export class HierarchicalSAPToolRegistry {
             this.serviceCategories.set(service.id, categories);
         }
 
-        this.logger.debug(`Categorized ${this.discoveredServices.length} services into categories`);
+        this.logger.debug(`Categorized ${this.discoveredServices.length} services into categories using ${this.processClassification ? 'SAP Signavio' : 'basic'} classification`);
+    }
+
+    /**
+     * Optimized keyword matching with early exit
+     */
+    private matchesKeywords(text: string, keywords: string[]): boolean {
+        const lowerText = text.toLowerCase();
+        // Early exit on first match to reduce processing
+        for (const keyword of keywords) {
+            if (lowerText.includes(keyword)) return true;
+        }
+        return false;
     }
 
 

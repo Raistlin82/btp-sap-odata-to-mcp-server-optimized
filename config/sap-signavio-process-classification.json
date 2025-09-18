@@ -1,0 +1,249 @@
+{
+  "processCategories": {
+    "lead-to-cash": {
+      "name": "Lead to Cash",
+      "description": "End-to-end sales process from lead generation to cash collection",
+      "subprocesses": [
+        "lead-management",
+        "opportunity-management",
+        "quote-to-order",
+        "order-fulfillment",
+        "delivery-management",
+        "billing-invoicing",
+        "accounts-receivable",
+        "customer-service"
+      ],
+      "keywords": [
+        "lead", "opportunity", "sales", "quotation", "quote", "order", "delivery",
+        "invoice", "billing", "receivable", "customer", "crm", "sd_", "sales_order",
+        "delivery_note", "invoice_verification", "customer_master", "pricing"
+      ]
+    },
+    "procure-to-pay": {
+      "name": "Procure to Pay",
+      "description": "End-to-end procurement process from sourcing to payment",
+      "subprocesses": [
+        "sourcing-procurement",
+        "supplier-management",
+        "purchase-requisition",
+        "purchase-order",
+        "goods-receipt",
+        "invoice-verification",
+        "accounts-payable",
+        "vendor-payment"
+      ],
+      "keywords": [
+        "procurement", "purchase", "supplier", "vendor", "requisition", "po_",
+        "goods_receipt", "invoice_verification", "payable", "payment", "sourcing",
+        "contract", "mm_", "purchasing", "vendor_master", "material"
+      ]
+    },
+    "record-to-report": {
+      "name": "Record to Report",
+      "description": "Financial accounting and reporting processes",
+      "subprocesses": [
+        "financial-accounting",
+        "management-accounting",
+        "cost-accounting",
+        "budgeting-planning",
+        "financial-reporting",
+        "compliance-audit",
+        "asset-management",
+        "treasury-management"
+      ],
+      "keywords": [
+        "finance", "accounting", "ledger", "journal", "budget", "cost_center",
+        "profit_center", "asset", "depreciation", "treasury", "cash", "fi_",
+        "co_", "controlling", "report", "balance", "trial_balance"
+      ]
+    },
+    "plan-to-produce": {
+      "name": "Plan to Produce",
+      "description": "Manufacturing and production planning processes",
+      "subprocesses": [
+        "demand-planning",
+        "production-planning",
+        "material-requirements",
+        "capacity-planning",
+        "shop-floor-control",
+        "quality-management",
+        "maintenance-management",
+        "product-lifecycle"
+      ],
+      "keywords": [
+        "production", "manufacturing", "planning", "mrp", "capacity", "work_order",
+        "bom", "routing", "quality", "maintenance", "pp_", "qm_", "pm_",
+        "material_master", "plant", "work_center"
+      ]
+    },
+    "hire-to-retire": {
+      "name": "Hire to Retire",
+      "description": "Human resources management processes",
+      "subprocesses": [
+        "talent-acquisition",
+        "employee-onboarding",
+        "performance-management",
+        "learning-development",
+        "compensation-benefits",
+        "time-attendance",
+        "payroll-processing",
+        "employee-offboarding"
+      ],
+      "keywords": [
+        "hr", "employee", "personnel", "payroll", "recruitment", "performance",
+        "training", "compensation", "benefits", "time", "attendance", "pa_",
+        "py_", "personnel_master", "organizational"
+      ]
+    },
+    "design-to-operate": {
+      "name": "Design to Operate",
+      "description": "Product development and engineering processes",
+      "subprocesses": [
+        "product-design",
+        "engineering-change",
+        "prototype-development",
+        "product-testing",
+        "documentation-management",
+        "configuration-management",
+        "release-management",
+        "service-operations"
+      ],
+      "keywords": [
+        "design", "engineering", "product", "development", "prototype", "testing",
+        "configuration", "release", "document", "service", "ec_", "change",
+        "variant", "specification"
+      ]
+    },
+    "acquire-to-retire": {
+      "name": "Acquire to Retire",
+      "description": "Asset lifecycle management processes",
+      "subprocesses": [
+        "asset-acquisition",
+        "asset-deployment",
+        "asset-maintenance",
+        "asset-optimization",
+        "asset-disposal",
+        "depreciation-management",
+        "asset-accounting",
+        "compliance-monitoring"
+      ],
+      "keywords": [
+        "asset", "equipment", "depreciation", "maintenance", "disposal",
+        "acquisition", "capex", "fixed_asset", "aa_", "asset_master",
+        "investment", "retirement"
+      ]
+    },
+    "request-to-service": {
+      "name": "Request to Service",
+      "description": "Service management and support processes",
+      "subprocesses": [
+        "service-request",
+        "incident-management",
+        "problem-management",
+        "change-management",
+        "knowledge-management",
+        "service-catalog",
+        "sla-management",
+        "service-reporting"
+      ],
+      "keywords": [
+        "service", "request", "incident", "problem", "change", "ticket",
+        "support", "helpdesk", "sla", "knowledge", "sm_", "service_order",
+        "notification", "service_contract"
+      ]
+    },
+    "master-data-governance": {
+      "name": "Master Data Governance",
+      "description": "Master data management and governance processes",
+      "subprocesses": [
+        "data-quality",
+        "data-governance",
+        "master-data-creation",
+        "master-data-maintenance",
+        "data-distribution",
+        "data-archiving",
+        "data-security",
+        "data-analytics"
+      ],
+      "keywords": [
+        "master", "data", "governance", "quality", "mdg", "customer_master",
+        "vendor_master", "material_master", "employee_master", "chart_accounts",
+        "cost_center_master", "profit_center_master"
+      ]
+    },
+    "analytics-insights": {
+      "name": "Analytics & Insights",
+      "description": "Business intelligence and analytics processes",
+      "subprocesses": [
+        "data-collection",
+        "data-modeling",
+        "reporting",
+        "dashboard-creation",
+        "predictive-analytics",
+        "performance-monitoring",
+        "business-intelligence",
+        "data-visualization"
+      ],
+      "keywords": [
+        "analytics", "report", "dashboard", "kpi", "metrics", "intelligence",
+        "bi_", "bw_", "sac", "analysis", "cube", "query", "hana", "insight"
+      ]
+    }
+  },
+  "crossFunctionalProcesses": {
+    "compliance-risk": {
+      "name": "Compliance & Risk Management",
+      "description": "Cross-functional compliance and risk processes",
+      "keywords": [
+        "compliance", "risk", "audit", "governance", "grc", "control",
+        "regulation", "sox", "gdpr", "security"
+      ]
+    },
+    "integration-middleware": {
+      "name": "Integration & Middleware",
+      "description": "System integration and middleware services",
+      "keywords": [
+        "integration", "middleware", "api", "interface", "idoc", "rfc",
+        "pi_", "po_", "cpi", "webhook", "soap", "rest"
+      ]
+    },
+    "mobile-digital": {
+      "name": "Mobile & Digital Experience",
+      "description": "Mobile and digital transformation processes",
+      "keywords": [
+        "mobile", "digital", "app", "ui5", "fiori", "portal", "launchpad",
+        "user_experience", "frontend"
+      ]
+    }
+  },
+  "industrySpecific": {
+    "retail": {
+      "name": "Retail Processes",
+      "keywords": ["retail", "merchandise", "store", "pos", "category", "assortment"]
+    },
+    "utilities": {
+      "name": "Utilities Processes",
+      "keywords": ["utility", "meter", "billing", "consumption", "tariff", "is-u"]
+    },
+    "oil-gas": {
+      "name": "Oil & Gas Processes",
+      "keywords": ["oil", "gas", "upstream", "downstream", "refinery", "is-oil"]
+    },
+    "banking": {
+      "name": "Banking Processes",
+      "keywords": ["bank", "loan", "credit", "deposit", "account", "fs-"]
+    },
+    "insurance": {
+      "name": "Insurance Processes",
+      "keywords": ["insurance", "policy", "claim", "premium", "fs-ins"]
+    },
+    "healthcare": {
+      "name": "Healthcare Processes",
+      "keywords": ["healthcare", "patient", "medical", "hospital", "is-h"]
+    },
+    "public-sector": {
+      "name": "Public Sector Processes",
+      "keywords": ["public", "government", "tax", "grant", "psm"]
+    }
+  }
+}
