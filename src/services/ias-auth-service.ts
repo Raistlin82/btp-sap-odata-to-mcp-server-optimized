@@ -399,33 +399,28 @@ export class IASAuthService {
         // Decode the JWT token to see all claims including scopes
         const tokenPart = accessToken.replace('Bearer ', '').split('.')[1];
         const decodedPayload = JSON.parse(Buffer.from(tokenPart, 'base64').toString());
-        this.logger.warn('--- JWT PAYLOAD ANALYSIS ---');
-        this.logger.warn(JSON.stringify(decodedPayload, null, 2));
-        
-        // Check for scopes in different claim locations
-        const scopeClaims = {
-          scope: decodedPayload.scope,
-          scopes: decodedPayload.scopes,
-          scp: decodedPayload.scp,
-          authorities: decodedPayload.authorities,
-          'xs.user.attributes': decodedPayload['xs.user.attributes'],
-          role_collections: decodedPayload.role_collections,
-          groups: decodedPayload.groups
-        };
-        
-        this.logger.warn('--- SCOPE CLAIMS ANALYSIS ---');
-        Object.entries(scopeClaims).forEach(([key, value]) => {
-          if (value !== undefined) {
-            this.logger.warn(`${key}: ${JSON.stringify(value)}`);
-          }
-        });
-        
-        // Look for admin-related scopes in any claim
-        const allClaimsText = JSON.stringify(decodedPayload).toLowerCase();
-        const hasAdminReference = allClaimsText.includes('admin') || allClaimsText.includes('mcpadmin');
-        this.logger.warn(`Contains admin references: ${hasAdminReference}`);
-        
-        this.logger.warn('--- END JWT ANALYSIS ---');
+        // JWT payload analysis - only in development mode
+        if (process.env.NODE_ENV === 'development') {
+          this.logger.debug('JWT payload decoded for scope analysis');
+
+          // Check for scopes in different claim locations
+          const scopeClaims = {
+            scope: decodedPayload.scope,
+            scopes: decodedPayload.scopes,
+            scp: decodedPayload.scp,
+            authorities: decodedPayload.authorities,
+            'xs.user.attributes': decodedPayload['xs.user.attributes'],
+            role_collections: decodedPayload.role_collections,
+            groups: decodedPayload.groups
+          };
+
+          // Log only relevant scope information in development
+          Object.entries(scopeClaims).forEach(([key, value]) => {
+            if (value !== undefined) {
+              this.logger.debug(`Scope claim ${key} found`);
+            }
+          });
+        }
         
         // If JWT contains application scopes directly, extract them
         const directScopes = decodedPayload.scope?.split?.(' ') || decodedPayload.scopes || [];
