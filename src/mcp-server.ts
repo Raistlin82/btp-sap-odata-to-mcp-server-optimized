@@ -1,3 +1,6 @@
+// Core MCP server implementation for SAP BTP integration
+// Provides MCP (Model Context Protocol) server with SAP OData service discovery and tool registry
+
 import { HierarchicalSAPToolRegistry } from './tools/hierarchical-tool-registry.js';
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -12,35 +15,55 @@ import { ErrorHandler } from './utils/error-handler.js';
 import { ODataService } from './types/sap-types.js';
 import { TokenStore } from './services/token-store.js';
 
+/**
+ * Main MCP server class that orchestrates SAP BTP integration
+ * Handles service discovery, tool registration, and protocol communication
+ */
 export class MCPServer {
-    private mcpServer: McpServer;
-    private sapClient: SAPClient;
-    private logger: Logger;
-    private discoveredServices: ODataService[] = [];
-    private toolRegistry: HierarchicalSAPToolRegistry;
+    private mcpServer: McpServer; // Core MCP protocol server
+    private sapClient: SAPClient; // SAP system communication client
+    private logger: Logger; // Centralized logging service
+    private discoveredServices: ODataService[] = []; // Cache of discovered SAP services
+    private toolRegistry: HierarchicalSAPToolRegistry; // Dynamic tool registry for SAP operations
 
+    /**
+     * Initialize MCP server with SAP service discovery and authentication
+     * @param discoveredServices - Pre-discovered SAP OData services
+     * @param tokenStore - Optional token storage for authentication
+     * @param authServerUrl - Optional authentication server URL
+     */
     constructor(
-        discoveredServices: ODataService[], 
-        tokenStore?: TokenStore, 
+        discoveredServices: ODataService[],
+        tokenStore?: TokenStore,
         authServerUrl?: string
     ) {
         this.logger = new Logger('mcp-server');
         const config = new Config();
+
+        // Initialize SAP connectivity components
         const destinationService = new DestinationService(this.logger, config);
         this.sapClient = new SAPClient(destinationService, this.logger);
+
+        // Store discovered services for tool generation
         this.discoveredServices = discoveredServices;
+
+        // Create core MCP server instance
         this.mcpServer = new McpServer({
             name: "btp-sap-odata-to-mcp-server",
             version: "2.0.0"
         });
+
+        // Configure global error handling
         this.mcpServer.server.onerror = (error) => {
             this.logger.error('MCP Server Error:', error);
             ErrorHandler.handle(error);
         };
+
+        // Initialize hierarchical tool registry for dynamic SAP tool creation
         this.toolRegistry = new HierarchicalSAPToolRegistry(
-            this.mcpServer, 
-            this.sapClient, 
-            this.logger, 
+            this.mcpServer,
+            this.sapClient,
+            this.logger,
             this.discoveredServices,
             tokenStore,
             authServerUrl

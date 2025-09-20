@@ -1,12 +1,23 @@
+// Configuration management system for SAP BTP integration
+// Handles environment variables, Cloud Foundry services, and runtime configuration
+
 import xsenv from '@sap/xsenv';
 import { Logger } from './logger.js';
 import { DestinationConfig, DestinationValidationResult, DestinationType } from '../types/destination-types.js';
 import { NETWORK_TIMEOUTS } from '../constants/timeouts.js';
 
+/**
+ * Centralized configuration management with multi-source support
+ * Supports environment variables, Cloud Foundry services, and runtime updates
+ */
 export class Config {
-    private config: Map<string, unknown> = new Map();
-    private logger = new Logger('Config');
+    private config: Map<string, unknown> = new Map(); // Internal configuration cache
+    private logger = new Logger('Config'); // Configuration-specific logger
 
+    /**
+     * Initialize configuration from all available sources
+     * Loads from environment variables, VCAP services, and CF user-provided services
+     */
     constructor() {
         this.loadConfiguration();
     }
@@ -20,23 +31,29 @@ export class Config {
         this.loadFromCFServices();
     }
 
+    /**
+     * Load configuration from all available sources with proper fallbacks
+     * Priority: Environment variables > VCAP services > defaults
+     */
     private loadConfiguration(): void {
-        // Load from environment variables
+        // Load SAP destination configuration
         this.loadDestinationConfig();
+
+        // Load network and system configuration with fallbacks
         this.config.set('request.timeout', parseInt(process.env.REQUEST_TIMEOUT || String(NETWORK_TIMEOUTS.REQUEST_TIMEOUT)));
         this.config.set('request.retries', parseInt(process.env.REQUEST_RETRIES || '3'));
         this.config.set('log.level', process.env.LOG_LEVEL || 'info');
         this.config.set('node.env', process.env.NODE_ENV || 'development');
-        
-        // OData service discovery configuration
+
+        // Load OData service discovery configuration
         this.loadODataServiceConfig();
-        
-        // Load configuration from CF services (user-provided services)
+
+        // Load configuration from CF user-provided services
         this.loadFromCFServices();
-        
-        // Load from VCAP services if available
+
+        // Load from VCAP services (Cloud Foundry service bindings)
         try {
-            xsenv.loadEnv();
+            xsenv.loadEnv(); // Load environment with @sap/xsenv
             const vcapServices = process.env.VCAP_SERVICES ? JSON.parse(process.env.VCAP_SERVICES) : {};
             this.config.set('vcap.services', vcapServices);
         } catch (error) {
