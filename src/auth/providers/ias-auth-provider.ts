@@ -101,7 +101,7 @@ export class IASAuthProvider implements IOAuth2Provider {
         throw new Error(Messages.auth.errors.tokenExchangeFailed);
       }
 
-      const tokenResponse = await response.json();
+      const tokenResponse = await response.json() as any;
       const userInfo = await this.getUserInfoFromToken(tokenResponse.access_token);
 
       return this.createTokenData(tokenResponse, userInfo);
@@ -162,7 +162,7 @@ export class IASAuthProvider implements IOAuth2Provider {
         };
       }
 
-      const result = await response.json();
+      const result = await response.json() as any;
 
       if (result.active === true) {
         const userInfo = await this.getUserInfo(jwtToken);
@@ -210,7 +210,7 @@ export class IASAuthProvider implements IOAuth2Provider {
         throw new Error(`${Messages.auth.errors.tokenRefreshFailed}: ${response.status}`);
       }
 
-      const tokenResponse = await response.json();
+      const tokenResponse = await response.json() as any;
       const userInfo = await this.getUserInfoFromToken(tokenResponse.access_token);
 
       return this.createTokenData(tokenResponse, userInfo);
@@ -271,7 +271,7 @@ export class IASAuthProvider implements IOAuth2Provider {
         throw new Error(`${Messages.auth.errors.authenticationFailed}: ${response.status}`);
       }
 
-      const tokenResponse = await response.json();
+      const tokenResponse = await response.json() as any;
 
       return {
         token: `Bearer ${tokenResponse.access_token}`,
@@ -353,7 +353,7 @@ export class IASAuthProvider implements IOAuth2Provider {
       throw new Error(`${Messages.auth.errors.authenticationFailed}: ${response.status}`);
     }
 
-    const tokenResponse = await response.json();
+    const tokenResponse = await response.json() as any;
     const userInfo = await this.getUserInfoFromToken(tokenResponse.access_token);
 
     return this.createTokenData(tokenResponse, userInfo);
