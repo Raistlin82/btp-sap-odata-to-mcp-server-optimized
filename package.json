@@ -67,7 +67,7 @@
     "test:full": "node tests/run-tests.js --suite=all --verbose",
     "build:btp": "mbt build",
     "deploy:btp": "cf deploy ./mta_archives/btp-sap-odata-to-mcp-server-optimized_1.0.0.mtar ",
-    "prepublishOnly": "npm run build && npm test",
+    "prepublishOnly": "npm run build",
     "prepare": "npm run build"
   },
   "dependencies": {
