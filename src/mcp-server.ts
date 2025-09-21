@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 // Core MCP server implementation for SAP BTP integration
 // Provides MCP (Model Context Protocol) server with SAP OData service discovery and tool registry
 
