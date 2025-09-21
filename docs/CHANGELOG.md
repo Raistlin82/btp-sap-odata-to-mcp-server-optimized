@@ -14,6 +14,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced caching mechanisms
 - Enhanced real-time capabilities
 
+## [3.0.0] - 2025-01-21 - 🔐 Security & Architecture Refactoring
+
+### 🔐 Security Enhancements
+#### Fixed
+- **JWT Logging Security**: Removed sensitive JWT payload logging in production
+- **Session Management**: Fixed race conditions in global session maps
+- **Error Handling**: Implemented secure error handling that prevents information leakage
+- **Cloud Logging**: Fixed fallback mechanism for environments without application-logs service
+
+#### Added
+- **Modular Authentication Factory**: Pluggable authentication system supporting:
+  - IAS (SAP Identity Authentication Service)
+  - OAuth2
+  - JWT
+  - Basic Auth
+  - API Keys
+  - Custom providers
+- **Secure Session Bridge**: Thread-safe session management with proper locking
+- **Message Externalization**: Complete i18n support with externalized messages
+
+### 🎯 Configuration Simplification
+#### Changed
+- **OData Discovery Simplified**: Migrated from complex 8+ parameter system to simple pattern-based:
+  - Pattern Mode: Include/exclude patterns (e.g., `*API*`, `*_TEST*`)
+  - Business Mode: Pre-configured domains (sales, finance, HR)
+  - Whitelist Mode: Explicit service control
+  - All Mode: Development only with safety limits
+- **Environment Variables**: Streamlined configuration with clear defaults
+- **Cloud Foundry**: Simplified CF deployment configuration
+
+#### Removed
+- Legacy discovery configuration complexity
+- Redundant configuration parameters
+- Unnecessary JWT token logging
+- Italian documentation (translated to English)
+
+### 📚 Documentation Updates
+#### Updated
+- **CONFIGURATION.md**: Comprehensive guide with OData discovery, CF deployment, and troubleshooting
+- **README.md**: Updated with latest security features and simplified configuration
+- **.env.example**: Aligned with current application configuration
+- **example-default-env.json**: Updated for local development with BAS
+- **.cfignore**: Comprehensive exclusion list for CF deployment
+- **.gitignore**: Updated with complete ignore patterns
+
+#### Removed
+- Redundant discovery documentation files (merged into CONFIGURATION.md)
+- Italian language documentation files
+- Internal work documents
+
 ## [2.4.0] - 2025-01-16 - 🎨 UI Tools Integration Release
 
 ### 🎨 UI Tools & User Experience

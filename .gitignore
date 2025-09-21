@@ -1,39 +1,105 @@
-/node_modules/
-/dist/
-/build/
-.env
-mta_archives/
-default-env.json
-
-# macOS
-.DS_Store
-*/.DS_Store
-
-# IDE
-.vscode/
-.idea/
-
-# Claude Code
-.claude/
-
-# Logs
-*.log
+# Dependencies
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# Runtime data
-pids
+# Build output
+dist/
+build/
+*.tsbuildinfo
+*.map
+
+# Environment files
+.env
+.env.*
+!.env.example
+default-env.json
+!example-default-env.json
+
+# Cloud Foundry / SAP BTP
+mta_archives/
+mta-op-*/
+resources/
+*.mtar
+
+# IDE and Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-*
+.project
+.classpath
+
+# OS Files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs
+logs/
+*.log
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+
+# Temporary files
+.tmp/
+tmp/
+temp/
+*.tmp
+*.temp
 *.pid
 *.seed
 *.pid.lock
 
-# Coverage directory used by tools like istanbul
-coverage/
+# Cache
+.cache/
+.eslintcache
+.parcel-cache
+.turbo
 
-# nyc test coverage
-.nyc_output
+# Session files
+sessions/
+*.session
 
-# Temporary folders
-.tmp/
-temp/
+# Claude Code
+.claude/
+
+# Backups
+*.backup
+*.bak
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# Private keys and certificates
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+
+# Local development
+local/
+scratch/
+work/
+
+# Node.js specific
+.npm
+.node_repl_history
+
+# Package manager locks (optionally)
+# Uncomment if you want to ignore lock files
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml

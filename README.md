@@ -1,29 +1,41 @@
-# SAP OData to AI-Powered MCP Server (Optimized Playground)
+# SAP OData to AI-Powered MCP Server (Optimized)
 
-This repository is an experimental and optimized environment based on the original project **[btp-sap-odata-to-mcp-server](https://github.com/lemaiwo/btp-sap-odata-to-mcp-server)** by @lemaiwo. It has been enhanced with AI capabilities, a hierarchical tool architecture, a powerful interactive UI suite, and a robust authentication system for enterprise scenarios.
+This repository is an enterprise-ready MCP (Model Context Protocol) server that bridges SAP OData services with AI capabilities. Based on the original project **[btp-sap-odata-to-mcp-server](https://github.com/lemaiwo/btp-sap-odata-to-mcp-server)** by @lemaiwo, this optimized version features enhanced security, simplified configuration, modular authentication, and comprehensive Cloud Foundry integration.
 
 ## ✨ Key Features
 
--   **🧠 Hierarchical Tools & Smart Router**: The `sap-smart-query` tool acts as a universal entry point. It interprets requests (in natural language or OData) and orchestrates the optimal workflow, simplifying the user experience by abstracting the complexity of over 17 underlying tools.
+### 🔐 Enhanced Security Architecture
+- **Modular Authentication System**: Factory pattern supporting IAS, OAuth2, JWT, Basic Auth, and API Keys
+- **Secure Session Management**: Thread-safe session bridging with proper locking mechanisms
+- **Role-Based Access Control**: Granular permissions with XSUAA integration
+- **Principal Propagation**: Maintains user context throughout the request lifecycle
+- **Security Best Practices**: No sensitive data logging, secure error handling, JWT validation
 
--   **🎨 Interactive UI Tools Suite**: A suite of 5 integrated tools for creating rich, interactive SAP Fiori-based user experiences directly from data:
-    -   **`ui-form-generator`**: Dynamically generates SAP Fiori forms with built-in validation for creating and editing data.
-    -   **`ui-data-grid`**: Creates interactive tables with sorting, filtering, pagination, and data export capabilities.
-    -   **`ui-dashboard-composer`**: Builds KPI dashboards with real-time charts and graphs for data visualization.
-    -   **`ui-workflow-builder`**: Allows for the creation of visual workflow processes with approval steps and custom logic.
-    -   **`ui-report-builder`**: Generates analytical reports with drill-down capabilities for in-depth data exploration.
+### 🎯 Simplified OData Discovery
+- **Pattern-Based Filtering**: Simple include/exclude patterns for service discovery
+- **Business Domain Mode**: Pre-configured domains (sales, finance, HR, etc.)
+- **Whitelist Mode**: Explicit service control for production environments
+- **Smart Defaults**: Automatic exclusion of test/debug services
 
--   **🔄 End-to-End Workflow Integration**: UI tools are automatically and intelligently suggested in context after SAP data operations, creating seamless data-to-UI workflows without manual intervention.
+### 🧠 AI-Powered Capabilities
+- **Smart Query Router**: Natural language to OData conversion
+- **Hierarchical Tool Architecture**: 17+ tools organized in logical layers
+- **Intelligent Workflow Orchestration**: Automatic tool chaining and optimization
+- **Real-time Analytics**: KPI monitoring and trend analysis
 
--   **🔐 Enterprise-Grade Authentication**: Features native integration with SAP BTP's security services (XSUAA and IAS). It supports a session-based authentication flow, role-based access control (RBAC), and principal propagation for a secure, enterprise-ready setup.
+### 🎨 Interactive UI Tools Suite
+- **`ui-form-generator`**: Dynamic SAP Fiori forms with validation
+- **`ui-data-grid`**: Interactive tables with sorting and filtering
+- **`ui-dashboard-composer`**: Real-time KPI dashboards
+- **`ui-workflow-builder`**: Visual workflow creation
+- **`ui-report-builder`**: Analytical reports with drill-down
 
--   **🤖 AI and Real-time Capabilities**: Includes a suite of advanced tools for:
-    -   Natural language to OData query conversion.
-    -   AI-driven data analysis and trend identification.
-    -   Query performance optimization.
-    -   Real-time data streaming and KPI monitoring.
-
--   **☁️ Cloud-Native and Optimized**: Designed for efficient deployment on SAP BTP, Cloud Foundry. It includes structured logging, health check endpoints, and graceful shutdown for robust lifecycle management in a cloud environment.
+### ☁️ Cloud-Native Features
+- **Cloud Foundry Optimized**: Native integration with CF services
+- **Structured Logging**: SAP Cloud Logging with fallback support
+- **Health Monitoring**: Comprehensive health check endpoints
+- **Performance Metrics**: Built-in performance tracking
+- **Graceful Shutdown**: Proper resource cleanup
 
 ## 🚀 Quick Start
 
@@ -43,10 +55,29 @@ npm install
 
 ### 2. Configuration
 
-Copy the `.env.example` file to `.env` and populate the required variables for your SAP IAS tenant and other configurations.
+Configure the application using environment variables. See the [Configuration Guide](./docs/CONFIGURATION.md) for detailed documentation.
 
 ```bash
 cp .env.example .env
+# Edit .env with your configuration
+```
+
+#### Quick Configuration Example
+
+```bash
+# Authentication
+SAP_IAS_URL=https://your-tenant.accounts.ondemand.com
+SAP_IAS_CLIENT_ID=your-client-id
+SAP_IAS_CLIENT_SECRET=your-secret
+
+# OData Discovery (Simplified)
+ODATA_DISCOVERY_MODE=pattern
+ODATA_INCLUDE_PATTERNS=*API*,Z*
+ODATA_EXCLUDE_PATTERNS=*_TEST*,*_TEMP*
+ODATA_MAX_SERVICES=50
+
+# Destinations
+SAP_DESTINATION_NAME=SAP_S4HANA
 ```
 
 ### 3. Build and Deploy

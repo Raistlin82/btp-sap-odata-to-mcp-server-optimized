@@ -4,11 +4,14 @@
             {
                 "name": "sap-mcp-xsuaa",
                 "label": "xsuaa",
-                "tags": [
-                    "xsuaa"
-                ],
+                "tags": ["xsuaa"],
                 "credentials": {
-                    <for running in BAS add credentials>
+                    "// Note": "Add actual credentials from BTP for local development",
+                    "clientid": "sb-btp-sap-odata-to-mcp-server!t12345",
+                    "clientsecret": "your-client-secret",
+                    "url": "https://your-tenant.authentication.region.hana.ondemand.com",
+                    "xsappname": "btp-sap-odata-to-mcp-server!t12345",
+                    "tenantid": "your-tenant-id"
                 }
             }
         ],
@@ -16,11 +19,13 @@
             {
                 "name": "sap-mcp-destination",
                 "label": "destination",
-                "tags": [
-                    "destination"
-                ],
+                "tags": ["destination"],
                 "credentials": {
-                    <for running in BAS add credentials>
+                    "// Note": "Add actual credentials from BTP for local development",
+                    "clientid": "sb-destination-client",
+                    "clientsecret": "your-destination-secret",
+                    "uri": "https://destination-configuration.region.hana.ondemand.com",
+                    "url": "https://your-tenant.authentication.region.hana.ondemand.com"
                 }
             }
         ],
@@ -28,13 +33,35 @@
             {
                 "name": "sap-mcp-connectivity",
                 "label": "connectivity",
-                "tags": [
-                    "connectivity"
-                ],
+                "tags": ["connectivity"],
                 "credentials": {
-                    <for running in BAS add credentials>
+                    "// Note": "Add actual credentials from BTP for local development",
+                    "clientid": "sb-connectivity-client",
+                    "clientsecret": "your-connectivity-secret",
+                    "onpremise_proxy_host": "connectivityproxy.region.hana.ondemand.com",
+                    "onpremise_proxy_port": 20003
+                }
+            }
+        ],
+        "application-logs": [
+            {
+                "name": "sap-mcp-application-logs",
+                "label": "application-logs",
+                "tags": ["application-logs"],
+                "credentials": {
+                    "// Note": "Optional - Cloud Logging service",
+                    "url": "https://application-logs.region.hana.ondemand.com"
                 }
             }
         ]
-    }
+    },
+    "// Environment Variables": "Add any additional environment variables below",
+    "SAP_IAS_URL": "https://your-tenant.accounts.ondemand.com",
+    "SAP_IAS_CLIENT_ID": "your-ias-client-id",
+    "SAP_IAS_CLIENT_SECRET": "your-ias-client-secret",
+    "ODATA_DISCOVERY_MODE": "pattern",
+    "ODATA_INCLUDE_PATTERNS": "*API*,Z*",
+    "ODATA_EXCLUDE_PATTERNS": "*_TEST*,*_TEMP*",
+    "NODE_ENV": "development",
+    "LOG_LEVEL": "debug"
 }
