@@ -1,0 +1,82 @@
+# NPM publish ignore file
+# Files that should NOT be included in the NPM package
+
+# MCP Registry tokens (SENSITIVE - NEVER PUBLISH)
+.mcpregistry*
+.mcpregistry_github_token
+.mcpregistry_registry_token
+
+# Source files (only need compiled output)
+src/
+*.ts
+!*.d.ts
+
+# Development files
+tests/
+*.test.js
+*.spec.js
+coverage/
+.nyc_output/
+
+# Configuration files
+.env
+.env.*
+!.env.example
+default-env.json
+example-default-env.json
+tsconfig.json
+jest.config.*
+.eslintrc*
+.prettierrc*
+
+# Version control
+.git/
+.gitignore
+.github/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Documentation source (keep only README.md)
+docs/
+*.md
+!README.md
+!LICENSE
+
+# Cloud Foundry / SAP BTP
+mta.yaml
+xs-security.json
+mta_archives/
+mta-op-*/
+resources/
+*.mtar
+
+# CI/CD
+.travis.yml
+.gitlab-ci.yml
+azure-pipelines.yml
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.log
+logs/
+
+# Local development
+work/
+examples/
+scratch/
+local/
+
+# Build artifacts not needed
+*.map
+*.tsbuildinfo
+
+# Server configuration (sensitive)
+server.json
+mcp-stdio.js
