@@ -612,12 +612,60 @@ export function createApp(): express.Application {
         res.redirect('/auth/' + queryString);
     });
 
-    // Simple test endpoint
+    // Simple test endpoint with dynamic endpoint discovery
     app.get('/', (req, res) => {
+        // Get all registered routes dynamically
+        const routes: string[] = [];
+
+        // Extract routes from Express app
+        app._router?.stack?.forEach((middleware: any) => {
+            if (middleware.route) {
+                // Direct route
+                const methods = Object.keys(middleware.route.methods);
+                routes.push(`${methods.join(',').toUpperCase()} ${middleware.route.path}`);
+            } else if (middleware.name === 'router') {
+                // Router middleware (like auth server routes on /auth)
+                middleware.handle?.stack?.forEach((handler: any) => {
+                    if (handler.route) {
+                        const methods = Object.keys(handler.route.methods);
+                        const path = (middleware.regexp.source.includes('auth') ? '/auth' : '') + handler.route.path;
+                        routes.push(`${methods.join(',').toUpperCase()} ${path}`);
+                    }
+                });
+            }
+        });
+
+        // Key endpoints for documentation
+        const keyEndpoints = [
+            '/health - Health check and status',
+            '/health/live - Liveness probe (CF compatible)',
+            '/health/ready - Readiness probe (CF compatible)',
+            '/health/status - Detailed health information',
+            '/mcp - MCP protocol endpoint',
+            '/docs - API documentation',
+            '/login - Authentication portal',
+            '/auth/status - Authentication status',
+            '/auth/admin - Admin dashboard',
+            '/monitoring/metrics - Performance metrics',
+            '/config/services - Service configuration'
+        ];
+
         res.json({
             message: 'SAP MCP Server is running',
             timestamp: new Date().toISOString(),
-            endpoints: ['/health', '/mcp', '/docs', '/login', '/auth/status']
+            version: '1.0.1',
+            status: 'healthy',
+            keyEndpoints,
+            totalRoutes: routes.length,
+            environment: process.env.NODE_ENV || 'development',
+            features: {
+                mcp: true,
+                authentication: true,
+                healthChecks: true,
+                monitoring: true,
+                aiIntegration: true,
+                uiTools: true
+            }
         });
     });
 
