@@ -34,32 +34,47 @@ export class CloudLoggingService {
    */
   private initializeCloudLogging(): void {
     try {
-      // Load SAP Cloud Logging service binding
-      const services = xsenv.getServices({
-        logging: { label: 'application-logs' }
-      });
+      // Check if running in Cloud Foundry environment
+      const isCloudFoundry = process.env.VCAP_SERVICES || process.env.CF_INSTANCE_INDEX;
 
-      if (services.logging) {
-        // Initialize SAP Logger with Cloud Logging service
-        if (SAPLogging) {
-          this.sapLogger = SAPLogging.createLogger({
-            level: process.env.LOG_LEVEL || 'info',
-            format: 'json',
-            output: process.env.NODE_ENV === 'production' ? 'stdout' : 'console'
-          });
-        } else {
-          this.sapLogger = this.createFallbackLogger();
-        }
-
-        this.isCloudLoggingAvailable = true;
-        this.localLogger.info('✅ SAP Cloud Logging service initialized successfully');
-      } else {
+      if (!isCloudFoundry) {
+        // Local development - use fallback without warnings
         this.initializeFallbackLogger();
-        this.localLogger.warn('⚠️  SAP Cloud Logging service not bound, using fallback logger');
+        this.localLogger.debug('Running in local development mode - using console logger');
+        return;
+      }
+
+      // Try to load Cloud Logging service if available
+      let services: any = {};
+      try {
+        // Try to get service bindings, but don't require them
+        services = xsenv.getServices({
+          logging: { label: 'application-logs' }
+        });
+      } catch (e) {
+        // Service lookup failed - continue with fallback
+        services = {};
+      }
+
+      if (services.logging && SAPLogging) {
+        // Initialize SAP Logger with Cloud Logging service
+        this.sapLogger = SAPLogging.createLogger({
+          level: process.env.LOG_LEVEL || 'info',
+          format: 'json',
+          output: 'stdout' // Always use stdout in CF
+        });
+        this.isCloudLoggingAvailable = true;
+        this.localLogger.info('✅ SAP Cloud Logging service initialized');
+      } else {
+        // Use fallback logger without warning - this is normal in CF without logging service
+        this.initializeFallbackLogger();
+        // Only log at debug level since this is expected behavior
+        this.localLogger.debug('Using standard console logging (Cloud Logging service not bound)');
       }
     } catch (error) {
+      // Silently fall back to console logging
       this.initializeFallbackLogger();
-      this.localLogger.warn('⚠️  Failed to initialize SAP Cloud Logging, using fallback:', error);
+      this.localLogger.debug('Using fallback logger:', error);
     }
   }
 

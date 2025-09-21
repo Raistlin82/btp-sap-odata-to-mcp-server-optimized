@@ -1,4 +1,75 @@
+# Cloud Foundry Ignore File
+# Files and directories to exclude from Cloud Foundry deployment
+
+# Dependencies (will be installed during staging)
 node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Source files (only need compiled output)
+src/
+*.ts
+!*.d.ts
+
+# Development and test files
+tests/
+*.test.js
+*.spec.js
+coverage/
+.nyc_output/
+
+# Version control
 .git/
+.gitignore
+.github/
+
+# Environment and configuration
+.env
+.env.*
+!.env.example
+default-env.json
+example-default-env.json
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Build artifacts
+*.map
+.cache/
+
+# Logs
+logs/
 *.log
 
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Local development files
+mta_archives/
+mta-op-*/
+resources/
+
+# CI/CD
+.travis.yml
+.gitlab-ci.yml
+azure-pipelines.yml
+
+# Other unnecessary files for production
+examples/
+work/
+.eslintrc*
+.prettierrc*
+jest.config.*
+tsconfig.json
