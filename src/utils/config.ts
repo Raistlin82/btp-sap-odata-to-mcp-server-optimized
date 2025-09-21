@@ -65,8 +65,9 @@ export class Config {
         // OData service filtering configuration
         // Can be set via environment variables or will use defaults
         
-        // Service patterns - supports glob patterns and regex
-        const servicePatterns = process.env.ODATA_SERVICE_PATTERNS;
+        // Service include patterns - supports glob patterns and regex
+        // Support both new (ODATA_INCLUDE_PATTERNS) and legacy (ODATA_SERVICE_PATTERNS) variable names
+        const servicePatterns = process.env.ODATA_INCLUDE_PATTERNS || process.env.ODATA_SERVICE_PATTERNS;
         if (servicePatterns) {
             try {
                 // Try parsing as JSON array first
@@ -82,7 +83,8 @@ export class Config {
         }
 
         // Service exclusion patterns
-        const exclusionPatterns = process.env.ODATA_EXCLUSION_PATTERNS;
+        // Support both new (ODATA_EXCLUDE_PATTERNS) and legacy (ODATA_EXCLUSION_PATTERNS) variable names
+        const exclusionPatterns = process.env.ODATA_EXCLUDE_PATTERNS || process.env.ODATA_EXCLUSION_PATTERNS;
         if (exclusionPatterns) {
             try {
                 const patterns = JSON.parse(exclusionPatterns);
@@ -153,25 +155,29 @@ export class Config {
                     this.config.set('odata.allowAllServices', creds.ODATA_ALLOW_ALL === 'true' || creds.ODATA_ALLOW_ALL === '*');
                 }
                 
-                if (creds.ODATA_SERVICE_PATTERNS) {
+                // Support both new (ODATA_INCLUDE_PATTERNS) and legacy (ODATA_SERVICE_PATTERNS) variable names
+                const includePatterns = creds.ODATA_INCLUDE_PATTERNS || creds.ODATA_SERVICE_PATTERNS;
+                if (includePatterns) {
                     try {
-                        const patterns = typeof creds.ODATA_SERVICE_PATTERNS === 'string' 
-                            ? JSON.parse(creds.ODATA_SERVICE_PATTERNS)
-                            : creds.ODATA_SERVICE_PATTERNS;
+                        const patterns = typeof includePatterns === 'string'
+                            ? JSON.parse(includePatterns)
+                            : includePatterns;
                         this.config.set('odata.servicePatterns', Array.isArray(patterns) ? patterns : [patterns]);
                     } catch {
-                        this.config.set('odata.servicePatterns', creds.ODATA_SERVICE_PATTERNS.split(',').map((p: string) => p.trim()));
+                        this.config.set('odata.servicePatterns', includePatterns.split(',').map((p: string) => p.trim()));
                     }
                 }
                 
-                if (creds.ODATA_EXCLUSION_PATTERNS) {
+                // Support both new (ODATA_EXCLUDE_PATTERNS) and legacy (ODATA_EXCLUSION_PATTERNS) variable names
+                const excludePatterns = creds.ODATA_EXCLUDE_PATTERNS || creds.ODATA_EXCLUSION_PATTERNS;
+                if (excludePatterns) {
                     try {
-                        const patterns = typeof creds.ODATA_EXCLUSION_PATTERNS === 'string'
-                            ? JSON.parse(creds.ODATA_EXCLUSION_PATTERNS)
-                            : creds.ODATA_EXCLUSION_PATTERNS;
+                        const patterns = typeof excludePatterns === 'string'
+                            ? JSON.parse(excludePatterns)
+                            : excludePatterns;
                         this.config.set('odata.exclusionPatterns', Array.isArray(patterns) ? patterns : [patterns]);
                     } catch {
-                        this.config.set('odata.exclusionPatterns', creds.ODATA_EXCLUSION_PATTERNS.split(',').map((p: string) => p.trim()));
+                        this.config.set('odata.exclusionPatterns', excludePatterns.split(',').map((p: string) => p.trim()));
                     }
                 }
                 

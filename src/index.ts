@@ -284,7 +284,7 @@ function getConfigurationSource(): string {
         }
     }
     
-    if (process.env.ODATA_SERVICE_PATTERNS) {
+    if (process.env.ODATA_INCLUDE_PATTERNS || process.env.ODATA_SERVICE_PATTERNS) {
         return 'CF Environment Variables';
     }
     
