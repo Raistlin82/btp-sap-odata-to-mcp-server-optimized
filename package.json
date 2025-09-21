@@ -1,10 +1,10 @@
 {
   "name": "btp-sap-odata-to-mcp-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Enterprise SAP OData to MCP Server with AI capabilities and Cloud Foundry integration",
   "//": "NOTE: @sap/xsenv@5.6.1 warning from @sap-cloud-sdk/connectivity is non-critical - Node.js 24 works fine with backward compatibility",
   "license": "MIT",
-  "mcpName": "btp-sap-odata-to-mcp-server",
+  "mcpName": "io.github.Raistlin82/btp-sap-odata-to-mcp-server-optimized",
   "homepage": "https://github.com/Raistlin82/btp-sap-odata-to-mcp-server-optimized#readme",
   "repository": {
     "type": "git",

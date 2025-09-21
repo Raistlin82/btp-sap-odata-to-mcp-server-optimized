@@ -7,7 +7,7 @@
     "url": "https://github.com/Raistlin82/btp-sap-odata-to-mcp-server-optimized",
     "source": "github"
   },
-  "version": "1.0.0",
+  "version": "1.0.1",
   "license": "MIT",
   "homepage": "https://github.com/Raistlin82/btp-sap-odata-to-mcp-server-optimized#readme",
   "keywords": [
@@ -28,7 +28,7 @@
       "registry_type": "npm",
       "registry_base_url": "https://registry.npmjs.org",
       "identifier": "btp-sap-odata-to-mcp-server",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "transport": {
         "type": "stdio"
       },
