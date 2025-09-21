@@ -991,30 +991,125 @@ export function createApp(): express.Application {
     // API documentation endpoint
     app.get('/docs', (req, res) => {
         res.json({
-            title: 'SAP MCP Server API',
-            description: 'Modern Model Context Protocol server for SAP SAP OData services',
-            version: '2.0.0',
+            title: 'SAP BTP OData to MCP Server',
+            description: 'Enterprise-ready Model Context Protocol server for SAP OData services with AI capabilities',
+            version: '1.0.1',
+            repository: 'https://github.com/Raistlin82/btp-sap-odata-to-mcp-server-optimized',
+            documentation: 'https://github.com/Raistlin82/btp-sap-odata-to-mcp-server-optimized#readme',
+
             endpoints: {
-                'GET /health': 'Health check endpoint',
+                // Core API
+                'GET /': 'Server status and endpoint overview',
+                'GET /docs': 'This comprehensive API documentation',
+
+                // Health & Monitoring
+                'GET /health': 'Basic health check endpoint',
+                'GET /health/live': 'Liveness probe (Cloud Foundry compatible)',
+                'GET /health/ready': 'Readiness probe (Cloud Foundry compatible)',
+                'GET /health/status': 'Detailed health information with dependencies',
+                'GET /health/ai': 'AI services health status',
+                'GET /monitoring/metrics': 'Performance metrics and statistics',
+                'GET /monitoring/logging': 'Logging configuration and status',
+
+                // MCP Protocol
                 'GET /mcp': 'MCP server information and SSE endpoint',
-                'POST /mcp': 'Main MCP communication endpoint',
-                'DELETE /mcp': 'Session termination endpoint',
-                'GET /docs': 'This API documentation'
+                'POST /mcp': 'Main MCP communication endpoint (JSON-RPC 2.0)',
+                'DELETE /mcp': 'Session termination and cleanup',
+
+                // Authentication & Authorization
+                'GET /login': 'Authentication portal redirect',
+                'GET /auth/status': 'Current authentication status',
+                'GET /auth/admin': 'Admin dashboard (requires authentication)',
+                'POST /auth/login': 'IAS/XSUAA login endpoint',
+                'GET /auth/callback': 'OAuth callback handler',
+                'POST /auth/logout': 'Session termination',
+
+                // Configuration & Admin
+                'GET /config/services': 'OData service discovery configuration',
+                'POST /config/services/update': 'Update service discovery settings',
+                'POST /config/services/test': 'Test configuration changes',
+                'GET /auth/admin/users': 'User session management',
+                'POST /auth/admin/odata/reload': 'Reload OData service discovery',
+                'GET /auth/admin/odata/status': 'OData discovery status',
+                'GET /auth/admin/destinations/status': 'SAP Destination service status'
             },
+
+            features: {
+                security: {
+                    authentication: 'SAP IAS (Identity Authentication Service)',
+                    authorization: 'XSUAA with role-based access control',
+                    sessionManagement: 'Secure session bridging with automatic cleanup',
+                    dataProtection: 'Automatic sanitization of sensitive data in logs'
+                },
+                discovery: {
+                    modes: ['pattern', 'business', 'whitelist', 'all'],
+                    patterns: 'Include/exclude patterns for service filtering',
+                    businessDomains: ['sales', 'finance', 'hr', 'procurement', 'logistics'],
+                    maxServices: 'Configurable service limits for performance'
+                },
+                aiCapabilities: {
+                    naturalLanguageQueries: 'Convert natural language to OData queries',
+                    smartDataAnalysis: 'AI-driven data analysis and insights',
+                    performanceOptimization: 'Automatic query optimization',
+                    realTimeAnalytics: 'Live KPI monitoring and trend analysis'
+                },
+                uiTools: {
+                    formGenerator: 'Dynamic SAP Fiori forms with validation',
+                    dataGrids: 'Interactive tables with sorting and filtering',
+                    dashboards: 'Real-time KPI dashboards with charts',
+                    workflowBuilder: 'Visual workflow creation tools',
+                    reportBuilder: 'Analytical reports with drill-down capabilities'
+                }
+            },
+
             mcpCapabilities: {
-                tools: 'Dynamic CRUD operations for all discovered SAP entities',
-                resources: 'Service metadata and entity information',
-                logging: 'Comprehensive logging support'
-            },
-            usage: {
-                exampleQueries: [
-                    '"show me 10 banks"',
-                    '"update bank with id 1 to have street number 5"',
-                    '"create a new customer with name John Doe"',
-                    '"delete the order with ID 12345"'
+                tools: [
+                    'sap-smart-query: Universal entry point for natural language queries',
+                    'search-sap-services: Discover available OData services',
+                    'discover-service-entities: Explore service entity types',
+                    'get-entity-schema: Retrieve detailed entity metadata',
+                    'execute-entity-operation: CRUD operations on any entity',
+                    'ui-form-generator: Create interactive forms',
+                    'ui-data-grid: Generate data tables',
+                    'ui-dashboard-composer: Build KPI dashboards',
+                    'ai-query-builder: Natural language to OData conversion',
+                    'realtime-data-stream: Live data monitoring'
                 ],
-                sessionManagement: 'Automatic session creation and cleanup',
-                authentication: 'Uses SAP BTP destination service for SAP authentication'
+                resources: [
+                    'Service metadata and entity schemas',
+                    'Business process documentation',
+                    'Performance metrics and analytics'
+                ],
+                transport: 'HTTP with Server-Sent Events (SSE) support'
+            },
+
+            usage: {
+                gettingStarted: 'Visit /auth/admin for authentication and configuration',
+                exampleQueries: [
+                    '"Show me the top 10 customers by revenue"',
+                    '"Create a new sales order for customer 12345"',
+                    '"Update the delivery status of order SO-001 to shipped"',
+                    '"Generate a revenue dashboard for the last quarter"',
+                    '"Build a form to create new business partners"'
+                ],
+                authentication: {
+                    required: true,
+                    method: 'SAP IAS OAuth2 + XSUAA JWT validation',
+                    roles: ['MCPViewer', 'MCPEditor', 'MCPAdmin'],
+                    endpoint: '/auth/login'
+                },
+                configuration: {
+                    discovery: 'Configure via environment variables or admin dashboard',
+                    variables: ['ODATA_DISCOVERY_MODE', 'ODATA_INCLUDE_PATTERNS', 'ODATA_EXCLUDE_PATTERNS'],
+                    documentation: 'See /config/services for current settings'
+                }
+            },
+
+            support: {
+                issues: 'https://github.com/Raistlin82/btp-sap-odata-to-mcp-server-optimized/issues',
+                documentation: 'https://github.com/Raistlin82/btp-sap-odata-to-mcp-server-optimized/tree/main/docs',
+                npmPackage: 'https://www.npmjs.com/package/btp-sap-odata-to-mcp-server',
+                mcpRegistry: 'https://registry.modelcontextprotocol.io'
             }
         });
     });
