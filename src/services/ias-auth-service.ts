@@ -136,7 +136,7 @@ export class IASAuthService {
         throw new Error(`Token exchange failed: ${response.status} ${response.statusText}`);
       }
 
-      const tokenResponse: IASTokenResponse = await response.json();
+      const tokenResponse: IASTokenResponse = await response.json() as any;
       
       // Get user info from IAS
       const userInfo = await this.getUserInfo(tokenResponse.access_token);
@@ -229,7 +229,7 @@ export class IASAuthService {
         throw new Error(`Authentication failed: ${response.status} ${response.statusText}`);
       }
 
-      const tokenResponse: IASTokenResponse = await response.json();
+      const tokenResponse: IASTokenResponse = await response.json() as any;
       
       // Get user info from IAS
       const userInfo = await this.getUserInfo(tokenResponse.access_token);
@@ -291,7 +291,7 @@ export class IASAuthService {
         throw new Error(`Client credentials authentication failed: ${response.status} ${response.statusText}`);
       }
 
-      const tokenResponse: IASTokenResponse = await response.json();
+      const tokenResponse: IASTokenResponse = await response.json() as any;
       
       const tokenData: TokenData = {
         token: `Bearer ${tokenResponse.access_token}`,
@@ -343,7 +343,7 @@ export class IASAuthService {
         throw new Error(`Token refresh failed: ${response.status} ${response.statusText}`);
       }
 
-      const tokenResponse: IASTokenResponse = await response.json();
+      const tokenResponse: IASTokenResponse = await response.json() as any;
       
       // Get user info from IAS
       const userInfo = await this.getUserInfo(tokenResponse.access_token);
@@ -391,7 +391,7 @@ export class IASAuthService {
         throw new Error(`User info request failed: ${response.status} ${response.statusText}`);
       }
 
-      const userInfo: IASUserInfo = await response.json();
+      const userInfo: IASUserInfo = await response.json() as any;
       this.logger.debug(`Retrieved user info for: ${userInfo.preferred_username || userInfo.email || userInfo.sub}`);
       
       // === ENHANCED DEBUG LOG: DECODED JWT CLAIMS FOR SCOPE ANALYSIS ===
@@ -478,7 +478,7 @@ export class IASAuthService {
         return { valid: false, error: `Introspection failed: ${response.status}` };
       }
 
-      const introspectResult = await response.json();
+      const introspectResult = await response.json() as any;
       
       if (introspectResult.active === true) {
         // Token is valid, return payload from introspection
