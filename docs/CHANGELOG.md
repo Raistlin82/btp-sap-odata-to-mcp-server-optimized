@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session Management**: Fixed race conditions in global session maps
 - **Error Handling**: Implemented secure error handling that prevents information leakage
 - **Cloud Logging**: Fixed fallback mechanism for environments without application-logs service
+- **Logger Data Sanitization**: Implemented automatic sanitization of sensitive data in all log levels
+  - Masks passwords, tokens, secrets, API keys, and other sensitive fields
+  - Preserves debugging capability in development mode
+  - Uses pattern-based detection for comprehensive coverage
 
 #### Added
 - **Modular Authentication Factory**: Pluggable authentication system supporting:

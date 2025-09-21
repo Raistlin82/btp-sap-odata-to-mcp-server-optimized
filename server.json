@@ -1,0 +1,102 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.Raistlin82/btp-sap-odata-to-mcp-server-optimized",
+  "description": "Enterprise SAP OData to MCP Server with AI capabilities and Cloud Foundry integration",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/Raistlin82/btp-sap-odata-to-mcp-server-optimized",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "license": "MIT",
+  "homepage": "https://github.com/Raistlin82/btp-sap-odata-to-mcp-server-optimized#readme",
+  "keywords": [
+    "sap",
+    "odata",
+    "mcp",
+    "ai",
+    "btp",
+    "cloud-foundry",
+    "enterprise",
+    "security",
+    "authentication",
+    "ias",
+    "xsuaa"
+  ],
+  "packages": [
+    {
+      "registry_type": "npm",
+      "registry_base_url": "https://registry.npmjs.org",
+      "identifier": "btp-sap-odata-to-mcp-server",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environment_variables": [
+        {
+          "name": "SAP_IAS_URL",
+          "description": "URL of the SAP Identity Authentication Service tenant",
+          "is_required": true,
+          "format": "string",
+          "is_secret": false
+        },
+        {
+          "name": "SAP_IAS_CLIENT_ID",
+          "description": "Client ID for the OAuth application in IAS",
+          "is_required": true,
+          "format": "string",
+          "is_secret": false
+        },
+        {
+          "name": "SAP_IAS_CLIENT_SECRET",
+          "description": "Client Secret for the OAuth application in IAS",
+          "is_required": true,
+          "format": "string",
+          "is_secret": true
+        },
+        {
+          "name": "SAP_DESTINATION_NAME",
+          "description": "Name of the BTP destination used for service discovery",
+          "is_required": true,
+          "format": "string",
+          "is_secret": false
+        },
+        {
+          "name": "ODATA_DISCOVERY_MODE",
+          "description": "OData discovery mode: pattern, business, whitelist, or all",
+          "is_required": false,
+          "format": "string",
+          "is_secret": false
+        },
+        {
+          "name": "ODATA_INCLUDE_PATTERNS",
+          "description": "Comma-separated patterns to include (pattern mode)",
+          "is_required": false,
+          "format": "string",
+          "is_secret": false
+        },
+        {
+          "name": "ODATA_EXCLUDE_PATTERNS",
+          "description": "Comma-separated patterns to exclude (pattern mode)",
+          "is_required": false,
+          "format": "string",
+          "is_secret": false
+        },
+        {
+          "name": "PORT",
+          "description": "The port on which the Express server will listen",
+          "is_required": false,
+          "format": "string",
+          "is_secret": false
+        },
+        {
+          "name": "NODE_ENV",
+          "description": "The application's operating environment",
+          "is_required": false,
+          "format": "string",
+          "is_secret": false
+        }
+      ]
+    }
+  ]
+}

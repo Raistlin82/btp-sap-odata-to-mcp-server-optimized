@@ -1,10 +1,43 @@
 {
   "name": "btp-sap-odata-to-mcp-server",
   "version": "1.0.0",
-  "description": "Node.js MCP server for SAP OData services integration",
+  "description": "Enterprise SAP OData to MCP Server with AI capabilities and Cloud Foundry integration",
   "//": "NOTE: @sap/xsenv@5.6.1 warning from @sap-cloud-sdk/connectivity is non-critical - Node.js 24 works fine with backward compatibility",
   "license": "MIT",
+  "mcpName": "btp-sap-odata-to-mcp-server",
+  "homepage": "https://github.com/Raistlin82/btp-sap-odata-to-mcp-server-optimized#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Raistlin82/btp-sap-odata-to-mcp-server-optimized.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Raistlin82/btp-sap-odata-to-mcp-server-optimized/issues"
+  },
+  "keywords": [
+    "mcp",
+    "sap",
+    "odata",
+    "ai",
+    "btp",
+    "cloud-foundry",
+    "enterprise",
+    "security",
+    "authentication",
+    "ias",
+    "xsuaa",
+    "model-context-protocol"
+  ],
+  "author": "Gabriele Rendina",
   "main": "dist/index.js",
+  "bin": {
+    "btp-sap-odata-to-mcp-server": "dist/mcp-server.js"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
   "type": "module",
   "engines": {
     "node": "18.x || 20.x || 22.x || 24.x",
@@ -33,7 +66,9 @@
     "test:verbose": "node tests/run-tests.js --verbose",
     "test:full": "node tests/run-tests.js --suite=all --verbose",
     "build:btp": "mbt build",
-    "deploy:btp": "cf deploy ./mta_archives/btp-sap-odata-to-mcp-server-optimized_1.0.0.mtar "
+    "deploy:btp": "cf deploy ./mta_archives/btp-sap-odata-to-mcp-server-optimized_1.0.0.mtar ",
+    "prepublishOnly": "npm run build && npm test",
+    "prepare": "npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.1",
