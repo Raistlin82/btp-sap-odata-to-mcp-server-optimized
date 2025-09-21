@@ -1,3 +1,7 @@
+# NPM publish ignore file
+.mcpregistry_github_token
+.mcpregistry_registry_token
+
 # Dependencies
 node_modules/
 npm-debug.log*
