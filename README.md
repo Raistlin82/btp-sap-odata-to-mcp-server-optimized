@@ -92,12 +92,26 @@ npm run deploy:btp
 
 ## 📚 Documentation
 
-For a detailed understanding of the project, please refer to the complete documentation.
+Complete documentation is available with structured navigation for all aspects of the project.
 
--   **[Getting Started](./docs/README.md)**: The main hub for all documentation.
--   **[Architecture Overview](./docs/ARCHITECTURE.md)**: A deep dive into the system's architecture, including the hierarchical tool model and the smart router.
--   **[Tool Reference](./docs/TOOL_REFERENCE.md)**: Detailed documentation for all available tools, with parameters and examples.
--   **[User Guide](./docs/USER_GUIDE.md)**: A step-by-step guide on how to authenticate and use the tools.
--   **[Deployment Guide](./docs/DEPLOYMENT.md)**: Instructions for deploying the application to SAP BTP and for local development.
--   **[Configuration Guide](./docs/CONFIGURATION.md)**: A comprehensive guide to all environment variables and security configurations.
--   **[Testing Guide](./docs/guides/TESTING.md)**: Information on how to run and extend the test suite.
+### 🏠 **[Documentation Hub](./docs/README.md)**
+Main navigation center with use-case-based guidance and complete file index.
+
+### 🚀 Quick Links
+
+| Category | Document | Description |
+|----------|----------|-------------|
+| **Getting Started** | [Configuration Guide](./docs/CONFIGURATION.md) | Environment setup, OData discovery, CF deployment |
+| **Architecture** | [Architecture Overview](./docs/ARCHITECTURE.md) | System design, security model, tool hierarchy |
+| **Usage** | [User Guide](./docs/USER_GUIDE.md) | Authentication, tool usage, workflow examples |
+| **Reference** | [Tool Reference](./docs/TOOL_REFERENCE.md) | Complete tool documentation with parameters |
+| **Deployment** | [Deployment Guide](./docs/DEPLOYMENT.md) | SAP BTP and local development setup |
+| **Development** | [Testing Guide](./docs/guides/TESTING.md) | Test suite and development guidelines |
+| **Changes** | [Changelog](./docs/CHANGELOG.md) | Version history and feature updates |
+
+### 📖 **Navigation Flow**
+```
+README.md → docs/README.md → All Documentation
+     ↓           ↓
+Quick Start → Structured Navigation → Complete Coverage
+```
