@@ -29,10 +29,20 @@ modules:
       LOG_LEVEL: debug
       # Dual Destination Configuration
       SAP_DESTINATION_NAME: "SAP_SYSTEM"
-      SAP_DESTINATION_NAME_RT: "SAP_SYSTEM_RT"  
+      SAP_DESTINATION_NAME_RT: "SAP_SYSTEM_RT"
       SAP_USE_SINGLE_DESTINATION: "false"
       # OData Service Configuration: Using BTP environment variables instead of hardcoded values
-      
+
+      # MCP Client Compatibility Configuration
+      # Inverted logic: Default = full features, list = legacy/compatibility mode
+      MCP_LEGACY_CLIENTS: "cline,windsurf,inspector"
+      # Compatibility settings (applied ONLY to legacy clients above)
+      MCP_DISABLE_UI_SUGGESTIONS: "false"
+      MCP_SIMPLIFIED_RESPONSES: "false"
+      MCP_MINIMAL_FORMATTING: "false"
+      MCP_FORCE_UI_SUGGESTIONS: "false"
+      # MCP_MAX_RESPONSE_LENGTH: "50000"  # Uncomment to limit response size
+
     build-parameters:
       builder: custom
       commands:
