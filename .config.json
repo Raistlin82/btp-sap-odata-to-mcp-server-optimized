@@ -1,0 +1,15 @@
+{
+    "mcpServers": {
+        "btp-odata-mcp": {
+            "type": "streamable-http",
+            "url": "https://wind-tre-s-p-a--burrata-noprod-8cs9fy8w-mcp-noprod-spac37b2ce9c.cfapps.eu30.hana.ondemand.com/mcp",
+            "displayName": "BTP OData MCP (remote)",
+            "description": "Production/test endpoint for SAP OData -> MCP"
+        }
+    },
+    "defaultServer": "btp-odata-mcp",
+    "options": {
+        "allowProxying": true,
+        "sseEndpoint": "/sse"
+    }
+}
