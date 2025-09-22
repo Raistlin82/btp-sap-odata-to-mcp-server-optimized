@@ -18,10 +18,10 @@ modules:
     path: ./
     parameters:
       app-name: sap-mcp-server-${space}
-      memory: 512M
+      memory: 1G
       disk-quota: 1G
       buildpack: nodejs_buildpack
-      command: npm run start
+      command: node --max-old-space-size=896 --gc-global dist/index.js
       keep-existing-routes: true
       health-check-type: http
       health-check-http-endpoint: /health
