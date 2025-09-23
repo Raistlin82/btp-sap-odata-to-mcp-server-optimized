@@ -1083,7 +1083,18 @@ export class HierarchicalSAPToolRegistry {
                 'master-data': {
                     name: 'Master Data',
                     description: '',
-                    keywords: ['business_partner', 'bp_', 'material', 'product']
+                    keywords: [
+                        // Anagrafiche commerciali e tecniche
+                        'business_partner', 'bp_', 'customer', 'vendor', 'supplier',
+                        // Contratti e accordi
+                        'contract', 'agreement',
+                        // Materiali e prodotti
+                        'material', 'product', 'item',
+                        // Altri master data comuni
+                        'plant', 'storage', 'location', 'warehouse',
+                        // Anagrafiche tecniche
+                        'equipment', 'asset'
+                    ]
                 },
                 'integration': {
                     name: 'Integration',
@@ -1133,6 +1144,38 @@ export class HierarchicalSAPToolRegistry {
                         categories.push(categoryKey);
                     }
                 }
+
+                // Map SAP Signavio categories to user-friendly filter categories
+                const userFriendlyCategories: string[] = [];
+                for (const category of categories) {
+                    switch (category) {
+                        case 'master-data':
+                            // Master Data includes ALL anagrafiche (business partner, customer, vendor, contracts, etc.)
+                            userFriendlyCategories.push('business-partner');
+                            break;
+                        case 'order-to-cash':
+                            userFriendlyCategories.push('sales');
+                            break;
+                        case 'record-to-report':
+                            userFriendlyCategories.push('finance');
+                            break;
+                        case 'source-to-pay':
+                            userFriendlyCategories.push('procurement');
+                            break;
+                        case 'hire-to-retire':
+                            userFriendlyCategories.push('hr');
+                            break;
+                        case 'plan-to-produce':
+                            userFriendlyCategories.push('logistics');
+                            break;
+                        default:
+                            // Keep original category if no mapping found
+                            userFriendlyCategories.push(category);
+                            break;
+                    }
+                }
+                // Replace categories with mapped ones
+                categories.splice(0, categories.length, ...userFriendlyCategories);
             } else {
                 // Fallback to basic categorization if configuration not loaded
                 // Business Partner related
