@@ -409,7 +409,7 @@ export class IntelligentToolRouter {
             return possibleUITools[0];
 
         } catch (error) {
-            console.warn('Error suggesting UI tool for workflow:', error);
+            this.logger.warn('Error suggesting UI tool for workflow:', error);
             return undefined;
         }
     }

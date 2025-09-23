@@ -1421,7 +1421,8 @@ export async function startServer(port: number = 3000): Promise<void> {
 if (import.meta.url === `file://${process.argv[1]}`) {
     const port = parseInt(process.env.PORT || '3000');
     startServer(port).catch((error) => {
-        console.error('Failed to start server:', error);
+        const logger = new Logger('ServerMain');
+        logger.error('Failed to start server', { error: error.message });
         process.exit(1);
     });
 }

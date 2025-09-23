@@ -8,7 +8,8 @@ This documentation guides you through key concepts, usage, configuration, deploy
 
 ### 🏗️ Architecture & Design
 - **[Architecture Overview](./ARCHITECTURE.md)**: Deep dive into the system's architecture, hierarchical tool model, and smart router
-- **[Architecture Sequence Diagrams](./ARCHITECTURE-SEQUENCE-DIAGRAMS.md)**: Visual representation of system interactions and workflows
+- **[Architecture Sequence Diagrams](./ARCHITECTURE-SEQUENCE-DIAGRAMS.md)**: Technical sequence diagrams and workflow documentation
+- **[🎨 Modern Architecture Diagrams](./MODERN-ARCHITECTURE-DIAGRAMS.md)**: **NEW!** Interactive, modern visual architecture with beautiful diagrams
 
 ### 👥 User Guides
 - **[User Guide](./USER_GUIDE.md)**: Step-by-step guide for authentication, tool usage, and workflow examples

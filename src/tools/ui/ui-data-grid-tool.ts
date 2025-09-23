@@ -733,7 +733,7 @@ Examples:
                 init() {
                     this.setupEventHandlers();
                     this.renderGrid();
-                    console.log('SAP Data Grid initialized for', this.entitySet, 'with', this.data.length, 'records');
+                    this.logger.debug('SAP Data Grid initialized for', this.entitySet, 'with', this.data.length, 'records');
                 }
 
                 setupEventHandlers() {
@@ -811,7 +811,7 @@ Examples:
                         rowElement.classList.add('selected');
                     }
 
-                    console.log('Selected rows:', Array.from(this.selectedRows));
+                    this.logger.debug('Selected rows:', Array.from(this.selectedRows););
                 }
 
                 handleExport(format) {
@@ -836,7 +836,7 @@ Examples:
                             this.exportToJSON(exportData);
                             break;
                         default:
-                            console.log('Export data:', exportData);
+                            this.logger.debug('Export data:', exportData);
                     }
                 }
 
@@ -949,7 +949,7 @@ Examples:
                 }
 
                 refreshData() {
-                    console.log('Refreshing grid data...');
+                    this.logger.debug('Refreshing grid data...');
                     // In a real implementation, this would fetch fresh data from SAP
                     this.renderGrid();
                 }
@@ -983,7 +983,7 @@ Examples:
             function handleGridFilter(entitySet, column, value) {
                 if (window.sapDataGrid) {
                     // Implement filtering logic
-                    console.log('Filtering', column, 'by', value);
+                    this.logger.debug('Filtering', column, 'by', value);
                 }
             }
 

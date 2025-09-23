@@ -1,6 +1,11 @@
 # 📐 Architecture Documentation: Tool Sequence Diagrams
 
+> **🎨 For modern, interactive diagrams see [Modern Architecture Diagrams](./MODERN-ARCHITECTURE-DIAGRAMS.md)**
+
+![Architecture](https://img.shields.io/badge/Architecture-Microservices-blue) ![Documentation](https://img.shields.io/badge/Docs-Interactive-green) ![Status](https://img.shields.io/badge/Status-Updated-brightgreen)
+
 ## Table of Contents
+
 1. [System Overview](#system-overview)
 2. [Core SAP Tools](#core-sap-tools)
 3. [UI Tools](#ui-tools)
@@ -34,31 +39,45 @@ The SAP OData MCP Server implements a hierarchical tool architecture with 17 int
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant MCP Client
-    participant sap-smart-query
-    participant check-sap-authentication
-    participant MCPAuthManager
-    participant TokenStore
-    participant SAP BTP XSUAA
-
-    User->>MCP Client: "Authenticate to SAP"
-    MCP Client->>sap-smart-query: Route request
-    sap-smart-query->>check-sap-authentication: Direct to auth tool
-
-    alt No Session ID Provided
-        check-sap-authentication->>User: Return auth_url
-        User->>SAP BTP XSUAA: Visit auth URL
-        SAP BTP XSUAA->>User: Return session_id
-        User->>check-sap-authentication: Provide session_id
+    box rgba(129, 199, 132, 0.1) 👤 Client Layer
+        participant User as 👨‍💻 User
+        participant MCP as 💻 MCP Client
     end
 
-    check-sap-authentication->>MCPAuthManager: Validate session
-    MCPAuthManager->>TokenStore: Store token
-    MCPAuthManager->>SAP BTP XSUAA: Validate JWT
-    SAP BTP XSUAA-->>MCPAuthManager: Token valid + scopes
-    MCPAuthManager-->>check-sap-authentication: Auth successful
-    check-sap-authentication-->>User: ✅ Authenticated + available tools
+    box rgba(33, 150, 243, 0.1) 🎯 Smart Router
+        participant Router as 🎯 sap-smart-query
+        participant Auth as 🔑 check-sap-authentication
+    end
+
+    box rgba(255, 152, 0, 0.1) 🛡️ Security Layer
+        participant Manager as 🔐 MCPAuthManager
+        participant Store as 💾 TokenStore
+    end
+
+    box rgba(76, 175, 80, 0.1) ☁️ SAP BTP
+        participant XSUAA as 🌐 SAP BTP XSUAA
+    end
+
+    User->>+MCP: 🔐 "Authenticate to SAP"
+    MCP->>+Router: 📡 Route authentication request
+    Router->>+Auth: 🎯 Direct to auth tool
+
+    rect rgba(255, 235, 59, 0.1)
+        Note over Auth,User: 🔐 Authentication Flow
+        Auth->>User: 🌐 Return auth_url
+        User->>XSUAA: 🖱️ Visit auth URL in browser
+        XSUAA->>User: ✅ Return session_id
+        User->>Auth: 🎫 Provide session_id
+    end
+
+    Auth->>+Manager: 🔍 Validate session
+    Manager->>Store: 💾 Store secure token
+    Manager->>XSUAA: ✅ Validate JWT + scopes
+    XSUAA-->>Manager: 🎯 Token valid + permissions
+    Manager-->>-Auth: ✅ Authentication successful
+    Auth-->>-Router: 🛠️ Return available tools
+    Router-->>-MCP: 📊 Tool capabilities
+    MCP-->>-User: ✨ Ready for SAP operations
 ```
 
 ### 2. search-sap-services

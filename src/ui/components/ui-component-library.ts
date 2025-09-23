@@ -313,7 +313,7 @@ export class UIComponentLibrary {
 
                 init() {
                     this.setupRefresh();
-                    console.log('SAP Dashboard initialized');
+                    this.logger.debug('SAP Dashboard initialized');
                 }
 
                 setupRefresh() {
@@ -325,7 +325,7 @@ export class UIComponentLibrary {
                 }
 
                 refreshData() {
-                    console.log('Refreshing dashboard data...');
+                    this.logger.debug('Refreshing dashboard data...');
                     // Implement data refresh logic
                 }
             }
@@ -353,7 +353,7 @@ export class UIComponentLibrary {
 
                 init() {
                     this.renderCurrentStep();
-                    console.log('SAP Workflow initialized with ${config.steps.length} steps');
+                    this.logger.debug('SAP Workflow initialized with ${config.steps.length} steps');
                 }
 
                 nextStep() {
@@ -372,7 +372,7 @@ export class UIComponentLibrary {
 
                 renderCurrentStep() {
                     const step = this.steps[this.currentStep];
-                    console.log('Rendering step:', step.name);
+                    this.logger.debug('Rendering step:', step.name);
                     // Implement step rendering logic
                 }
 

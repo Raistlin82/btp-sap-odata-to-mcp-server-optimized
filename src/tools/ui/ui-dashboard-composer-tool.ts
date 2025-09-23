@@ -1004,7 +1004,7 @@ Examples:
                     this.initializeWidgets();
                     this.setupRefreshTimer();
                     this.setupEventHandlers();
-                    console.log('SAP Dashboard Manager initialized:', this.config.title);
+                    this.logger.debug('SAP Dashboard Manager initialized:', this.config.title);
                 }
 
                 setupDashboard() {
@@ -1229,14 +1229,14 @@ Examples:
                 }
 
                 refreshAll() {
-                    console.log('Refreshing all dashboard widgets...');
+                    this.logger.debug('Refreshing all dashboard widgets...');
                     this.widgets.forEach((widget, id) => {
                         this.refreshWidget(id);
                     });
                 }
 
                 refreshWidget(widgetId) {
-                    console.log(\`Refreshing widget: \${widgetId}\`);
+                    this.logger.debug('Refreshing widget', { widgetId });
                     // In a real implementation, this would fetch fresh data
                     const widget = this.widgets.get(widgetId);
                     if (widget && widget.type === 'chart') {
@@ -1253,19 +1253,19 @@ Examples:
 
                 applyFilter(field, value) {
                     this.filters.set(field, value);
-                    console.log(\`Filter applied: \${field} = \${value}\`);
+                    this.logger.debug('Filter applied', { field, value });
                     // In a real implementation, this would filter all widgets
                     this.refreshAll();
                 }
 
                 exportDashboard(format = 'pdf') {
-                    console.log(\`Exporting dashboard as \${format}...\`);
+                    this.logger.debug('Exporting dashboard', { format });
                     // In a real implementation, this would generate exports
                     alert(\`Dashboard export (\${format}) functionality would be implemented here\`);
                 }
 
                 exportWidget(widgetId) {
-                    console.log(\`Exporting widget: \${widgetId}\`);
+                    this.logger.debug('Exporting widget', { widgetId });
                     // In a real implementation, this would export the specific widget
                 }
 

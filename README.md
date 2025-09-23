@@ -103,6 +103,7 @@ Main navigation center with use-case-based guidance and complete file index.
 |----------|----------|-------------|
 | **Getting Started** | [Configuration Guide](./docs/CONFIGURATION.md) | Environment setup, OData discovery, CF deployment |
 | **Architecture** | [Architecture Overview](./docs/ARCHITECTURE.md) | System design, security model, tool hierarchy |
+| **🎨 Modern Diagrams** | [Modern Architecture Diagrams](./docs/MODERN-ARCHITECTURE-DIAGRAMS.md) | **NEW!** Interactive visual architecture |
 | **Usage** | [User Guide](./docs/USER_GUIDE.md) | Authentication, tool usage, workflow examples |
 | **Reference** | [Tool Reference](./docs/TOOL_REFERENCE.md) | Complete tool documentation with parameters |
 | **Deployment** | [Deployment Guide](./docs/DEPLOYMENT.md) | SAP BTP and local development setup |

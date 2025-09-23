@@ -954,7 +954,7 @@ Examples:
                     this.renderWorkflow();
                     this.setupEventHandlers();
                     this.trackAnalytics('workflow_started');
-                    console.log('SAP Workflow Engine initialized:', this.config.title);
+                    this.logger.debug('SAP Workflow Engine initialized:', this.config.title);
                 }
 
                 loadWorkflowState() {
@@ -1477,7 +1477,7 @@ Examples:
                             step: this.currentStep,
                             data
                         });
-                        console.log('Analytics:', event, data);
+                        this.logger.debug('Analytics:', event, data);
                     }
                 }
 

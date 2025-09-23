@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/logger.js';
 import { z } from 'zod';
 import { MCPToolHandler } from '../../types/mcp-types.js';
 import { UIRenderingEngine } from '../../ui/engines/ui-rendering-engine.js';
@@ -43,6 +44,8 @@ const InputSchema = z.object({
 });
 
 export class UIReportBuilderTool implements MCPToolHandler {
+    private logger = new Logger('UiReportBuilderTool');
+
   name = 'ui-report-builder';
   description = 'Creates comprehensive drill-down reports with analytical capabilities and export options';
   inputSchema = InputSchema;
@@ -711,7 +714,7 @@ export class UIReportBuilderTool implements MCPToolHandler {
                 updateAnalytics();
 
             } catch (error) {
-                console.error('Error loading data:', error);
+                this.logger.error('Error loading data:', { error: error });
                 showError('Failed to load report data');
             }
         }
@@ -1085,7 +1088,7 @@ export class UIReportBuilderTool implements MCPToolHandler {
             // Group by functionality
             if (groupBy) {
                 // Implement grouping logic here
-                console.log('Grouping by:', groupBy);
+                this.logger.debug('Grouping by:', groupBy);
             }
 
             currentPage = 1;
@@ -1331,7 +1334,7 @@ export class UIReportBuilderTool implements MCPToolHandler {
 
             try {
                 // Here you would call your scheduling API
-                console.log('Scheduling report:', { frequency, recipients });
+                this.logger.debug('Scheduling report:', { frequency, recipients });
                 showMessage(\`Report scheduled \${frequency} for \${recipients}\`, 'success');
                 hideScheduleModal();
             } catch (error) {

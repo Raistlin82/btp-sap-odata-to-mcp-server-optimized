@@ -508,7 +508,7 @@ Examples:
                 init() {
                     this.setupValidation();
                     this.setupEventHandlers();
-                    console.log('SAP Form Handler initialized for', this.entityType, this.operation);
+                    this.logger.debug('SAP Form Handler initialized for', this.entityType, this.operation);
                 }
 
                 setupValidation() {
@@ -613,7 +613,7 @@ Examples:
                 }
 
                 submitForm(data) {
-                    console.log('Submitting form data:', data);
+                    this.logger.debug('Submitting form data:', data);
                     // Implement actual form submission to SAP backend
                     alert('Form submitted successfully!');
                 }

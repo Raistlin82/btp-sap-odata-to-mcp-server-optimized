@@ -315,7 +315,7 @@ export class UIRenderingEngine {
             // Layout initialization
             document.addEventListener('DOMContentLoaded', function() {
                 // Initialize layout-specific functionality
-                console.log('Layout ${layout.type} initialized');
+                this.logger.debug('Layout ${layout.type} initialized');
             });
         `;
 
