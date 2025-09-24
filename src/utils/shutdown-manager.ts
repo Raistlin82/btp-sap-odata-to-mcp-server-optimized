@@ -67,23 +67,27 @@ export class ShutdownManager {
     });
 
     // Handle uncaught exceptions
-    process.on('uncaughtException', (error) => {
+    process.on('uncaughtException', error => {
       this.logger.error('Uncaught exception:', error);
-      this.shutdown('uncaughtException').catch(shutdownError => {
-        this.logger.error('Error during exception shutdown:', shutdownError);
-      }).finally(() => {
-        process.exit(1);
-      });
+      this.shutdown('uncaughtException')
+        .catch(shutdownError => {
+          this.logger.error('Error during exception shutdown:', shutdownError);
+        })
+        .finally(() => {
+          process.exit(1);
+        });
     });
 
     // Handle unhandled promise rejections
     process.on('unhandledRejection', (reason, promise) => {
       this.logger.error('Unhandled promise rejection:', { reason, promise });
-      this.shutdown('unhandledRejection').catch(shutdownError => {
-        this.logger.error('Error during rejection shutdown:', shutdownError);
-      }).finally(() => {
-        process.exit(1);
-      });
+      this.shutdown('unhandledRejection')
+        .catch(shutdownError => {
+          this.logger.error('Error during rejection shutdown:', shutdownError);
+        })
+        .finally(() => {
+          process.exit(1);
+        });
     });
   }
 
@@ -138,13 +142,13 @@ export class ShutdownManager {
       process.exit(0);
     } catch (error) {
       this.logger.error('Error during graceful shutdown:', error);
-      
+
       // Clear the timeout
       if (this.shutdownTimeout) {
         clearTimeout(this.shutdownTimeout);
         this.shutdownTimeout = null;
       }
-      
+
       process.exit(1);
     }
   }

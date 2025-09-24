@@ -6,7 +6,7 @@
 import { ISessionManager, Session } from './interfaces/session-manager.interface.js';
 import { UserInfo } from './interfaces/auth-provider.interface.js';
 import { Logger } from '../utils/logger.js';
-import { Messages } from '../i18n/messages.js';
+// Removed unused Messages import
 import { randomUUID } from 'crypto';
 
 export interface MCPSession {
@@ -56,7 +56,7 @@ export class SecureSessionBridge {
         server,
         transport,
         createdAt: new Date(),
-        metadata
+        metadata,
       };
 
       this.mcpSessions.set(sessionId, mcpSession);
@@ -71,10 +71,7 @@ export class SecureSessionBridge {
   /**
    * Associate MCP session with user session (secure)
    */
-  async associateMCPSessionWithUser(
-    mcpSessionId: string,
-    userSessionId: string
-  ): Promise<void> {
+  async associateMCPSessionWithUser(mcpSessionId: string, userSessionId: string): Promise<void> {
     // Verify user session exists
     const userSession = await this.sessionManager.get(userSessionId);
     if (!userSession) {
@@ -112,7 +109,7 @@ export class SecureSessionBridge {
 
       this.logger.info(
         `MCP session ${mcpSessionId} associated with user session ${userSessionId} ` +
-        `(user: ${userSession.userInfo.id})`
+          `(user: ${userSession.userInfo.id})`
       );
     } finally {
       this.releaseLock(mcpSessionId);
@@ -204,7 +201,7 @@ export class SecureSessionBridge {
         if (!mostRecentSession || mcpSession.createdAt > mostRecentSession.createdAt) {
           mostRecentSession = {
             userSessionId: mcpSession.userSessionId,
-            createdAt: mcpSession.createdAt
+            createdAt: mcpSession.createdAt,
           };
         }
       }
@@ -303,7 +300,7 @@ export class SecureSessionBridge {
 
     this.logger.info(
       `Invalidated user session ${userSessionId} and ${mcpSessions.length} MCP sessions` +
-      (reason ? ` (${reason})` : '')
+        (reason ? ` (${reason})` : '')
     );
   }
 
@@ -325,7 +322,7 @@ export class SecureSessionBridge {
       totalMcpSessions,
       associatedMcpSessions,
       unassociatedMcpSessions,
-      uniqueUsers
+      uniqueUsers,
     };
   }
 
@@ -358,7 +355,7 @@ export class SecureSessionBridge {
     }
 
     let releaseLock: () => void;
-    const lockPromise = new Promise<void>((resolve) => {
+    const lockPromise = new Promise<void>(resolve => {
       releaseLock = resolve;
     });
 
@@ -383,7 +380,7 @@ export class SecureSessionBridge {
   private startAutoCleanup(): void {
     // Cleanup every 10 minutes
     this.cleanupInterval = setInterval(() => {
-      this.cleanup().catch((error) => {
+      this.cleanup().catch(error => {
         this.logger.error('Session bridge cleanup failed:', error);
       });
     }, 600000);

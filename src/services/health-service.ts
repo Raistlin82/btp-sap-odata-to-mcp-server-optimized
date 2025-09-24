@@ -57,7 +57,7 @@ export class HealthService {
    */
   async livenessProbe(): Promise<HealthCheckResult> {
     const startTime = Date.now();
-    
+
     try {
       // Basic application liveness - can we respond to requests?
       const memoryUsage = process.memoryUsage();
@@ -65,14 +65,14 @@ export class HealthService {
 
       // Check if memory usage is critically high (>90% of max heap)
       const heapUsedPercent = (memoryUsage.heapUsed / memoryUsage.heapTotal) * 100;
-      
+
       if (heapUsedPercent > 90) {
         return {
           status: 'unhealthy',
           timestamp: new Date().toISOString(),
           duration: Date.now() - startTime,
           error: `Critical memory usage: ${heapUsedPercent.toFixed(1)}%`,
-          details: { memoryUsage, uptime }
+          details: { memoryUsage, uptime },
         };
       }
 
@@ -80,21 +80,21 @@ export class HealthService {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        details: { 
+        details: {
           uptime,
           memoryUsage: {
             heapUsed: `${(memoryUsage.heapUsed / 1024 / 1024).toFixed(1)}MB`,
             heapTotal: `${(memoryUsage.heapTotal / 1024 / 1024).toFixed(1)}MB`,
-            heapUsedPercent: `${heapUsedPercent.toFixed(1)}%`
-          }
-        }
+            heapUsedPercent: `${heapUsedPercent.toFixed(1)}%`,
+          },
+        },
       };
     } catch (error) {
       return {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -105,21 +105,23 @@ export class HealthService {
    */
   async readinessProbe(): Promise<HealthCheckResult> {
     const startTime = Date.now();
-    
+
     try {
       const checks = await Promise.allSettled([
         this.checkDestinationService(),
         this.checkAuthenticationService(),
-        this.checkTokenStore()
+        this.checkTokenStore(),
       ]);
 
       const failedChecks = checks.filter((check, index) => {
-        return check.status === 'rejected' || 
-               (check.status === 'fulfilled' && check.value.status === 'unhealthy');
+        return (
+          check.status === 'rejected' ||
+          (check.status === 'fulfilled' && check.value.status === 'unhealthy')
+        );
       });
 
-      const status = failedChecks.length === 0 ? 'healthy' : 
-                    failedChecks.length <= 1 ? 'degraded' : 'unhealthy';
+      const status =
+        failedChecks.length === 0 ? 'healthy' : failedChecks.length <= 1 ? 'degraded' : 'unhealthy';
 
       return {
         status,
@@ -128,15 +130,15 @@ export class HealthService {
         details: {
           totalChecks: checks.length,
           failedChecks: failedChecks.length,
-          checkedComponents: ['destination', 'authentication', 'tokenStore']
-        }
+          checkedComponents: ['destination', 'authentication', 'tokenStore'],
+        },
       };
     } catch (error) {
       return {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -146,41 +148,57 @@ export class HealthService {
    */
   async deepHealthCheck(): Promise<SystemHealth> {
     const startTime = Date.now();
-    
+
     const checks: Record<string, HealthCheckResult> = {};
 
     // Run all health checks in parallel
-    const [
-      liveness,
-      destination,
-      auth,
-      tokenStore,
-      cloudLogging,
-      memory,
-      vcap
-    ] = await Promise.allSettled([
-      this.livenessProbe(),
-      this.checkDestinationService(),
-      this.checkAuthenticationService(),
-      this.checkTokenStore(),
-      this.checkCloudLogging(),
-      this.checkMemoryUsage(),
-      this.checkVCAPServices()
-    ]);
+    const [liveness, destination, auth, tokenStore, cloudLogging, memory, vcap] =
+      await Promise.allSettled([
+        this.livenessProbe(),
+        this.checkDestinationService(),
+        this.checkAuthenticationService(),
+        this.checkTokenStore(),
+        this.checkCloudLogging(),
+        this.checkMemoryUsage(),
+        this.checkVCAPServices(),
+      ]);
 
     // Collect results
-    checks.liveness = liveness.status === 'fulfilled' ? liveness.value : this.createErrorResult('liveness', liveness.reason);
-    checks.destination = destination.status === 'fulfilled' ? destination.value : this.createErrorResult('destination', destination.reason);
-    checks.authentication = auth.status === 'fulfilled' ? auth.value : this.createErrorResult('authentication', auth.reason);
-    checks.tokenStore = tokenStore.status === 'fulfilled' ? tokenStore.value : this.createErrorResult('tokenStore', tokenStore.reason);
-    checks.cloudLogging = cloudLogging.status === 'fulfilled' ? cloudLogging.value : this.createErrorResult('cloudLogging', cloudLogging.reason);
-    checks.memory = memory.status === 'fulfilled' ? memory.value : this.createErrorResult('memory', memory.reason);
-    checks.vcapServices = vcap.status === 'fulfilled' ? vcap.value : this.createErrorResult('vcapServices', vcap.reason);
+    checks.liveness =
+      liveness.status === 'fulfilled'
+        ? liveness.value
+        : this.createErrorResult('liveness', liveness.reason);
+    checks.destination =
+      destination.status === 'fulfilled'
+        ? destination.value
+        : this.createErrorResult('destination', destination.reason);
+    checks.authentication =
+      auth.status === 'fulfilled'
+        ? auth.value
+        : this.createErrorResult('authentication', auth.reason);
+    checks.tokenStore =
+      tokenStore.status === 'fulfilled'
+        ? tokenStore.value
+        : this.createErrorResult('tokenStore', tokenStore.reason);
+    checks.cloudLogging =
+      cloudLogging.status === 'fulfilled'
+        ? cloudLogging.value
+        : this.createErrorResult('cloudLogging', cloudLogging.reason);
+    checks.memory =
+      memory.status === 'fulfilled'
+        ? memory.value
+        : this.createErrorResult('memory', memory.reason);
+    checks.vcapServices =
+      vcap.status === 'fulfilled'
+        ? vcap.value
+        : this.createErrorResult('vcapServices', vcap.reason);
 
     // Determine overall health
     const healthyCount = Object.values(checks).filter(check => check.status === 'healthy').length;
     const degradedCount = Object.values(checks).filter(check => check.status === 'degraded').length;
-    const unhealthyCount = Object.values(checks).filter(check => check.status === 'unhealthy').length;
+    const unhealthyCount = Object.values(checks).filter(
+      check => check.status === 'unhealthy'
+    ).length;
 
     let overall: 'healthy' | 'degraded' | 'unhealthy';
     if (unhealthyCount > 0) {
@@ -192,10 +210,15 @@ export class HealthService {
     }
 
     // Log health check results
-    this.cloudLogging?.logHealthEvent('system', overall, `Health check completed: ${healthyCount} healthy, ${degradedCount} degraded, ${unhealthyCount} unhealthy`, {
-      duration: Date.now() - startTime,
-      checkCount: Object.keys(checks).length
-    });
+    this.cloudLogging?.logHealthEvent(
+      'system',
+      overall,
+      `Health check completed: ${healthyCount} healthy, ${degradedCount} degraded, ${unhealthyCount} unhealthy`,
+      {
+        duration: Date.now() - startTime,
+        checkCount: Object.keys(checks).length,
+      }
+    );
 
     return {
       overall,
@@ -203,7 +226,7 @@ export class HealthService {
       version: process.env.npm_package_version || '1.0.0',
       uptime: Date.now() - this.startTime,
       checks,
-      environment: this.getEnvironmentInfo()
+      environment: this.getEnvironmentInfo(),
     };
   }
 
@@ -212,13 +235,13 @@ export class HealthService {
    */
   private async checkDestinationService(): Promise<HealthCheckResult> {
     const startTime = Date.now();
-    
+
     if (!this.destinationService) {
       return {
         status: 'degraded',
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        details: { message: 'Destination service not initialized' }
+        details: { message: 'Destination service not initialized' },
       };
     }
 
@@ -226,7 +249,7 @@ export class HealthService {
       // Test both design-time and runtime destinations
       const [designTimeTest, runtimeTest] = await Promise.allSettled([
         this.destinationService.testDestination('design-time'),
-        this.destinationService.testDestination('runtime')
+        this.destinationService.testDestination('runtime'),
       ]);
 
       const designTimeOk = designTimeTest.status === 'fulfilled' && designTimeTest.value.available;
@@ -248,16 +271,18 @@ export class HealthService {
         details: {
           designTime: designTimeOk,
           runtime: runtimeOk,
-          designTimeError: designTimeTest.status === 'fulfilled' ? designTimeTest.value.error : 'Test failed',
-          runtimeError: runtimeTest.status === 'fulfilled' ? runtimeTest.value.error : 'Test failed'
-        }
+          designTimeError:
+            designTimeTest.status === 'fulfilled' ? designTimeTest.value.error : 'Test failed',
+          runtimeError:
+            runtimeTest.status === 'fulfilled' ? runtimeTest.value.error : 'Test failed',
+        },
       };
     } catch (error) {
       return {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -267,34 +292,34 @@ export class HealthService {
    */
   private async checkAuthenticationService(): Promise<HealthCheckResult> {
     const startTime = Date.now();
-    
+
     if (!this.authService) {
       return {
         status: 'degraded',
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        details: { message: 'Authentication service not initialized' }
+        details: { message: 'Authentication service not initialized' },
       };
     }
 
     try {
       const isConfigured = this.authService.isProperlyConfigured();
-      
+
       return {
         status: isConfigured ? 'healthy' : 'degraded',
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        details: { 
+        details: {
           configured: isConfigured,
-          hasCredentials: !!(process.env.SAP_IAS_CLIENT_ID && process.env.SAP_IAS_CLIENT_SECRET)
-        }
+          hasCredentials: !!(process.env.SAP_IAS_CLIENT_ID && process.env.SAP_IAS_CLIENT_SECRET),
+        },
       };
     } catch (error) {
       return {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -304,22 +329,22 @@ export class HealthService {
    */
   private async checkTokenStore(): Promise<HealthCheckResult> {
     const startTime = Date.now();
-    
+
     if (!this.tokenStore) {
       return {
         status: 'degraded',
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        details: { message: 'Token store not initialized' }
+        details: { message: 'Token store not initialized' },
       };
     }
 
     try {
       const stats = await this.tokenStore.getStats();
-      
+
       // Consider unhealthy if too many expired sessions (indicates cleanup issues)
       const expiredRatio = stats.expiredSessions / (stats.totalSessions || 1);
-      
+
       let status: 'healthy' | 'degraded' | 'unhealthy';
       if (expiredRatio > 0.5) {
         status = 'unhealthy';
@@ -337,15 +362,15 @@ export class HealthService {
           totalSessions: stats.totalSessions,
           activeUsers: stats.activeUsers,
           expiredSessions: stats.expiredSessions,
-          expiredRatio: `${(expiredRatio * 100).toFixed(1)}%`
-        }
+          expiredRatio: `${(expiredRatio * 100).toFixed(1)}%`,
+        },
       };
     } catch (error) {
       return {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -355,31 +380,31 @@ export class HealthService {
    */
   private async checkCloudLogging(): Promise<HealthCheckResult> {
     const startTime = Date.now();
-    
+
     if (!this.cloudLogging) {
       return {
         status: 'degraded',
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        details: { message: 'Cloud logging not initialized' }
+        details: { message: 'Cloud logging not initialized' },
       };
     }
 
     try {
       const status = this.cloudLogging.getStatus();
-      
+
       return {
         status: status.cloudLoggingAvailable ? 'healthy' : 'degraded',
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        details: status
+        details: status,
       };
     } catch (error) {
       return {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -389,11 +414,11 @@ export class HealthService {
    */
   private async checkMemoryUsage(): Promise<HealthCheckResult> {
     const startTime = Date.now();
-    
+
     try {
       const memoryUsage = process.memoryUsage();
       const heapUsedPercent = (memoryUsage.heapUsed / memoryUsage.heapTotal) * 100;
-      
+
       let status: 'healthy' | 'degraded' | 'unhealthy';
       if (heapUsedPercent > 90) {
         status = 'unhealthy';
@@ -412,15 +437,15 @@ export class HealthService {
           heapTotal: `${(memoryUsage.heapTotal / 1024 / 1024).toFixed(1)}MB`,
           heapUsedPercent: `${heapUsedPercent.toFixed(1)}%`,
           rss: `${(memoryUsage.rss / 1024 / 1024).toFixed(1)}MB`,
-          external: `${(memoryUsage.external / 1024 / 1024).toFixed(1)}MB`
-        }
+          external: `${(memoryUsage.external / 1024 / 1024).toFixed(1)}MB`,
+        },
       };
     } catch (error) {
       return {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -430,17 +455,19 @@ export class HealthService {
    */
   private async checkVCAPServices(): Promise<HealthCheckResult> {
     const startTime = Date.now();
-    
+
     try {
       const vcapServices = process.env.VCAP_SERVICES ? JSON.parse(process.env.VCAP_SERVICES) : {};
-      const vcapApplication = process.env.VCAP_APPLICATION ? JSON.parse(process.env.VCAP_APPLICATION) : {};
-      
+      const vcapApplication = process.env.VCAP_APPLICATION
+        ? JSON.parse(process.env.VCAP_APPLICATION)
+        : {};
+
       const hasDestination = !!(vcapServices.destination || vcapServices['destination']);
       const hasXSUAA = !!(vcapServices.xsuaa || vcapServices['authorization']);
       const hasConnectivity = !!(vcapServices.connectivity || vcapServices['connectivity']);
-      
+
       const serviceCount = Object.keys(vcapServices).length;
-      
+
       let status: 'healthy' | 'degraded' | 'unhealthy';
       if (hasDestination && hasXSUAA) {
         status = 'healthy';
@@ -461,15 +488,15 @@ export class HealthService {
           hasConnectivity,
           applicationName: vcapApplication.application_name,
           spaceId: vcapApplication.space_id,
-          instanceIndex: vcapApplication.instance_index
-        }
+          instanceIndex: vcapApplication.instance_index,
+        },
       };
     } catch (error) {
       return {
         status: 'degraded',
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        details: { message: 'VCAP services not available (local development)' }
+        details: { message: 'VCAP services not available (local development)' },
       };
     }
   }
@@ -479,17 +506,19 @@ export class HealthService {
    */
   private getEnvironmentInfo(): SystemHealth['environment'] {
     try {
-      const vcapApplication = process.env.VCAP_APPLICATION ? JSON.parse(process.env.VCAP_APPLICATION) : {};
-      
+      const vcapApplication = process.env.VCAP_APPLICATION
+        ? JSON.parse(process.env.VCAP_APPLICATION)
+        : {};
+
       return {
         nodeEnv: process.env.NODE_ENV || 'development',
         region: vcapApplication.cf_api?.split('.')[1],
         space: vcapApplication.space_name,
-        organization: vcapApplication.organization_name
+        organization: vcapApplication.organization_name,
       };
     } catch {
       return {
-        nodeEnv: process.env.NODE_ENV || 'development'
+        nodeEnv: process.env.NODE_ENV || 'development',
       };
     }
   }
@@ -502,7 +531,7 @@ export class HealthService {
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
       duration: 0,
-      error: error instanceof Error ? error.message : `${component} check failed`
+      error: error instanceof Error ? error.message : `${component} check failed`,
     };
   }
 }

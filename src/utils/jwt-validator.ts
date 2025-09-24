@@ -25,20 +25,20 @@ export class JWTValidator {
 
   constructor(logger?: Logger) {
     this.logger = logger || new Logger('JWTValidator');
-    
+
     // Load XSUAA credentials for JWT validation
     try {
-      const services = xsenv.getServices({ 
+      const services = xsenv.getServices({
         xsuaa: { label: 'xsuaa' },
-        identity: { label: 'identity' }
+        identity: { label: 'identity' },
       });
       this.xsuaaCredentials = services.xsuaa;
       this.identityCredentials = services.identity;
-      
+
       if (!this.xsuaaCredentials) {
         this.logger.warn('XSUAA service not configured - JWT validation will be limited');
       }
-      
+
       if (this.identityCredentials) {
         this.logger.info('Identity service (IAS) found - enabling direct IAS token validation');
       }
@@ -55,17 +55,17 @@ export class JWTValidator {
     try {
       // Remove Bearer prefix if present
       const cleanToken = token.replace(/^Bearer\s+/i, '');
-      
+
       // First try to determine token type by examining the issuer
       const tokenType = await this.determineTokenType(cleanToken);
       this.logger.debug(`Detected token type: ${tokenType}`);
-      
+
       if (tokenType === 'IAS' && this.identityCredentials) {
         return await this.validateIASToken(cleanToken);
       } else if (tokenType === 'XSUAA' && this.xsuaaCredentials) {
         return await this.validateXSUAAToken(cleanToken);
       }
-      
+
       // Fallback: try XSUAA first, then IAS
       if (this.xsuaaCredentials) {
         try {
@@ -80,18 +80,17 @@ export class JWTValidator {
       } else if (this.identityCredentials) {
         return await this.validateIASToken(cleanToken);
       }
-      
+
       return {
         valid: false,
-        error: 'No authentication services configured - cannot validate JWT signature'
+        error: 'No authentication services configured - cannot validate JWT signature',
       };
-
     } catch (error) {
       this.logger.debug('JWT validation failed:', error);
-      
+
       const errorMessage = error instanceof Error ? error.message : String(error);
       let errorType = 'VALIDATION_FAILED';
-      
+
       if (errorMessage.includes('expired')) {
         errorType = 'TOKEN_EXPIRED';
       } else if (errorMessage.includes('signature')) {
@@ -104,7 +103,7 @@ export class JWTValidator {
 
       return {
         valid: false,
-        error: `${errorType}: ${errorMessage}`
+        error: `${errorType}: ${errorMessage}`,
       };
     }
   }
@@ -116,22 +115,22 @@ export class JWTValidator {
     try {
       const parts = token.split('.');
       if (parts.length !== 3) return 'UNKNOWN';
-      
+
       const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
       const issuer = payload.iss;
-      
+
       if (!issuer) return 'UNKNOWN';
-      
+
       // IAS tokens typically have issuer like: https://afhdupfoc.accounts.ondemand.com
       if (issuer.includes('accounts.ondemand.com') || issuer.includes('accounts.cloud.sap')) {
         return 'IAS';
       }
-      
+
       // XSUAA tokens typically have issuer like: https://burrata-noprod-8cs9fy8w.authentication.eu30.hana.ondemand.com
       if (issuer.includes('authentication.') && issuer.includes('hana.ondemand.com')) {
         return 'XSUAA';
       }
-      
+
       return 'UNKNOWN';
     } catch (error) {
       this.logger.debug('Failed to determine token type:', error);
@@ -158,7 +157,7 @@ export class JWTValidator {
 
     this.logger.debug('XSUAA token validated successfully', {
       user: tokenInfo.getLogonName(),
-      scopes: grantedScopes
+      scopes: grantedScopes,
     });
 
     return {
@@ -169,14 +168,14 @@ export class JWTValidator {
         givenName: tokenInfo.getGivenName(),
         familyName: tokenInfo.getFamilyName(),
         tenant: tokenInfo.getIdentityZone(),
-        scopes: grantedScopes
+        scopes: grantedScopes,
       },
       userInfo: {
         sub: tokenInfo.getLogonName(),
         email: tokenInfo.getEmail(),
         name: `${tokenInfo.getGivenName()} ${tokenInfo.getFamilyName()}`.trim(),
-        scopes: grantedScopes
-      }
+        scopes: grantedScopes,
+      },
     };
   }
 
@@ -193,7 +192,7 @@ export class JWTValidator {
     // Parse token payload
     const parts = token.split('.');
     const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-    
+
     // Verify issuer matches our IAS domain
     const expectedIssuer = this.identityCredentials.url;
     if (payload.iss !== expectedIssuer) {
@@ -204,14 +203,14 @@ export class JWTValidator {
     const groups = payload.groups || [];
     const email = payload.email || payload.preferred_username;
     const name = payload.name || `${payload.given_name || ''} ${payload.family_name || ''}`.trim();
-    
+
     // Map IAS groups to application scopes
     const mappedScopes = this.mapGroupsToScopes(groups);
-    
+
     this.logger.info('IAS token validated successfully', {
       user: email,
       groups: groups,
-      mappedScopes: mappedScopes
+      mappedScopes: mappedScopes,
     });
 
     return {
@@ -223,14 +222,14 @@ export class JWTValidator {
         familyName: payload.family_name,
         tenant: payload.zone_uuid || 'default',
         scopes: mappedScopes,
-        groups: groups
+        groups: groups,
       },
       userInfo: {
         sub: payload.sub,
         email: email,
         name: name,
-        scopes: mappedScopes
-      }
+        scopes: mappedScopes,
+      },
     };
   }
 
@@ -238,12 +237,18 @@ export class JWTValidator {
    * Map IAS groups to application scopes based on role collection configuration
    */
   private mapGroupsToScopes(groups: string[]): string[] {
-    const xsappname = this.xsuaaCredentials?.xsappname || process.env.XSUAA_XSAPPNAME || 'btp-sap-odata-to-mcp-server';
+    const xsappname =
+      this.xsuaaCredentials?.xsappname ||
+      process.env.XSUAA_XSAPPNAME ||
+      'btp-sap-odata-to-mcp-server';
     const scopes: string[] = [];
 
     // Map role collections to scopes based on xs-security.json configuration
     // Role collections can be configured via ROLE_COLLECTIONS environment variable
-    const roleCollections = (process.env.ROLE_COLLECTIONS || 'MCPAdministrator,MCPUser,MCPManager,MCPViewer,MCPUIUser,MCPUIAnalyst,MCPUIDesigner').split(',');
+    const roleCollections = (
+      process.env.ROLE_COLLECTIONS ||
+      'MCPAdministrator,MCPUser,MCPManager,MCPViewer,MCPUIUser,MCPUIAnalyst,MCPUIDesigner'
+    ).split(',');
 
     for (const group of groups) {
       switch (group) {
@@ -316,7 +321,7 @@ export class JWTValidator {
   async quickValidate(token: string): Promise<{ valid: boolean; error?: string }> {
     try {
       const cleanToken = token.replace(/^Bearer\s+/i, '');
-      
+
       // Basic format check
       const parts = cleanToken.split('.');
       if (parts.length !== 3) {
@@ -338,11 +343,10 @@ export class JWTValidator {
       }
 
       return { valid: true };
-
     } catch (error) {
-      return { 
-        valid: false, 
-        error: `Token format validation failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      return {
+        valid: false,
+        error: `Token format validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
   }
@@ -353,18 +357,20 @@ export class JWTValidator {
    * Always use validateJWT() for security decisions
    */
   extractClaimsUnsafe(token: string): any {
-    this.logger.warn('SECURITY WARNING: extractClaimsUnsafe() called - this should only be used for non-security operations');
-    
+    this.logger.warn(
+      'SECURITY WARNING: extractClaimsUnsafe() called - this should only be used for non-security operations'
+    );
+
     try {
       const cleanToken = token.replace(/^Bearer\s+/i, '');
       const parts = cleanToken.split('.');
-      
+
       if (parts.length !== 3) {
         throw new Error('Invalid JWT format');
       }
 
       const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-      
+
       // Return only safe, non-sensitive claims
       return {
         sub: payload.sub,

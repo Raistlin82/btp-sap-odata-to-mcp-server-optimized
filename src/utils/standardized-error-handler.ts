@@ -15,14 +15,14 @@ export enum ErrorType {
   MCP_PROTOCOL = 'MCP_PROTOCOL',
   CONFIGURATION = 'CONFIGURATION',
   SYSTEM = 'SYSTEM',
-  BUSINESS_LOGIC = 'BUSINESS_LOGIC'
+  BUSINESS_LOGIC = 'BUSINESS_LOGIC',
 }
 
 export enum ErrorSeverity {
   LOW = 'LOW',
   MEDIUM = 'MEDIUM',
   HIGH = 'HIGH',
-  CRITICAL = 'CRITICAL'
+  CRITICAL = 'CRITICAL',
 }
 
 export interface ErrorContext {
@@ -105,7 +105,7 @@ export class StandardizedErrorHandler {
       severity: ErrorSeverity.MEDIUM,
       statusCode,
       context,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
@@ -125,7 +125,7 @@ export class StandardizedErrorHandler {
       statusCode: 400,
       details,
       context,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
@@ -141,7 +141,7 @@ export class StandardizedErrorHandler {
       return {
         ...error,
         context: { ...error.context, ...context },
-        requestId
+        requestId,
       };
     }
 
@@ -156,7 +156,7 @@ export class StandardizedErrorHandler {
         details: this.isProduction ? undefined : error.stack,
         context,
         timestamp,
-        requestId
+        requestId,
       };
     }
 
@@ -170,7 +170,7 @@ export class StandardizedErrorHandler {
         statusCode: 500,
         context,
         timestamp,
-        requestId
+        requestId,
       };
     }
 
@@ -184,7 +184,7 @@ export class StandardizedErrorHandler {
       details: this.isProduction ? undefined : JSON.stringify(error),
       context,
       timestamp,
-      requestId
+      requestId,
     };
   }
 
@@ -209,7 +209,7 @@ export class StandardizedErrorHandler {
       severity: error.severity,
       statusCode: error.statusCode,
       timestamp: error.timestamp,
-      requestId: error.requestId
+      requestId: error.requestId,
     };
 
     // Only include safe context fields in production
@@ -217,7 +217,7 @@ export class StandardizedErrorHandler {
       sanitized.context = {
         requestId: error.context.requestId,
         operation: error.context.operation,
-        timestamp: error.context.timestamp
+        timestamp: error.context.timestamp,
       };
     }
 
@@ -253,7 +253,7 @@ export class StandardizedErrorHandler {
       statusCode: error.statusCode,
       context: error.context,
       requestId: error.requestId,
-      details: error.details
+      details: error.details,
     };
 
     switch (logLevel) {
@@ -281,7 +281,7 @@ export class StandardizedErrorHandler {
       this.logger.error('CRITICAL ERROR - Monitoring notification needed', {
         code: error.code,
         message: error.message,
-        context: error.context
+        context: error.context,
       });
     }
   }
@@ -313,7 +313,7 @@ export class StandardizedErrorHandler {
       /password[=:]\\s*[^\\s]+/gi,
       /token[=:]\\s*[^\\s]+/gi,
       /secret[=:]\\s*[^\\s]+/gi,
-      /authorization[=:]\\s*[^\\s]+/gi
+      /authorization[=:]\\s*[^\\s]+/gi,
     ];
 
     let message = error.message;

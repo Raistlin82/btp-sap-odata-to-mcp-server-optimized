@@ -45,10 +45,12 @@ export interface MCPAuthResult {
         description: string;
         benefits: string[];
       };
-      quick_start?: string | {
-        browser: string;
-        curl: string;
-      };
+      quick_start?:
+        | string
+        | {
+            browser: string;
+            curl: string;
+          };
     };
   };
 }
@@ -75,11 +77,10 @@ export class MCPAuthManager {
    * Authenticate MCP tool call - checks multiple authentication sources
    */
   async authenticateToolCall(
-    toolName: string, 
-    args: any, 
+    toolName: string,
+    args: any,
     clientInfo?: any
   ): Promise<MCPAuthResult> {
-    
     // Check if this tool requires authentication
     if (!this.requiresAuth(toolName)) {
       return {
@@ -87,15 +88,19 @@ export class MCPAuthManager {
         context: {
           isAuthenticated: false,
           user: 'anonymous',
-          scopes: []
-        }
+          scopes: [],
+        },
       };
     }
 
     // For runtime operations (execute-entity-operation), try session ID first, then fallback to global auth
     if (this.isRuntimeOperation(toolName)) {
       // First try explicit session ID from arguments
-      const sessionId = (args.parameters?.session_id || args.parameters?.auth_session_id) || args?.session_id || args?.auth_session_id;
+      const sessionId =
+        args.parameters?.session_id ||
+        args.parameters?.auth_session_id ||
+        args?.session_id ||
+        args?.auth_session_id;
 
       let authResult: MCPAuthResult;
 
@@ -105,16 +110,22 @@ export class MCPAuthManager {
         if (authResult.authenticated) {
           return authResult;
         }
-        this.logger.warn(`Runtime operation ${toolName} failed authentication with provided Session ID: ${sessionId}`);
+        this.logger.warn(
+          `Runtime operation ${toolName} failed authentication with provided Session ID: ${sessionId}`
+        );
       }
 
       // Fallback to MCP session-based authentication (check if MCP session is associated with user session)
-      this.logger.debug(`Runtime operation ${toolName}: No explicit session ID provided, checking MCP session association`);
+      this.logger.debug(
+        `Runtime operation ${toolName}: No explicit session ID provided, checking MCP session association`
+      );
       authResult = await this.tryMCPSessionAuth(clientInfo);
 
       if (!authResult.authenticated) {
         // Final fallback to global authentication (set during OAuth flow)
-        this.logger.debug(`Runtime operation ${toolName}: No MCP session association found, trying global authentication`);
+        this.logger.debug(
+          `Runtime operation ${toolName}: No MCP session association found, trying global authentication`
+        );
         authResult = await this.tryGlobalAuth();
       }
 
@@ -134,23 +145,23 @@ export class MCPAuthManager {
           instructions: {
             step1: `1. Authenticate at: ${this.authServerUrl.replace('/auth', '')}/auth/`,
             step2: `2. Copy your Session ID from the success page`,
-            step3: `3. Include "session_id": "YOUR_SESSION_ID" in your MCP tool parameters`
-          }
-        }
+            step3: `3. Include "session_id": "YOUR_SESSION_ID" in your MCP tool parameters`,
+          },
+        },
       };
     }
 
     // For non-runtime operations, use fallback methods including clientId lookup
     let authResult = await this.trySessionAuthWithFallbacks(args, clientInfo);
-    
+
     if (!authResult.authenticated) {
       authResult = await this.tryGlobalAuth();
     }
-    
+
     if (!authResult.authenticated) {
       authResult = await this.tryConfigFileAuth();
     }
-    
+
     if (!authResult.authenticated) {
       authResult = await this.tryEnvironmentAuth();
     }
@@ -171,9 +182,9 @@ export class MCPAuthManager {
           instructions: {
             step1: `Visit: ${this.authServerUrl}/login`,
             step2: `Request access to scope: ${requiredScope}`,
-            step3: 'Re-authenticate with proper permissions'
-          }
-        }
+            step3: 'Re-authenticate with proper permissions',
+          },
+        },
       };
     }
 
@@ -207,17 +218,19 @@ export class MCPAuthManager {
               scopes: tokenData.scopes,
               isAuthenticated: true,
               clientInfo,
-              source: 'mcp_session_association'
-            }
+              source: 'mcp_session_association',
+            },
           };
         } else {
-          this.logger.warn(`Associated user session ${associatedUserSessionId} is invalid or expired`);
+          this.logger.warn(
+            `Associated user session ${associatedUserSessionId} is invalid or expired`
+          );
           return {
             authenticated: false,
             error: {
               code: 'ASSOCIATED_SESSION_EXPIRED',
-              message: 'Associated user session is invalid or expired'
-            }
+              message: 'Associated user session is invalid or expired',
+            },
           };
         }
       }
@@ -228,8 +241,8 @@ export class MCPAuthManager {
         authenticated: false,
         error: {
           code: 'MCP_SESSION_NOT_ASSOCIATED',
-          message: 'MCP session not associated with user session'
-        }
+          message: 'MCP session not associated with user session',
+        },
       };
     } catch (error) {
       this.logger.error('Error during MCP session authentication:', error);
@@ -237,8 +250,8 @@ export class MCPAuthManager {
         authenticated: false,
         error: {
           code: 'MCP_SESSION_AUTH_ERROR',
-          message: 'Error during MCP session authentication'
-        }
+          message: 'Error during MCP session authentication',
+        },
       };
     }
   }
@@ -249,8 +262,12 @@ export class MCPAuthManager {
   private async trySessionAuthWithFallbacks(args: any, clientInfo?: any): Promise<MCPAuthResult> {
     try {
       // Check for session ID in tool arguments first
-      const sessionId = (args.parameters?.session_id || args.parameters?.auth_session_id) || args?.session_id || args?.auth_session_id;
-      
+      const sessionId =
+        args.parameters?.session_id ||
+        args.parameters?.auth_session_id ||
+        args?.session_id ||
+        args?.auth_session_id;
+
       if (sessionId) {
         const tokenData = await this.tokenStore.get(sessionId);
         if (tokenData) {
@@ -262,8 +279,8 @@ export class MCPAuthManager {
               user: tokenData.user,
               scopes: tokenData.scopes,
               isAuthenticated: true,
-              clientInfo
-            }
+              clientInfo,
+            },
           };
         }
       }
@@ -280,12 +297,11 @@ export class MCPAuthManager {
               user: tokenData.user,
               scopes: tokenData.scopes,
               isAuthenticated: true,
-              clientInfo
-            }
+              clientInfo,
+            },
           };
         }
       }
-
     } catch (error) {
       this.logger.debug('Session authentication with fallbacks failed:', error);
     }
@@ -299,8 +315,12 @@ export class MCPAuthManager {
   private async trySessionAuth(args: any, clientInfo?: any): Promise<MCPAuthResult> {
     try {
       // Check for session ID in tool arguments
-      const sessionId = (args.parameters?.session_id || args.parameters?.auth_session_id) || args?.session_id || args?.auth_session_id;
-      
+      const sessionId =
+        args.parameters?.session_id ||
+        args.parameters?.auth_session_id ||
+        args?.session_id ||
+        args?.auth_session_id;
+
       if (sessionId) {
         const tokenData = await this.tokenStore.get(sessionId);
         if (tokenData) {
@@ -321,8 +341,8 @@ export class MCPAuthManager {
               user: tokenData.user,
               scopes: tokenData.scopes,
               isAuthenticated: true,
-              clientInfo
-            }
+              clientInfo,
+            },
           };
         } else {
           // Session ID provided but invalid/expired
@@ -336,9 +356,9 @@ export class MCPAuthManager {
               instructions: {
                 step1: `1. Your session has expired or is invalid`,
                 step2: `2. Re-authenticate at: ${this.authServerUrl.replace('/auth', '')}/auth/`,
-                step3: `3. Use the new Session ID provided after authentication`
-              }
-            }
+                step3: `3. Use the new Session ID provided after authentication`,
+              },
+            },
           };
         }
       }
@@ -347,7 +367,6 @@ export class MCPAuthManager {
       // This ensures runtime operations always require explicit Session ID
       this.logger.debug('No Session ID provided in tool arguments');
       return { authenticated: false };
-
     } catch (error) {
       this.logger.debug('Session authentication failed:', error);
     }
@@ -372,14 +391,14 @@ export class MCPAuthManager {
       const configPaths = [
         path.join(homedir(), '.sap', 'mcp-config.json'),
         path.join(homedir(), '.config', 'sap-mcp', 'config.json'),
-        path.join(process.cwd(), 'mcp-sap-config.json')
+        path.join(process.cwd(), 'mcp-sap-config.json'),
       ];
 
       for (const configPath of configPaths) {
         try {
           const configContent = readFileSync(configPath, 'utf8');
           const config = JSON.parse(configContent);
-          
+
           if (config.sap_mcp_session_id) {
             const tokenData = await this.tokenStore.get(config.sap_mcp_session_id);
             if (tokenData) {
@@ -390,17 +409,16 @@ export class MCPAuthManager {
                   token: tokenData.token,
                   user: tokenData.user,
                   scopes: tokenData.scopes,
-                  isAuthenticated: true
-                }
+                  isAuthenticated: true,
+                },
               };
             }
           }
-        } catch (error) {
+        } catch (_error) {
           // Try next config path
           continue;
         }
       }
-
     } catch (error) {
       this.logger.debug('Config file authentication failed:', error);
     }
@@ -414,9 +432,8 @@ export class MCPAuthManager {
   private async tryEnvironmentAuth(): Promise<MCPAuthResult> {
     try {
       // Try session ID from environment
-      const sessionId = process.env.SAP_MCP_SESSION_ID || 
-                       process.env.MCP_SESSION_ID ||
-                       process.env.SAP_SESSION_ID;
+      const sessionId =
+        process.env.SAP_MCP_SESSION_ID || process.env.MCP_SESSION_ID || process.env.SAP_SESSION_ID;
 
       if (sessionId) {
         const tokenData = await this.tokenStore.get(sessionId);
@@ -428,16 +445,15 @@ export class MCPAuthManager {
               token: tokenData.token,
               user: tokenData.user,
               scopes: tokenData.scopes,
-              isAuthenticated: true
-            }
+              isAuthenticated: true,
+            },
           };
         }
       }
 
       // Try direct token from environment (less secure, for development)
-      const token = process.env.SAP_BTP_JWT_TOKEN || 
-                   process.env.SAP_ACCESS_TOKEN ||
-                   process.env.MCP_AUTH_TOKEN;
+      const token =
+        process.env.SAP_BTP_JWT_TOKEN || process.env.SAP_ACCESS_TOKEN || process.env.MCP_AUTH_TOKEN;
 
       if (token) {
         // For direct tokens, we can't get user info from token store
@@ -448,11 +464,10 @@ export class MCPAuthManager {
             token: token.startsWith('Bearer ') ? token : `Bearer ${token}`,
             user: 'env-user',
             scopes: ['read', 'write'], // Default scopes for env tokens
-            isAuthenticated: true
-          }
+            isAuthenticated: true,
+          },
         };
       }
-
     } catch (error) {
       this.logger.debug('Environment authentication failed:', error);
     }
@@ -465,7 +480,7 @@ export class MCPAuthManager {
    */
   private getAuthInstructions(): MCPAuthResult {
     const baseUrl = this.authServerUrl.replace('/auth', '');
-    
+
     // Get the client credentials from environment variables (required)
     const clientId = process.env.SAP_IAS_CLIENT_ID;
     const clientSecret = process.env.SAP_IAS_CLIENT_SECRET;
@@ -476,11 +491,12 @@ export class MCPAuthManager {
         authenticated: false,
         error: {
           code: 'configuration_error',
-          message: 'Missing required SAP IAS configuration: SAP_IAS_CLIENT_ID, SAP_IAS_CLIENT_SECRET, and SAP_IAS_URL must be set'
-        }
+          message:
+            'Missing required SAP IAS configuration: SAP_IAS_CLIENT_ID, SAP_IAS_CLIENT_SECRET, and SAP_IAS_URL must be set',
+        },
       };
     }
-    
+
     return {
       authenticated: false,
       error: {
@@ -494,14 +510,14 @@ export class MCPAuthManager {
           web_method: {
             step1: `Open browser: ${baseUrl}/auth/`,
             step2: `Complete SAP IAS authentication`,
-            step3: `Copy the Session ID from the success page and provide it in your next request`
+            step3: `Copy the Session ID from the success page and provide it in your next request`,
           },
           cli_method: {
             description: 'For programmatic access, use the session_id parameter:',
             step1: `1. First authenticate: curl -X POST "${baseUrl}/auth/login" -H "Content-Type: application/json" -d '{"username":"YOUR_USERNAME","password":"YOUR_PASSWORD"}'`,
             step2: `2. The response will contain your Session ID`,
             step3: `3. Use the Session ID in your MCP tool calls by adding "session_id": "YOUR_SESSION_ID" to the arguments`,
-            note: 'Each user can have only one active session. New authentication will invalidate previous sessions.'
+            note: 'Each user can have only one active session. New authentication will invalidate previous sessions.',
           },
           server_managed: {
             description: 'Session-based authentication with Session ID:',
@@ -510,12 +526,12 @@ export class MCPAuthManager {
               '✓ Proper Principal Propagation to SAP systems',
               '✓ Single active session per user (automatic cleanup)',
               '✓ Session expiration and renewal handling',
-              '✓ Works with Claude Desktop and all MCP clients'
-            ]
+              '✓ Works with Claude Desktop and all MCP clients',
+            ],
           },
-          quick_start: `To get your Session ID: Navigate to ${baseUrl}/auth/ → Authenticate → Copy Session ID → Use in MCP calls`
-        }
-      }
+          quick_start: `To get your Session ID: Navigate to ${baseUrl}/auth/ → Authenticate → Copy Session ID → Use in MCP calls`,
+        },
+      },
     };
   }
 
@@ -523,9 +539,7 @@ export class MCPAuthManager {
    * Check if a tool is a runtime operation (requires explicit Session ID)
    */
   private isRuntimeOperation(toolName: string): boolean {
-    const runtimeTools = [
-      'execute-entity-operation'
-    ];
+    const runtimeTools = ['execute-entity-operation'];
     return runtimeTools.includes(toolName);
   }
 
@@ -539,17 +553,17 @@ export class MCPAuthManager {
       'mcp_initialize',
       'mcp_list_tools',
       'mcp_list_resources',
-      
+
       // SAP service discovery tools (always public)
       'search-sap-services',
-      'discover-service-entities', 
+      'discover-service-entities',
       'get-entity-schema',
-      
+
       // System tools
       'sap_service_discovery',
       'sap_metadata',
       'sap_health_check',
-      'system_info'
+      'system_info',
     ];
 
     return !publicTools.includes(toolName);
@@ -579,17 +593,17 @@ export class MCPAuthManager {
 
     const scopeMapping: Record<string, string> = {
       // Read operations
-      'sap_odata_read_entity': 'read',
-      'sap_odata_query_entities': 'read',
-      'sap_odata_get_metadata': 'read',
+      sap_odata_read_entity: 'read',
+      sap_odata_query_entities: 'read',
+      sap_odata_get_metadata: 'read',
 
       // Write operations
-      'sap_odata_create_entity': 'write',
-      'sap_odata_update_entity': 'write',
-      'sap_odata_patch_entity': 'write',
+      sap_odata_create_entity: 'write',
+      sap_odata_update_entity: 'write',
+      sap_odata_patch_entity: 'write',
 
       // Delete operations
-      'sap_odata_delete_entity': 'delete',
+      sap_odata_delete_entity: 'delete',
 
       // Admin operations
       'sap_admin_*': 'admin',
@@ -600,7 +614,7 @@ export class MCPAuthManager {
       'ui-data-grid': 'ui.grids',
       'ui-dashboard-composer': 'ui.dashboards',
       'ui-workflow-builder': 'ui.workflows',
-      'ui-report-builder': 'ui.reports'
+      'ui-report-builder': 'ui.reports',
     };
 
     // Check for exact match first
@@ -648,10 +662,21 @@ export class MCPAuthManager {
 
     // Check scope hierarchy (write includes read, delete includes write and read)
     const scopeHierarchy: Record<string, string[]> = {
-      'read': ['read'],
-      'write': ['read', 'write'],
-      'delete': ['read', 'write', 'delete'],
-      'admin': ['read', 'write', 'delete', 'admin', 'discover', 'ui.forms', 'ui.grids', 'ui.dashboards', 'ui.workflows', 'ui.reports']
+      read: ['read'],
+      write: ['read', 'write'],
+      delete: ['read', 'write', 'delete'],
+      admin: [
+        'read',
+        'write',
+        'delete',
+        'admin',
+        'discover',
+        'ui.forms',
+        'ui.grids',
+        'ui.dashboards',
+        'ui.workflows',
+        'ui.reports',
+      ],
     };
 
     for (const userScope of userScopes) {
@@ -708,7 +733,7 @@ export class MCPAuthManager {
       code: authResult.error.code,
       authenticated: false,
       authUrl: authResult.error.authUrl,
-      instructions: authResult.error.instructions
+      instructions: authResult.error.instructions,
     };
   }
 }

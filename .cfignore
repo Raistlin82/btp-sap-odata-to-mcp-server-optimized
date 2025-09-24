@@ -71,5 +71,7 @@ examples/
 work/
 .eslintrc*
 .prettierrc*
+.editorconfig
+.husky/
 jest.config.*
 tsconfig.json

@@ -7,13 +7,14 @@ export const ToolMessages = {
   // UI Form Tool
   uiForm: {
     name: 'get_ui_form',
-    description: 'Generate an interactive HTML form for data input with validation and submission handling',
+    description:
+      'Generate an interactive HTML form for data input with validation and submission handling',
     parameters: {
       title: 'Title displayed at the top of the form',
       description: 'Optional description shown below the title',
       fields: 'Array of form field definitions',
       submitButton: 'Text for the submit button',
-      cancelButton: 'Text for the cancel button'
+      cancelButton: 'Text for the cancel button',
     },
     fieldTypes: {
       text: 'Single-line text input',
@@ -26,7 +27,7 @@ export const ToolMessages = {
       checkbox: 'Multiple checkboxes',
       textarea: 'Multi-line text input',
       file: 'File upload',
-      hidden: 'Hidden field'
+      hidden: 'Hidden field',
     },
     validation: {
       required: 'This field is required',
@@ -37,20 +38,21 @@ export const ToolMessages = {
       max: 'Maximum value is {max}',
       pattern: 'Please match the required format',
       fileSize: 'File size must not exceed {size}MB',
-      fileType: 'Invalid file type. Allowed types: {types}'
+      fileType: 'Invalid file type. Allowed types: {types}',
     },
     messages: {
       submitting: 'Submitting form...',
       submitted: 'Form submitted successfully',
       error: 'Error submitting form',
-      cancelled: 'Form cancelled'
-    }
+      cancelled: 'Form cancelled',
+    },
   },
 
   // UI Table Tool
   uiTable: {
     name: 'get_ui_table',
-    description: 'Generate an interactive HTML table with sorting, filtering, and pagination capabilities',
+    description:
+      'Generate an interactive HTML table with sorting, filtering, and pagination capabilities',
     parameters: {
       title: 'Title displayed above the table',
       data: 'Array of data objects to display',
@@ -60,7 +62,7 @@ export const ToolMessages = {
       enableFilter: 'Enable data filtering',
       enablePagination: 'Enable pagination',
       enableExport: 'Enable data export options',
-      actions: 'Row action buttons configuration'
+      actions: 'Row action buttons configuration',
     },
     features: {
       sortAscending: 'Sort ascending',
@@ -74,7 +76,7 @@ export const ToolMessages = {
       export: 'Export',
       exportCsv: 'Export as CSV',
       exportJson: 'Export as JSON',
-      exportExcel: 'Export as Excel'
+      exportExcel: 'Export as Excel',
     },
     actions: {
       view: 'View',
@@ -82,15 +84,15 @@ export const ToolMessages = {
       delete: 'Delete',
       confirm: 'Confirm',
       cancel: 'Cancel',
-      confirmDelete: 'Are you sure you want to delete this item?'
+      confirmDelete: 'Are you sure you want to delete this item?',
     },
     pagination: {
       first: 'First',
       previous: 'Previous',
       next: 'Next',
       last: 'Last',
-      page: 'Page {current} of {total}'
-    }
+      page: 'Page {current} of {total}',
+    },
   },
 
   // UI Chart Tool
@@ -103,7 +105,7 @@ export const ToolMessages = {
       data: 'Chart data with labels and datasets',
       options: 'Chart configuration options',
       width: 'Chart width in pixels',
-      height: 'Chart height in pixels'
+      height: 'Chart height in pixels',
     },
     types: {
       line: 'Line Chart',
@@ -113,22 +115,22 @@ export const ToolMessages = {
       radar: 'Radar Chart',
       polarArea: 'Polar Area Chart',
       scatter: 'Scatter Plot',
-      bubble: 'Bubble Chart'
+      bubble: 'Bubble Chart',
     },
     labels: {
       noData: 'No data to display',
       loading: 'Loading chart...',
-      error: 'Error loading chart'
+      error: 'Error loading chart',
     },
     legend: {
       show: 'Show legend',
       hide: 'Hide legend',
-      position: 'Legend position'
+      position: 'Legend position',
     },
     tooltip: {
       label: 'Value',
-      total: 'Total'
-    }
+      total: 'Total',
+    },
   },
 
   // UI Dashboard Tool
@@ -140,7 +142,7 @@ export const ToolMessages = {
       layout: 'Layout configuration (grid, flex, etc.)',
       widgets: 'Array of dashboard widgets',
       theme: 'Dashboard theme (light, dark, custom)',
-      refreshInterval: 'Auto-refresh interval in seconds'
+      refreshInterval: 'Auto-refresh interval in seconds',
     },
     widgets: {
       metric: 'Metric Card',
@@ -150,7 +152,7 @@ export const ToolMessages = {
       map: 'Map View',
       timeline: 'Timeline',
       activity: 'Activity Feed',
-      progress: 'Progress Indicator'
+      progress: 'Progress Indicator',
     },
     metrics: {
       value: 'Current Value',
@@ -158,7 +160,7 @@ export const ToolMessages = {
       trend: 'Trend',
       target: 'Target',
       variance: 'Variance',
-      period: 'Period'
+      period: 'Period',
     },
     controls: {
       refresh: 'Refresh',
@@ -166,7 +168,7 @@ export const ToolMessages = {
       export: 'Export',
       settings: 'Settings',
       dateRange: 'Date Range',
-      filters: 'Filters'
+      filters: 'Filters',
     },
     status: {
       loading: 'Loading dashboard...',
@@ -175,8 +177,8 @@ export const ToolMessages = {
       noData: 'No data available',
       offline: 'Offline - Using cached data',
       live: 'Live',
-      lastUpdated: 'Last updated: {time}'
-    }
+      lastUpdated: 'Last updated: {time}',
+    },
   },
 
   // Common UI Messages
@@ -200,7 +202,7 @@ export const ToolMessages = {
       upload: 'Upload',
       download: 'Download',
       copy: 'Copy',
-      paste: 'Paste'
+      paste: 'Paste',
     },
     status: {
       loading: 'Loading...',
@@ -215,7 +217,7 @@ export const ToolMessages = {
       pending: 'Pending',
       processing: 'Processing...',
       completed: 'Completed',
-      failed: 'Failed'
+      failed: 'Failed',
     },
     validation: {
       required: 'Required',
@@ -225,7 +227,7 @@ export const ToolMessages = {
       invalidFormat: 'Invalid format',
       mustMatch: 'Must match',
       unique: 'Must be unique',
-      alreadyExists: 'Already exists'
+      alreadyExists: 'Already exists',
     },
     errors: {
       generic: 'An error occurred',
@@ -236,7 +238,7 @@ export const ToolMessages = {
       validationError: 'Validation error',
       notFound: 'Not found',
       unauthorized: 'Unauthorized',
-      forbidden: 'Forbidden'
+      forbidden: 'Forbidden',
     },
     accessibility: {
       close: 'Close dialog',
@@ -250,9 +252,9 @@ export const ToolMessages = {
       page: 'Page {number}',
       selected: 'Selected',
       loading: 'Loading content',
-      error: 'Error message'
-    }
-  }
+      error: 'Error message',
+    },
+  },
 };
 
 /**

@@ -30,14 +30,14 @@ export class AuthenticationValidator {
         return {
           isValid: true,
           user: 'anonymous',
-          scopes: ['ui.forms', 'ui.grids', 'ui.dashboards', 'ui.workflows', 'ui.reports']
+          scopes: ['ui.forms', 'ui.grids', 'ui.dashboards', 'ui.workflows', 'ui.reports'],
         };
       }
 
       if (!token) {
         return {
           isValid: false,
-          error: 'No authentication token provided'
+          error: 'No authentication token provided',
         };
       }
 
@@ -48,19 +48,19 @@ export class AuthenticationValidator {
         return {
           isValid: true,
           user: authResult.context?.user || 'authenticated_user',
-          scopes: this.extractScopes(authResult.context)
+          scopes: this.extractScopes(authResult.context),
         };
       } else {
         return {
           isValid: false,
-          error: authResult.error?.message || 'Authentication failed'
+          error: authResult.error?.message || 'Authentication failed',
         };
       }
     } catch (error) {
       this.logger?.error('Error validating authentication:', error);
       return {
         isValid: false,
-        error: error instanceof Error ? error.message : 'Authentication validation error'
+        error: error instanceof Error ? error.message : 'Authentication validation error',
       };
     }
   }
@@ -125,7 +125,7 @@ export class AuthenticationValidator {
       'ui-data-grid': 'ui.grids',
       'ui-dashboard-composer': 'ui.dashboards',
       'ui-workflow-builder': 'ui.workflows',
-      'ui-report-builder': 'ui.reports'
+      'ui-report-builder': 'ui.reports',
     };
 
     const requiredScope = scopeMapping[toolName];
@@ -136,7 +136,7 @@ export class AuthenticationValidator {
     if (!this.hasScope(validationResult.scopes, requiredScope)) {
       return {
         isValid: false,
-        error: `Insufficient permissions. Required scope: ${requiredScope}`
+        error: `Insufficient permissions. Required scope: ${requiredScope}`,
       };
     }
 

@@ -11,7 +11,7 @@ import { MemorySessionManager } from './services/memory-session-manager.js';
 import { ScopeAuthorizationService } from './services/scope-authorization-service.js';
 import { Logger } from '../utils/logger.js';
 import { Config } from '../utils/config.js';
-import { Messages } from '../i18n/messages.js';
+// Removed unused Messages import
 
 export enum AuthMechanism {
   IAS = 'ias',
@@ -19,14 +19,14 @@ export enum AuthMechanism {
   JWT = 'jwt',
   BASIC = 'basic',
   API_KEY = 'apikey',
-  CUSTOM = 'custom'
+  CUSTOM = 'custom',
 }
 
 export enum SessionMechanism {
   MEMORY = 'memory',
   REDIS = 'redis',
   DATABASE = 'database',
-  JWT = 'jwt'
+  JWT = 'jwt',
 }
 
 export interface AuthConfig {
@@ -199,7 +199,9 @@ export class AuthFactory {
    * Update authentication mechanism at runtime
    */
   updateAuthMechanism(mechanism: AuthMechanism): void {
-    this.logger.info(`Switching auth mechanism from ${this.authConfig.authMechanism} to ${mechanism}`);
+    this.logger.info(
+      `Switching auth mechanism from ${this.authConfig.authMechanism} to ${mechanism}`
+    );
 
     // Clear cached provider
     this.authProviderCache = null;
@@ -209,7 +211,7 @@ export class AuthFactory {
 
     // Test the new provider
     try {
-      const newProvider = this.createAuthProvider();
+      const _newProvider = this.createAuthProvider();
       this.logger.info(`Successfully switched to auth mechanism: ${mechanism}`);
     } catch (error) {
       this.logger.error(`Failed to switch to auth mechanism ${mechanism}:`, error);
@@ -221,7 +223,9 @@ export class AuthFactory {
    * Update session mechanism at runtime
    */
   updateSessionMechanism(mechanism: SessionMechanism): void {
-    this.logger.info(`Switching session mechanism from ${this.authConfig.sessionMechanism} to ${mechanism}`);
+    this.logger.info(
+      `Switching session mechanism from ${this.authConfig.sessionMechanism} to ${mechanism}`
+    );
 
     // Cleanup old session manager
     if (this.sessionManagerCache) {
@@ -238,7 +242,7 @@ export class AuthFactory {
 
     // Test the new session manager
     try {
-      const newSessionManager = this.createSessionManager();
+      const _newSessionManager = this.createSessionManager();
       this.logger.info(`Successfully switched to session mechanism: ${mechanism}`);
     } catch (error) {
       this.logger.error(`Failed to switch to session mechanism ${mechanism}:`, error);
@@ -275,16 +279,14 @@ export class AuthFactory {
    */
   private loadAuthConfig(): AuthConfig {
     // Load auth mechanism from environment
-    const authMechanism = this.config.get(
-      'auth.mechanism',
-      process.env.AUTH_MECHANISM || 'ias'
-    ).toLowerCase() as AuthMechanism;
+    const authMechanism = this.config
+      .get('auth.mechanism', process.env.AUTH_MECHANISM || 'ias')
+      .toLowerCase() as AuthMechanism;
 
     // Load session mechanism from environment
-    const sessionMechanism = this.config.get(
-      'session.mechanism',
-      process.env.SESSION_MECHANISM || 'memory'
-    ).toLowerCase() as SessionMechanism;
+    const sessionMechanism = this.config
+      .get('session.mechanism', process.env.SESSION_MECHANISM || 'memory')
+      .toLowerCase() as SessionMechanism;
 
     // Validate mechanisms
     if (!Object.values(AuthMechanism).includes(authMechanism)) {
@@ -301,7 +303,7 @@ export class AuthFactory {
         : AuthMechanism.IAS,
       sessionMechanism: Object.values(SessionMechanism).includes(sessionMechanism)
         ? sessionMechanism
-        : SessionMechanism.MEMORY
+        : SessionMechanism.MEMORY,
     };
   }
 
@@ -309,7 +311,10 @@ export class AuthFactory {
    * Create custom auth provider
    */
   private createCustomAuthProvider(): IAuthProvider {
-    const customName = this.config.get('auth.customProvider', process.env.AUTH_CUSTOM_PROVIDER || '');
+    const customName = this.config.get(
+      'auth.customProvider',
+      process.env.AUTH_CUSTOM_PROVIDER || ''
+    );
 
     if (!customName) {
       throw new Error('Custom auth mechanism selected but no custom provider name specified');
@@ -338,7 +343,7 @@ export class AuthFactory {
       authMechanism: this.authConfig.authMechanism,
       sessionMechanism: this.authConfig.sessionMechanism,
       isOAuth2Compatible: this.isOAuth2Provider(),
-      providerName: provider.name
+      providerName: provider.name,
     };
   }
 

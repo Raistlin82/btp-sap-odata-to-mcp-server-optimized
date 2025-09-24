@@ -42,9 +42,9 @@ export class JWTUtils {
         hasValidStructure: false,
         hadBearerPrefix: false,
         algorithm: undefined as string | undefined,
-        expiresAt: undefined as string | undefined
+        expiresAt: undefined as string | undefined,
       },
-      errors: [] as string[]
+      errors: [] as string[],
     };
 
     if (!token) {
@@ -54,7 +54,7 @@ export class JWTUtils {
 
     const originalToken = token;
     const cleanToken = this.cleanBearerToken(token);
-    
+
     if (!cleanToken) {
       result.errors.push('Token is empty after cleaning');
       return result;
@@ -89,7 +89,9 @@ export class JWTUtils {
 
       result.isValid = true;
     } catch (error) {
-      result.errors.push(`JWT parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      result.errors.push(
+        `JWT parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
 
     return result;
@@ -98,25 +100,23 @@ export class JWTUtils {
   /**
    * Safely log JWT information without exposing sensitive data
    */
-  static logTokenInfo(
-    token: string | undefined,
-    context: string,
-    logger?: Logger
-  ): void {
+  static logTokenInfo(token: string | undefined, context: string, logger?: Logger): void {
     const log = logger || this.logger;
-    
+
     if (!token) {
       log.debug(`${context}: No JWT token provided`);
       return;
     }
 
     const validation = this.validateTokenStructure(token);
-    
+
     if (validation.isValid) {
-      log.debug(`${context}: JWT valid - length=${validation.metadata.length}, ` +
-        `algorithm=${validation.metadata.algorithm || 'unknown'}, ` +
-        `expires=${validation.metadata.expiresAt || 'unknown'}, ` +
-        `hadBearer=${validation.metadata.hadBearerPrefix}`);
+      log.debug(
+        `${context}: JWT valid - length=${validation.metadata.length}, ` +
+          `algorithm=${validation.metadata.algorithm || 'unknown'}, ` +
+          `expires=${validation.metadata.expiresAt || 'unknown'}, ` +
+          `hadBearer=${validation.metadata.hadBearerPrefix}`
+      );
     } else {
       log.warn(`${context}: JWT validation failed - ${validation.errors.join(', ')}`);
     }
@@ -142,7 +142,7 @@ export class JWTUtils {
       return {
         cleanToken: undefined,
         isValid: false,
-        shouldUseToken: false
+        shouldUseToken: false,
       };
     }
 
@@ -155,7 +155,7 @@ export class JWTUtils {
     return {
       cleanToken,
       isValid: validation.isValid,
-      shouldUseToken: validation.isValid && !!cleanToken
+      shouldUseToken: validation.isValid && !!cleanToken,
     };
   }
 
@@ -168,7 +168,7 @@ export class JWTUtils {
     jwt?: string
   ): { destinationName: string; jwt?: string } {
     const options = { destinationName };
-    
+
     if (jwt) {
       const prepared = this.prepareForSAPSDK(jwt, `destination-${destinationName}`);
       if (prepared.shouldUseToken && prepared.cleanToken) {
@@ -194,7 +194,7 @@ export class JWTUtils {
       isExpired: boolean;
     } = {
       hasValidStructure: false,
-      isExpired: false
+      isExpired: false,
     };
 
     if (!token) {
@@ -244,7 +244,7 @@ export class JWTUtils {
     let hash = 0;
     for (let i = 0; i < identifier.length; i++) {
       const char = identifier.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
     return `user_${Math.abs(hash).toString(36)}`;

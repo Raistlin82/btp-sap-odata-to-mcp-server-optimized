@@ -26,7 +26,7 @@ export class TokenStore {
 
   constructor(logger?: Logger) {
     this.logger = logger || new Logger('TokenStore');
-    
+
     // Clean up expired tokens every 5 minutes
     this.cleanupInterval = setInterval(() => {
       this.cleanupExpiredTokens();
@@ -42,16 +42,17 @@ export class TokenStore {
 
     // For MCP clients, don't remove previous sessions to avoid frequent re-authentication issues
     // Only clean up when sessions are actually expired to improve user experience
-    const isMCPClient = clientInfo?.userAgent?.toLowerCase().includes('mcp') ||
-                       clientInfo?.clientId?.toLowerCase().includes('mcp') ||
-                       clientInfo?.userAgent?.toLowerCase().includes('claude') ||
-                       clientInfo?.userAgent?.toLowerCase().includes('copilot');
+    const isMCPClient =
+      clientInfo?.userAgent?.toLowerCase().includes('mcp') ||
+      clientInfo?.clientId?.toLowerCase().includes('mcp') ||
+      clientInfo?.userAgent?.toLowerCase().includes('claude') ||
+      clientInfo?.userAgent?.toLowerCase().includes('copilot');
 
     if (!isMCPClient && clientInfo?.clientId) {
       // Only for non-MCP clients, maintain single session per client
       await this.removePreviousClientSessions(tokenData.user, clientInfo.clientId);
     }
-    
+
     const storedTokenData: StoredTokenData = {
       ...tokenData,
       sessionId,
@@ -60,23 +61,25 @@ export class TokenStore {
       clientInfo: {
         userAgent: clientInfo?.userAgent,
         clientId: clientInfo?.clientId,
-        ipAddress: clientInfo?.ipAddress
-      }
+        ipAddress: clientInfo?.ipAddress,
+      },
     };
 
     this.tokens.set(sessionId, storedTokenData);
-    
+
     // Track sessions per user (can be multiple for different clients)
     const userSessions = this.userSessions.get(tokenData.user) || [];
     userSessions.push(sessionId);
     this.userSessions.set(tokenData.user, userSessions);
 
     const clientId = clientInfo?.clientId || clientInfo?.userAgent || 'unknown';
-    this.logger.info(`New session created for user: ${tokenData.user}, client: ${clientId}, session: ${sessionId}`);
-    
+    this.logger.info(
+      `New session created for user: ${tokenData.user}, client: ${clientId}, session: ${sessionId}`
+    );
+
     // TODO: In production, also store in Redis/database
     // await this.storeInRedis(sessionId, storedTokenData);
-    
+
     return sessionId;
   }
 
@@ -85,7 +88,7 @@ export class TokenStore {
    */
   async get(sessionId: string): Promise<StoredTokenData | null> {
     const tokenData = this.tokens.get(sessionId);
-    
+
     if (!tokenData) {
       // TODO: In production, check Redis/database as fallback
       // const redisData = await this.getFromRedis(sessionId);
@@ -159,7 +162,7 @@ export class TokenStore {
    */
   async update(sessionId: string, tokenData: TokenData): Promise<boolean> {
     const existingData = this.tokens.get(sessionId);
-    
+
     if (!existingData) {
       this.logger.warn(`Attempted to update non-existent session: ${sessionId}`);
       return false;
@@ -169,15 +172,15 @@ export class TokenStore {
       ...existingData,
       ...tokenData,
       sessionId, // Keep original session ID
-      lastUsedAt: Date.now()
+      lastUsedAt: Date.now(),
     };
 
     this.tokens.set(sessionId, updatedData);
     this.logger.info(`Token updated for session: ${sessionId}`);
-    
+
     // TODO: Update in Redis/database
     // await this.storeInRedis(sessionId, updatedData);
-    
+
     return true;
   }
 
@@ -186,7 +189,7 @@ export class TokenStore {
    */
   async remove(sessionId: string): Promise<boolean> {
     const tokenData = this.tokens.get(sessionId);
-    
+
     if (!tokenData) {
       return false;
     }
@@ -197,7 +200,7 @@ export class TokenStore {
     // Remove from user sessions
     const userSessions = this.userSessions.get(tokenData.user) || [];
     const updatedSessions = userSessions.filter(id => id !== sessionId);
-    
+
     if (updatedSessions.length === 0) {
       this.userSessions.delete(tokenData.user);
     } else {
@@ -205,10 +208,10 @@ export class TokenStore {
     }
 
     this.logger.info(`Token removed for session: ${sessionId}`);
-    
+
     // TODO: Remove from Redis/database
     // await this.removeFromRedis(sessionId);
-    
+
     return true;
   }
 
@@ -263,7 +266,9 @@ export class TokenStore {
     }
 
     if (removedCount > 0) {
-      this.logger.info(`Removed ${removedCount} existing sessions for user: ${username} (single session policy)`);
+      this.logger.info(
+        `Removed ${removedCount} existing sessions for user: ${username} (single session policy)`
+      );
     }
     return removedCount;
   }
@@ -277,9 +282,11 @@ export class TokenStore {
 
     for (const sessionId of sessionIds) {
       const tokenData = this.tokens.get(sessionId);
-      if (tokenData && 
-          (tokenData.clientInfo?.clientId === clientIdentifier || 
-           tokenData.clientInfo?.userAgent === clientIdentifier)) {
+      if (
+        tokenData &&
+        (tokenData.clientInfo?.clientId === clientIdentifier ||
+          tokenData.clientInfo?.userAgent === clientIdentifier)
+      ) {
         if (await this.remove(sessionId)) {
           removedCount++;
         }
@@ -287,7 +294,9 @@ export class TokenStore {
     }
 
     if (removedCount > 0) {
-      this.logger.info(`Removed ${removedCount} previous sessions for user: ${username}, client: ${clientIdentifier}`);
+      this.logger.info(
+        `Removed ${removedCount} previous sessions for user: ${username}, client: ${clientIdentifier}`
+      );
     }
     return removedCount;
   }
@@ -305,7 +314,7 @@ export class TokenStore {
    */
   async getAllSessions(): Promise<StoredTokenData[]> {
     const activeSessions: StoredTokenData[] = [];
-    
+
     for (const [sessionId] of this.tokens.entries()) {
       const tokenData = await this.get(sessionId);
       if (tokenData) {
@@ -351,7 +360,7 @@ export class TokenStore {
       activeUsers: this.userSessions.size,
       expiredSessions: expiredCount,
       oldestSession,
-      newestSession
+      newestSession,
     };
   }
 
@@ -393,11 +402,11 @@ export class TokenStore {
   // private async storeInRedis(sessionId: string, tokenData: StoredTokenData): Promise<void> {
   //   // Implementation for Redis storage
   // }
-  
+
   // private async getFromRedis(sessionId: string): Promise<StoredTokenData | null> {
   //   // Implementation for Redis retrieval
   // }
-  
+
   // private async removeFromRedis(sessionId: string): Promise<void> {
   //   // Implementation for Redis removal
   // }

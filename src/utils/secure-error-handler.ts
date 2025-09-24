@@ -31,11 +31,14 @@ export class SecureErrorHandler {
    * Sanitize error for external consumption
    * Removes sensitive information while preserving useful error details
    */
-  sanitizeError(error: unknown, context?: {
-    operation?: string;
-    requestId?: string;
-    userId?: string;
-  }): SecureError {
+  sanitizeError(
+    error: unknown,
+    context?: {
+      operation?: string;
+      requestId?: string;
+      userId?: string;
+    }
+  ): SecureError {
     const timestamp = new Date().toISOString();
     const requestId = context?.requestId || 'unknown';
 
@@ -44,7 +47,7 @@ export class SecureErrorHandler {
       error,
       context,
       timestamp,
-      requestId
+      requestId,
     });
 
     // Determine error type and create sanitized response
@@ -62,23 +65,26 @@ export class SecureErrorHandler {
       message: this.isDevelopment ? String(error) : 'An unexpected error occurred',
       code: 'UNKNOWN_ERROR',
       timestamp,
-      requestId
+      requestId,
     };
   }
 
   /**
    * Sanitize known Error instances
    */
-  private sanitizeKnownError(error: Error, meta: { timestamp: string; requestId: string }): SecureError {
+  private sanitizeKnownError(
+    error: Error,
+    meta: { timestamp: string; requestId: string }
+  ): SecureError {
     const errorMessage = error.message;
-    
+
     // Authentication/Authorization errors
     if (this.isAuthError(errorMessage)) {
       return {
         error: 'Authentication Failed',
         message: this.sanitizeAuthErrorMessage(errorMessage),
         code: this.getAuthErrorCode(errorMessage),
-        ...meta
+        ...meta,
       };
     }
 
@@ -88,7 +94,7 @@ export class SecureErrorHandler {
         error: 'Service Unavailable',
         message: 'Unable to connect to external service',
         code: 'SERVICE_UNAVAILABLE',
-        ...meta
+        ...meta,
       };
     }
 
@@ -98,7 +104,7 @@ export class SecureErrorHandler {
         error: 'Validation Error',
         message: this.sanitizeValidationError(errorMessage),
         code: 'VALIDATION_ERROR',
-        ...meta
+        ...meta,
       };
     }
 
@@ -108,7 +114,7 @@ export class SecureErrorHandler {
         error: 'Configuration Error',
         message: 'Service configuration issue',
         code: 'CONFIG_ERROR',
-        ...meta
+        ...meta,
       };
     }
 
@@ -118,23 +124,28 @@ export class SecureErrorHandler {
         error: 'SAP Service Error',
         message: this.sanitizeSAPError(errorMessage),
         code: 'SAP_ERROR',
-        ...meta
+        ...meta,
       };
     }
 
     // Generic server errors
     return {
       error: 'Internal Server Error',
-      message: this.isDevelopment ? errorMessage : 'An error occurred while processing your request',
+      message: this.isDevelopment
+        ? errorMessage
+        : 'An error occurred while processing your request',
       code: 'INTERNAL_ERROR',
-      ...meta
+      ...meta,
     };
   }
 
   /**
    * Sanitize object-based errors (e.g., from HTTP clients)
    */
-  private sanitizeObjectError(error: Record<string, unknown>, meta: { timestamp: string; requestId: string }): SecureError {
+  private sanitizeObjectError(
+    error: Record<string, unknown>,
+    meta: { timestamp: string; requestId: string }
+  ): SecureError {
     const statusCode = (error as any).statusCode || (error as any).status;
     const message = error.message || error.error;
 
@@ -143,7 +154,7 @@ export class SecureErrorHandler {
         error: 'Unauthorized',
         message: 'Authentication required',
         code: 'AUTH_REQUIRED',
-        ...meta
+        ...meta,
       };
     }
 
@@ -152,7 +163,7 @@ export class SecureErrorHandler {
         error: 'Forbidden',
         message: 'Insufficient permissions',
         code: 'INSUFFICIENT_PERMISSIONS',
-        ...meta
+        ...meta,
       };
     }
 
@@ -161,7 +172,7 @@ export class SecureErrorHandler {
         error: 'Not Found',
         message: 'Requested resource not found',
         code: 'RESOURCE_NOT_FOUND',
-        ...meta
+        ...meta,
       };
     }
 
@@ -170,7 +181,7 @@ export class SecureErrorHandler {
         error: 'Client Error',
         message: this.isDevelopment && typeof message === 'string' ? message : 'Invalid request',
         code: 'CLIENT_ERROR',
-        ...meta
+        ...meta,
       };
     }
 
@@ -179,15 +190,18 @@ export class SecureErrorHandler {
         error: 'External Service Error',
         message: 'External service is currently unavailable',
         code: 'EXTERNAL_SERVICE_ERROR',
-        ...meta
+        ...meta,
       };
     }
 
     return {
       error: 'Internal Server Error',
-      message: this.isDevelopment && typeof message === 'string' ? message : 'An unexpected error occurred',
+      message:
+        this.isDevelopment && typeof message === 'string'
+          ? message
+          : 'An unexpected error occurred',
       code: 'UNKNOWN_ERROR',
-      ...meta
+      ...meta,
     };
   }
 
@@ -196,8 +210,15 @@ export class SecureErrorHandler {
    */
   private isAuthError(message: string): boolean {
     const authKeywords = [
-      'authentication', 'unauthorized', 'invalid token', 'expired token',
-      'jwt', 'bearer', 'credentials', 'login', 'permission'
+      'authentication',
+      'unauthorized',
+      'invalid token',
+      'expired token',
+      'jwt',
+      'bearer',
+      'credentials',
+      'login',
+      'permission',
     ];
     return authKeywords.some(keyword => message.toLowerCase().includes(keyword));
   }
@@ -207,8 +228,14 @@ export class SecureErrorHandler {
    */
   private isNetworkError(message: string): boolean {
     const networkKeywords = [
-      'connection', 'timeout', 'network', 'econnrefused', 'enotfound',
-      'fetch failed', 'socket', 'dns'
+      'connection',
+      'timeout',
+      'network',
+      'econnrefused',
+      'enotfound',
+      'fetch failed',
+      'socket',
+      'dns',
     ];
     return networkKeywords.some(keyword => message.toLowerCase().includes(keyword));
   }
@@ -218,8 +245,13 @@ export class SecureErrorHandler {
    */
   private isValidationError(message: string): boolean {
     const validationKeywords = [
-      'validation', 'invalid input', 'bad request', 'malformed',
-      'schema', 'required field', 'invalid format'
+      'validation',
+      'invalid input',
+      'bad request',
+      'malformed',
+      'schema',
+      'required field',
+      'invalid format',
     ];
     return validationKeywords.some(keyword => message.toLowerCase().includes(keyword));
   }
@@ -229,8 +261,13 @@ export class SecureErrorHandler {
    */
   private isConfigError(message: string): boolean {
     const configKeywords = [
-      'not configured', 'configuration', 'missing env', 'credentials not found',
-      'service not available', 'vcap', 'binding'
+      'not configured',
+      'configuration',
+      'missing env',
+      'credentials not found',
+      'service not available',
+      'vcap',
+      'binding',
     ];
     return configKeywords.some(keyword => message.toLowerCase().includes(keyword));
   }
@@ -240,8 +277,14 @@ export class SecureErrorHandler {
    */
   private isSAPError(message: string): boolean {
     const sapKeywords = [
-      'sap', 'odata', 'destination', 'xsuaa', 'principal propagation',
-      'connectivity', 'cloud connector', 's/4hana'
+      'sap',
+      'odata',
+      'destination',
+      'xsuaa',
+      'principal propagation',
+      'connectivity',
+      'cloud connector',
+      's/4hana',
     ];
     return sapKeywords.some(keyword => message.toLowerCase().includes(keyword));
   }
@@ -277,9 +320,9 @@ export class SecureErrorHandler {
    */
   private sanitizeValidationError(message: string): string {
     // Remove sensitive information from validation messages
-    return this.isDevelopment ? 
-      message : 
-      'Invalid input provided. Please check your request and try again.';
+    return this.isDevelopment
+      ? message
+      : 'Invalid input provided. Please check your request and try again.';
   }
 
   /**
@@ -301,13 +344,16 @@ export class SecureErrorHandler {
   /**
    * Create detailed error for development/logging
    */
-  createDetailedError(error: unknown, context?: {
-    operation?: string;
-    requestId?: string;
-    userId?: string;
-  }): DetailedError {
+  createDetailedError(
+    error: unknown,
+    context?: {
+      operation?: string;
+      requestId?: string;
+      userId?: string;
+    }
+  ): DetailedError {
     const secureError = this.sanitizeError(error, context);
-    
+
     if (!this.isDevelopment) {
       return secureError;
     }
@@ -317,7 +363,7 @@ export class SecureErrorHandler {
       ...secureError,
       details: context,
       stack: error instanceof Error ? error.stack : undefined,
-      originalError: String(error)
+      originalError: String(error),
     };
   }
 }

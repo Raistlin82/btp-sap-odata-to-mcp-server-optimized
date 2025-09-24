@@ -1,19 +1,19 @@
 /**
  * Destination context types for dual destination architecture
- * 
+ *
  * Design-time: Used for service discovery, metadata parsing, schema analysis
  * Runtime: Used for actual CRUD operations (Create, Read, Update, Delete)
  */
 
 export type DestinationType = 'design-time' | 'runtime';
 
-export type OperationType = 
-  | 'discovery'     // Service discovery operations
-  | 'metadata'      // Metadata and schema parsing
-  | 'create'        // Create operations
-  | 'read'          // Read operations  
-  | 'update'        // Update operations
-  | 'delete';       // Delete operations
+export type OperationType =
+  | 'discovery' // Service discovery operations
+  | 'metadata' // Metadata and schema parsing
+  | 'create' // Create operations
+  | 'read' // Read operations
+  | 'update' // Update operations
+  | 'delete'; // Delete operations
 
 export interface DestinationContext {
   type: DestinationType;

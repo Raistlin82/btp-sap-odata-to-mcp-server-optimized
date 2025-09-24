@@ -30,25 +30,24 @@ export class AuthServer {
   constructor(options: AuthServerOptions = {}) {
     this.app = express();
     this.logger = new Logger('AuthServer');
-    
+
     try {
       this.logger.debug('Initializing IASAuthService...');
       this.iasAuthService = new IASAuthService(this.logger);
       this.logger.debug('IASAuthService initialized successfully');
-      
+
       this.logger.debug('Initializing TokenStore...');
       this.tokenStore = new TokenStore(this.logger);
       this.logger.debug('TokenStore initialized successfully');
-      
+
       this.logger.debug('Setting up middleware...');
       this.setupMiddleware(options);
       this.logger.debug('Middleware setup completed');
-      
+
       this.logger.debug('Setting up routes...');
       this.setupRoutes();
       this.logger.debug('Routes setup completed');
-      
-      
+
       this.logger.info('✅ AuthServer constructor completed successfully');
     } catch (error) {
       this.logger.error('❌ AuthServer constructor failed:', error);
@@ -59,32 +58,36 @@ export class AuthServer {
   private setupMiddleware(options: AuthServerOptions): void {
     // Security middleware
     if (options.enableHelmet !== false) {
-      this.app.use(helmet({
-        contentSecurityPolicy: {
-          directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-hashes'"], // Allow inline scripts and event handlers
-            scriptSrcAttr: ["'unsafe-inline'"], // Allow inline event handlers like onclick
-            styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles
-            imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'", "https:"], // Allow HTTPS connections
-            fontSrc: ["'self'", "https:", "data:"],
-            objectSrc: ["'none'"],
-            mediaSrc: ["'self'"],
-            frameSrc: ["'none'"]
-          }
-        },
-        crossOriginResourcePolicy: false
-      }));
+      this.app.use(
+        helmet({
+          contentSecurityPolicy: {
+            directives: {
+              defaultSrc: ["'self'"],
+              scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-hashes'"], // Allow inline scripts and event handlers
+              scriptSrcAttr: ["'unsafe-inline'"], // Allow inline event handlers like onclick
+              styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles
+              imgSrc: ["'self'", 'data:', 'https:'],
+              connectSrc: ["'self'", 'https:'], // Allow HTTPS connections
+              fontSrc: ["'self'", 'https:', 'data:'],
+              objectSrc: ["'none'"],
+              mediaSrc: ["'self'"],
+              frameSrc: ["'none'"],
+            },
+          },
+          crossOriginResourcePolicy: false,
+        })
+      );
     }
 
     // CORS configuration
-    this.app.use(cors({
-      origin: options.corsOrigins || ['http://localhost:3000', 'http://127.0.0.1:3000'],
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'x-mcp-session-id']
-    }));
+    this.app.use(
+      cors({
+        origin: options.corsOrigins || ['http://localhost:3000', 'http://127.0.0.1:3000'],
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'x-mcp-session-id'],
+      })
+    );
 
     // Body parsing middleware
     this.app.use(express.json({ limit: '10mb' }));
@@ -98,7 +101,7 @@ export class AuthServer {
       this.logger.debug(`${req.method} ${req.path}`, {
         ip: req.ip,
         userAgent: req.get('User-Agent'),
-        sessionId: req.headers['x-mcp-session-id']
+        sessionId: req.headers['x-mcp-session-id'],
       });
       next();
     });
@@ -111,7 +114,7 @@ export class AuthServer {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
-        memory: process.memoryUsage()
+        memory: process.memoryUsage(),
       });
     });
 
@@ -129,12 +132,12 @@ export class AuthServer {
     this.app.post('/login', async (req: Request, res: Response) => {
       try {
         const { username, password } = req.body;
-        
+
         if (!username || !password) {
           return res.status(400).json({
             success: false,
             error: 'Missing credentials',
-            message: 'Username and password are required'
+            message: 'Username and password are required',
           });
         }
 
@@ -147,7 +150,7 @@ export class AuthServer {
           userAgent: req.get('User-Agent'),
           ipAddress: req.ip,
           clientId: 'global-auth',
-          authenticatedAt: Date.now()
+          authenticatedAt: Date.now(),
         };
 
         await this.tokenStore.set(tokenData, clientInfo, globalAuthKey);
@@ -159,15 +162,14 @@ export class AuthServer {
           message: 'Authentication successful - server will remember your credentials',
           user: tokenData.user,
           authenticatedAt: new Date().toISOString(),
-          note: 'No client configuration required - MCP tools will work automatically'
+          note: 'No client configuration required - MCP tools will work automatically',
         });
-
       } catch (error) {
         this.logger.error('Global authentication failed:', error);
         res.status(401).json({
           success: false,
           error: 'Authentication failed',
-          message: error instanceof Error ? error.message : 'Invalid username or password'
+          message: error instanceof Error ? error.message : 'Invalid username or password',
         });
       }
     });
@@ -176,19 +178,20 @@ export class AuthServer {
     this.app.get('/authorize', (req: Request, res: Response) => {
       try {
         const { response_type, client_id, redirect_uri, scope, state } = req.query;
-        
+
         // Validate required parameters
         if (!response_type || !client_id || !redirect_uri) {
           return res.status(400).json({
             error: 'invalid_request',
-            error_description: 'Missing required parameters: response_type, client_id, redirect_uri'
+            error_description:
+              'Missing required parameters: response_type, client_id, redirect_uri',
           });
         }
 
         if (response_type !== 'code') {
           return res.status(400).json({
             error: 'unsupported_response_type',
-            error_description: 'Only authorization code flow is supported'
+            error_description: 'Only authorization code flow is supported',
           });
         }
 
@@ -197,15 +200,14 @@ export class AuthServer {
           redirect_uri as string,
           state as string
         );
-        
+
         this.logger.info(`Redirecting to IAS authorization: ${iasAuthUrl}`);
         res.redirect(iasAuthUrl);
-
       } catch (error) {
         this.logger.error('Authorization endpoint error:', error);
         res.status(500).json({
           error: 'server_error',
-          error_description: 'Internal server error during authorization'
+          error_description: 'Internal server error during authorization',
         });
       }
     });
@@ -214,27 +216,32 @@ export class AuthServer {
     this.app.get('/callback', async (req: Request, res: Response) => {
       try {
         const { code, state, error, error_description } = req.query;
-        
+
         if (error) {
           this.logger.error(`OAuth callback error: ${error} - ${error_description}`);
           return res.status(400).json({
             error: error as string,
-            error_description: error_description as string || 'Authorization failed'
+            error_description: (error_description as string) || 'Authorization failed',
           });
         }
 
         if (!code) {
           return res.status(400).json({
             error: 'invalid_request',
-            error_description: 'Missing authorization code'
+            error_description: 'Missing authorization code',
           });
         }
 
         // Exchange code for tokens - force HTTPS for Cloud Foundry deployments
-        const protocol = req.get('host')?.includes('.cfapps.') || req.get('host')?.includes('.ondemand.com') ? 'https' : req.protocol;
+        const protocol =
+          req.get('host')?.includes('.cfapps.') || req.get('host')?.includes('.ondemand.com')
+            ? 'https'
+            : req.protocol;
         const redirectUri = `${protocol}://${req.get('host')}/auth/callback`;
         this.logger.debug(`Constructed redirect URI for token exchange: ${redirectUri}`);
-        this.logger.debug(`Request protocol: ${req.protocol}, forced protocol: ${protocol}, host: ${req.get('host')}`);
+        this.logger.debug(
+          `Request protocol: ${req.protocol}, forced protocol: ${protocol}, host: ${req.get('host')}`
+        );
         const tokenData = await this.iasAuthService.exchangeCodeForTokens(
           code as string,
           redirectUri
@@ -244,12 +251,12 @@ export class AuthServer {
         const clientInfo = {
           userAgent: req.get('User-Agent'),
           ipAddress: req.ip,
-          clientId: `oauth2-${Date.now()}`
+          clientId: `oauth2-${Date.now()}`,
         };
 
         // Clean up any existing sessions for this user to prevent duplicates
         await this.tokenStore.removeUserSessions(tokenData.user);
-        
+
         const sessionId = await this.tokenStore.set(tokenData, clientInfo);
 
         // Store as global authentication for MCP client compatibility (replacing any existing)
@@ -258,15 +265,16 @@ export class AuthServer {
           userAgent: req.get('User-Agent'),
           ipAddress: req.ip,
           clientId: 'browser-oauth-global',
-          authenticatedAt: Date.now()
+          authenticatedAt: Date.now(),
         };
         await this.tokenStore.set(tokenData, globalClientInfo, globalAuthKey);
 
-        this.logger.info(`OAuth user authenticated successfully: ${tokenData.user}, session: ${sessionId}, global: ${globalAuthKey}`);
+        this.logger.info(
+          `OAuth user authenticated successfully: ${tokenData.user}, session: ${sessionId}, global: ${globalAuthKey}`
+        );
 
         // Redirect to success page with session ID
         res.redirect(`/login?session=${sessionId}&success=true`);
-
       } catch (error) {
         this.logger.error('OAuth callback failed:', error);
         res.redirect(`/login?error=${encodeURIComponent('Authentication failed')}`);
@@ -277,13 +285,13 @@ export class AuthServer {
     this.app.get('/status', async (req: Request, res: Response) => {
       try {
         const sessionId = req.headers['x-mcp-session-id'] as string;
-        
+
         if (!sessionId) {
           return res.json({ authenticated: false, message: 'No session ID provided' });
         }
 
         const tokenData = await this.tokenStore.get(sessionId);
-        
+
         if (!tokenData) {
           return res.json({ authenticated: false, message: 'Session not found or expired' });
         }
@@ -293,14 +301,13 @@ export class AuthServer {
           sessionId: tokenData.sessionId,
           user: tokenData.user,
           expiresAt: tokenData.expiresAt,
-          scopes: tokenData.scopes
+          scopes: tokenData.scopes,
         });
-
       } catch (error) {
         this.logger.error('Error checking auth status:', error);
         res.status(500).json({
           authenticated: false,
-          error: 'Internal server error'
+          error: 'Internal server error',
         });
       }
     });
@@ -309,12 +316,12 @@ export class AuthServer {
     this.app.post('/cli-auth', async (req: Request, res: Response) => {
       try {
         const { access_token, method = 'cli' } = req.body;
-        
+
         if (!access_token) {
           return res.status(400).json({
             success: false,
             error: 'Missing access_token',
-            message: 'Please provide the access_token obtained from the curl command'
+            message: 'Please provide the access_token obtained from the curl command',
           });
         }
 
@@ -322,21 +329,23 @@ export class AuthServer {
         let tokenData;
         let user = 'unknown';
         let scopes = ['read', 'write'];
-        
+
         try {
           // Try to get user info (works for user tokens)
           const userInfo = await this.iasAuthService.getUserInfo(access_token);
           user = userInfo.preferred_username || userInfo.email || userInfo.sub;
           scopes = userInfo.scope || ['read', 'write'];
         } catch (error) {
-          this.logger.debug('User info failed, trying token validation (likely client credentials token)');
-          
+          this.logger.debug(
+            'User info failed, trying token validation (likely client credentials token)'
+          );
+
           // For client credentials tokens, we can't get user info, but we can validate the token
           const isValid = await this.iasAuthService.validateToken(access_token);
           if (!isValid) {
             throw new Error('Invalid or expired access token');
           }
-          
+
           // For client credentials, use the client ID as user and assign appropriate scopes
           user = 'client-credentials-user';
           scopes = ['read', 'write', 'delete', 'admin']; // Client credentials get broader access
@@ -347,14 +356,14 @@ export class AuthServer {
           user: user,
           scopes: scopes,
           expiresAt: Date.now() + SESSION_LIFETIMES.AUTH_TOKEN_EXPIRY, // 8 hours for better MCP client experience
-          refreshToken: undefined
+          refreshToken: undefined,
         };
 
         // Store token with client info
         const clientInfo = {
           userAgent: req.get('User-Agent'),
           ipAddress: req.ip,
-          clientId: `${method}-${Date.now()}`
+          clientId: `${method}-${Date.now()}`,
         };
 
         const sessionId = await this.tokenStore.set(tokenData, clientInfo);
@@ -370,16 +379,15 @@ export class AuthServer {
           message: 'Authentication successful',
           instructions: {
             mcp_header: `Add this header to your MCP requests: x-mcp-session-id: ${sessionId}`,
-            environment: `export SAP_MCP_SESSION_ID="${sessionId}"`
-          }
+            environment: `export SAP_MCP_SESSION_ID="${sessionId}"`,
+          },
         });
-
       } catch (error) {
         this.logger.error('CLI authentication failed:', error);
         res.status(401).json({
           success: false,
           error: 'CLI authentication failed',
-          message: error instanceof Error ? error.message : 'Invalid or expired token'
+          message: error instanceof Error ? error.message : 'Invalid or expired token',
         });
       }
     });
@@ -396,34 +404,31 @@ export class AuthServer {
           if (!code || !redirect_uri) {
             return res.status(400).json({
               error: 'invalid_request',
-              error_description: 'Missing required parameters: code, redirect_uri'
+              error_description: 'Missing required parameters: code, redirect_uri',
             });
           }
 
           tokenData = await this.iasAuthService.exchangeCodeForTokens(code, redirect_uri);
-          
         } else if (grant_type === 'refresh_token') {
           // Token refresh
           if (!refresh_token) {
             return res.status(400).json({
               error: 'invalid_request',
-              error_description: 'Missing refresh_token parameter'
+              error_description: 'Missing refresh_token parameter',
             });
           }
 
           tokenData = await this.iasAuthService.refreshToken(refresh_token);
-          
         } else if (grant_type === 'client_credentials') {
           // Client credentials flow
           tokenData = await this.iasAuthService.getClientCredentialsToken();
-          
         } else {
           // Fallback to password flow (deprecated)
           if (!username || !password) {
             return res.status(400).json({
               success: false,
               error: 'Missing credentials',
-              message: 'Username and password are required'
+              message: 'Username and password are required',
             });
           }
 
@@ -434,14 +439,20 @@ export class AuthServer {
         const clientInfo = {
           userAgent: req.get('User-Agent'),
           ipAddress: req.ip,
-          clientId: req.get('x-client-id') || `${grant_type || 'password'}-${Date.now()}`
+          clientId: req.get('x-client-id') || `${grant_type || 'password'}-${Date.now()}`,
         };
 
         sessionId = await this.tokenStore.set(tokenData, clientInfo);
 
-        this.logger.info(`User authenticated successfully: ${tokenData.user}, session: ${sessionId}`);
+        this.logger.info(
+          `User authenticated successfully: ${tokenData.user}, session: ${sessionId}`
+        );
 
-        if (grant_type === 'authorization_code' || grant_type === 'refresh_token' || grant_type === 'client_credentials') {
+        if (
+          grant_type === 'authorization_code' ||
+          grant_type === 'refresh_token' ||
+          grant_type === 'client_credentials'
+        ) {
           // OAuth 2.0 standard response
           res.json({
             access_token: tokenData.token.replace('Bearer ', ''),
@@ -449,7 +460,7 @@ export class AuthServer {
             expires_in: Math.floor((tokenData.expiresAt - Date.now()) / 1000),
             scope: tokenData.scopes.join(' '),
             refresh_token: tokenData.refreshToken,
-            session_id: sessionId
+            session_id: sessionId,
           });
         } else {
           // Legacy response format
@@ -459,17 +470,16 @@ export class AuthServer {
             user: tokenData.user,
             expiresAt: tokenData.expiresAt,
             scopes: tokenData.scopes,
-            message: 'Authentication successful'
+            message: 'Authentication successful',
           });
         }
-
       } catch (error) {
         this.logger.error('Authentication failed:', error);
-        
+
         let statusCode = 401;
         let errorCode = 'invalid_client';
         let message = 'Authentication failed';
-        
+
         if (error instanceof Error) {
           if (error.message.includes('credentials')) {
             message = 'Invalid username or password';
@@ -489,7 +499,7 @@ export class AuthServer {
           error_description: message,
           // Legacy format for backward compatibility
           success: false,
-          message: message
+          message: message,
         });
       }
     });
@@ -498,22 +508,22 @@ export class AuthServer {
     this.app.post('/refresh', async (req: Request, res: Response) => {
       try {
         const sessionId = req.headers['x-mcp-session-id'] as string;
-        
+
         if (!sessionId) {
           return res.status(400).json({
             success: false,
             error: 'Missing session ID',
-            message: 'Session ID is required in headers'
+            message: 'Session ID is required in headers',
           });
         }
 
         const existingToken = await this.tokenStore.get(sessionId);
-        
+
         if (!existingToken || !existingToken.refreshToken) {
           return res.status(404).json({
             success: false,
             error: 'Invalid session',
-            message: 'Session not found or no refresh token available'
+            message: 'Session not found or no refresh token available',
           });
         }
 
@@ -529,15 +539,14 @@ export class AuthServer {
           user: newTokenData.user,
           expiresAt: newTokenData.expiresAt,
           scopes: newTokenData.scopes,
-          message: 'Token refreshed successfully'
+          message: 'Token refreshed successfully',
         });
-
       } catch (error) {
         this.logger.error('Token refresh failed:', error);
         res.status(401).json({
           success: false,
           error: 'Token refresh failed',
-          message: error instanceof Error ? error.message : 'Unknown error'
+          message: error instanceof Error ? error.message : 'Unknown error',
         });
       }
     });
@@ -546,11 +555,11 @@ export class AuthServer {
     this.app.get('/auth-url', (req: Request, res: Response) => {
       try {
         const { redirect_uri, state } = req.query;
-        
+
         if (!redirect_uri) {
           return res.status(400).json({
             error: 'invalid_request',
-            error_description: 'Missing redirect_uri parameter'
+            error_description: 'Missing redirect_uri parameter',
           });
         }
 
@@ -561,14 +570,13 @@ export class AuthServer {
 
         res.json({
           authorization_url: authUrl,
-          state: state || null
+          state: state || null,
         });
-
       } catch (error) {
         this.logger.error('Auth URL generation failed:', error);
         res.status(500).json({
           error: 'server_error',
-          error_description: 'Failed to generate authorization URL'
+          error_description: 'Failed to generate authorization URL',
         });
       }
     });
@@ -577,13 +585,13 @@ export class AuthServer {
     this.app.get('/config/:sessionId', async (req: Request, res: Response) => {
       try {
         const { sessionId } = req.params;
-        
+
         const tokenData = await this.tokenStore.get(sessionId);
-        
+
         if (!tokenData) {
           return res.status(404).json({
             error: 'Session not found',
-            message: 'The requested session does not exist or has expired'
+            message: 'The requested session does not exist or has expired',
           });
         }
 
@@ -599,19 +607,18 @@ export class AuthServer {
           instructions: {
             desktop: 'Place this file at ~/.sap/mcp-config.json',
             environment: `export SAP_MCP_SESSION_ID="${sessionId}"`,
-            oauth2: 'Use the authorization_url to authenticate via browser'
-          }
+            oauth2: 'Use the authorization_url to authenticate via browser',
+          },
         };
 
         res.setHeader('Content-Disposition', 'attachment; filename="mcp-sap-config.json"');
         res.setHeader('Content-Type', 'application/json');
         res.json(config);
-
       } catch (error) {
         this.logger.error('Config download failed:', error);
         res.status(500).json({
           error: 'Internal server error',
-          message: 'Failed to generate configuration'
+          message: 'Failed to generate configuration',
         });
       }
     });
@@ -620,7 +627,7 @@ export class AuthServer {
     this.app.post('/logout', async (req: Request, res: Response) => {
       try {
         const sessionId = req.headers['x-mcp-session-id'] as string;
-        
+
         if (sessionId) {
           const removed = await this.tokenStore.remove(sessionId);
           if (removed) {
@@ -630,67 +637,69 @@ export class AuthServer {
 
         res.json({
           success: true,
-          message: 'Logged out successfully'
+          message: 'Logged out successfully',
         });
-
       } catch (error) {
         this.logger.error('Logout failed:', error);
         res.status(500).json({
           success: false,
           error: 'Logout failed',
-          message: 'Internal server error'
+          message: 'Internal server error',
         });
       }
     });
 
     // Admin endpoint to view sessions (protected)
-    this.app.get('/admin/sessions', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        // Check admin scope
-        if (!req.authInfo?.scopes.some(scope => scope.includes('admin'))) {
-          return res.status(403).json({
-            error: 'Insufficient permissions',
-            message: 'Admin scope required'
+    this.app.get(
+      '/admin/sessions',
+      authMiddleware,
+      async (req: AuthenticatedRequest, res: Response) => {
+        try {
+          // Check admin scope
+          if (!req.authInfo?.scopes.some(scope => scope.includes('admin'))) {
+            return res.status(403).json({
+              error: 'Insufficient permissions',
+              message: 'Admin scope required',
+            });
+          }
+
+          const stats = await this.tokenStore.getStats();
+          const sessions = await this.tokenStore.getAllSessions();
+
+          res.json({
+            stats,
+            sessions: sessions.map(session => ({
+              sessionId: session.sessionId,
+              user: session.user,
+              createdAt: session.createdAt,
+              lastUsedAt: session.lastUsedAt,
+              expiresAt: session.expiresAt,
+              scopes: session.scopes,
+              clientInfo: session.clientInfo,
+            })),
+          });
+        } catch (error) {
+          this.logger.error('Admin sessions endpoint failed:', error);
+          res.status(500).json({
+            error: 'Internal server error',
+            message: 'Failed to retrieve sessions',
           });
         }
-
-        const stats = await this.tokenStore.getStats();
-        const sessions = await this.tokenStore.getAllSessions();
-
-        res.json({
-          stats,
-          sessions: sessions.map(session => ({
-            sessionId: session.sessionId,
-            user: session.user,
-            createdAt: session.createdAt,
-            lastUsedAt: session.lastUsedAt,
-            expiresAt: session.expiresAt,
-            scopes: session.scopes,
-            clientInfo: session.clientInfo
-          }))
-        });
-
-      } catch (error) {
-        this.logger.error('Admin sessions endpoint failed:', error);
-        res.status(500).json({
-          error: 'Internal server error',
-          message: 'Failed to retrieve sessions'
-        });
       }
-    });
+    );
 
     // Get token by session ID (for MCP server internal use)
     this.app.get('/internal/token/:sessionId', async (req: Request, res: Response) => {
       try {
         // This endpoint should be protected in production (internal network only)
         const { sessionId } = req.params;
-        
+
         const tokenData = await this.tokenStore.get(sessionId);
-        
+
         if (!tokenData) {
           return res.status(404).json({
             error: 'Session not found',
-            authenticated: false
+            authenticated: false,
           });
         }
 
@@ -699,14 +708,13 @@ export class AuthServer {
           token: tokenData.token,
           user: tokenData.user,
           scopes: tokenData.scopes,
-          expiresAt: tokenData.expiresAt
+          expiresAt: tokenData.expiresAt,
         });
-
       } catch (error) {
         this.logger.error('Internal token lookup failed:', error);
         res.status(500).json({
           error: 'Internal server error',
-          authenticated: false
+          authenticated: false,
         });
       }
     });
@@ -716,7 +724,7 @@ export class AuthServer {
       this.logger.error('Unhandled error:', error);
       res.status(500).json({
         error: 'Internal server error',
-        message: 'An unexpected error occurred'
+        message: 'An unexpected error occurred',
       });
     });
 
@@ -725,55 +733,55 @@ export class AuthServer {
       try {
         const serverUrl = req.get('host') || 'localhost:3000';
         const config = this.iasAuthService.getConfiguration();
-        
+
         const curlCommand = `curl -X POST "${config.tokenEndpoint}" \\
   -H "Content-Type: application/x-www-form-urlencoded" \\
   -d "grant_type=client_credentials&client_id=${config.clientId}&client_secret=${process.env.SAP_IAS_CLIENT_SECRET || 'YOUR_CLIENT_SECRET'}"`;
 
         const instructions = {
-          title: "CLI Authentication Instructions",
+          title: 'CLI Authentication Instructions',
           steps: [
             {
               step: 1,
-              description: "Get an access token using curl",
+              description: 'Get an access token using curl',
               command: curlCommand,
-              note: "This will return a JSON response with an 'access_token' field"
+              note: "This will return a JSON response with an 'access_token' field",
             },
             {
               step: 2,
-              description: "Extract the access token from the response",
+              description: 'Extract the access token from the response',
               example: `# The response will look like:
 # {"access_token":"eyJ...","token_type":"Bearer","expires_in":3600}
-# Copy the access_token value (without quotes)`
+# Copy the access_token value (without quotes)`,
             },
             {
               step: 3,
-              description: "Authenticate with the MCP server",
+              description: 'Authenticate with the MCP server',
               command: `curl -X POST "https://${serverUrl}/auth/cli-auth" \\
   -H "Content-Type: application/json" \\
   -d '{"access_token":"YOUR_ACCESS_TOKEN_HERE"}'`,
-              note: "Replace YOUR_ACCESS_TOKEN_HERE with the token from step 1"
+              note: 'Replace YOUR_ACCESS_TOKEN_HERE with the token from step 1',
             },
             {
               step: 4,
-              description: "Use the session ID in MCP requests",
+              description: 'Use the session ID in MCP requests',
               example: `# The response will contain a sessionId
 # Add this header to your MCP requests:
-# x-mcp-session-id: YOUR_SESSION_ID`
-            }
+# x-mcp-session-id: YOUR_SESSION_ID`,
+            },
           ],
           alternatives: {
             web_login: `https://${serverUrl}/login`,
-            oauth_direct: `${config.authorizationEndpoint}?client_id=${config.clientId}&response_type=code&redirect_uri=https://${serverUrl}/auth/callback&scope=openid profile email`
-          }
+            oauth_direct: `${config.authorizationEndpoint}?client_id=${config.clientId}&response_type=code&redirect_uri=https://${serverUrl}/auth/callback&scope=openid profile email`,
+          },
         };
 
         res.json(instructions);
       } catch (error) {
         this.logger.error('Failed to generate CLI instructions:', error);
-        res.status(500).json({ 
-          error: 'Failed to generate instructions', 
-          details: error instanceof Error ? error.message : 'Unknown error' 
+        res.status(500).json({
+          error: 'Failed to generate instructions',
+          details: error instanceof Error ? error.message : 'Unknown error',
         });
       }
     });
@@ -786,7 +794,11 @@ export class AuthServer {
         const debugConfig = {
           ...config,
           clientId: config.clientId,
-          clientSecret: config.clientId ? (config.clientId.includes('dummy') ? 'DUMMY/NOT_CONFIGURED' : 'PROVIDED') : 'MISSING',
+          clientSecret: config.clientId
+            ? config.clientId.includes('dummy')
+              ? 'DUMMY/NOT_CONFIGURED'
+              : 'PROVIDED'
+            : 'MISSING',
           isConfigured: this.iasAuthService.isProperlyConfigured(),
           supportedGrantTypes: config.supportedGrantTypes,
           supportedScopes: config.supportedScopes,
@@ -794,13 +806,16 @@ export class AuthServer {
             authorization: config.authorizationEndpoint,
             token: config.tokenEndpoint,
             userInfo: config.userInfoEndpoint,
-            introspection: config.introspectionEndpoint
-          }
+            introspection: config.introspectionEndpoint,
+          },
         };
         res.json(debugConfig);
       } catch (error) {
         this.logger.error('Failed to get configuration:', error);
-        res.status(500).json({ error: 'Configuration not available', details: error instanceof Error ? error.message : 'Unknown error' });
+        res.status(500).json({
+          error: 'Configuration not available',
+          details: error instanceof Error ? error.message : 'Unknown error',
+        });
       }
     });
 
@@ -808,73 +823,76 @@ export class AuthServer {
     this.app.post('/xsuaa-auth', async (req: Request, res: Response) => {
       try {
         const { access_token } = req.body;
-        
+
         if (!access_token) {
           return res.status(400).json({
             error: 'Missing access_token',
-            message: 'Please provide an XSUAA access token in the request body'
+            message: 'Please provide an XSUAA access token in the request body',
           });
         }
 
         // Try to create XSUAA security context directly
         const services = xsenv.getServices({ xsuaa: { label: 'xsuaa' } });
         const xsuaaCredentials = services.xsuaa;
-        
+
         if (!xsuaaCredentials) {
           return res.status(500).json({
             error: 'XSUAA service not available',
-            message: 'XSUAA service binding not found'
+            message: 'XSUAA service binding not found',
           });
         }
 
         // Create XSUAA security context directly with the provided token
         const securityContext = await new Promise<any>((resolve, reject) => {
-          xssec.createSecurityContext(`Bearer ${access_token}`, xsuaaCredentials, (err: any, ctx: any) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(ctx);
+          xssec.createSecurityContext(
+            `Bearer ${access_token}`,
+            xsuaaCredentials,
+            (err: any, ctx: any) => {
+              if (err) {
+                reject(err);
+              } else {
+                resolve(ctx);
+              }
             }
-          });
+          );
         });
 
         if (securityContext) {
           const userInfo = securityContext.getTokenInfo();
           const grantedScopes = securityContext.getGrantedScopes();
-          
+
           this.logger.info(`✅ XSUAA direct auth successful for: ${userInfo.getLogonName()}`);
           this.logger.info(`🎫 XSUAA scopes: ${grantedScopes.join(', ')}`);
-          
+
           // Store the token with XSUAA scopes
           const tokenData: TokenData = {
             token: `Bearer ${access_token}`,
             user: userInfo.getLogonName(),
             scopes: grantedScopes,
-            expiresAt: Date.now() + SESSION_LIFETIMES.AUTH_TOKEN_EXPIRY // 8 hours for better MCP experience
+            expiresAt: Date.now() + SESSION_LIFETIMES.AUTH_TOKEN_EXPIRY, // 8 hours for better MCP experience
           };
-          
+
           await this.tokenStore.set(tokenData, undefined, 'global_user_auth');
-          
+
           res.json({
             success: true,
             message: 'XSUAA authentication successful',
             user: userInfo.getLogonName(),
             scopes: grantedScopes,
-            hasAdminScope: grantedScopes.some((scope: string) => scope.includes('.admin'))
+            hasAdminScope: grantedScopes.some((scope: string) => scope.includes('.admin')),
           });
         } else {
           res.status(401).json({
             error: 'Authentication failed',
-            message: 'Could not create XSUAA security context'
+            message: 'Could not create XSUAA security context',
           });
         }
-
       } catch (error) {
         this.logger.error('XSUAA direct authentication failed:', error);
         res.status(401).json({
           error: 'Authentication failed',
           message: error instanceof Error ? error.message : 'Unknown error',
-          details: 'The provided XSUAA token is invalid or expired'
+          details: 'The provided XSUAA token is invalid or expired',
         });
       }
     });
@@ -883,10 +901,15 @@ export class AuthServer {
     this.app.get('/debug/user-scopes', async (req: Request, res: Response) => {
       try {
         let userAuth = null;
-        let scopeInfo: { hasGlobalAuth: boolean; hasSessionAuth: boolean; xsuaaConfig: any } = { hasGlobalAuth: false, hasSessionAuth: false, xsuaaConfig: null };
+        const scopeInfo: { hasGlobalAuth: boolean; hasSessionAuth: boolean; xsuaaConfig: any } = {
+          hasGlobalAuth: false,
+          hasSessionAuth: false,
+          xsuaaConfig: null,
+        };
 
         // Try to get authentication info from session or global auth
-        const sessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+        const sessionId =
+          (req.query.session as string) || (req.headers['x-mcp-session-id'] as string);
         if (sessionId) {
           const tokenData = await this.tokenStore.get(sessionId);
           if (tokenData && Date.now() < tokenData.expiresAt) {
@@ -907,11 +930,13 @@ export class AuthServer {
         // Get XSUAA configuration for scope prefix analysis
         try {
           const services = xsenv.getServices({ xsuaa: { label: 'xsuaa' } });
-          scopeInfo.xsuaaConfig = services.xsuaa ? {
-            xsappname: (services.xsuaa as any).xsappname,
-            clientid: (services.xsuaa as any).clientid,
-            url: (services.xsuaa as any).url
-          } : null;
+          scopeInfo.xsuaaConfig = services.xsuaa
+            ? {
+                xsappname: (services.xsuaa as any).xsappname,
+                clientid: (services.xsuaa as any).clientid,
+                url: (services.xsuaa as any).url,
+              }
+            : null;
         } catch (error) {
           this.logger.debug('XSUAA service not available:', error);
         }
@@ -924,30 +949,35 @@ export class AuthServer {
             instructions: {
               sessionAuth: 'Add ?session=YOUR_SESSION_ID to check specific session',
               globalAuth: 'Login via /auth/login to create global auth',
-              adminAccess: 'Admin access requires scope with format: {xsappname}.admin'
-            }
+              adminAccess: 'Admin access requires scope with format: {xsappname}.admin',
+            },
           });
         }
 
         // Analyze scopes for admin access
-        const xsappname = (scopeInfo.xsuaaConfig as any)?.xsappname || process.env.XSUAA_XSAPPNAME || 'btp-sap-odata-to-mcp-server';
+        const xsappname =
+          (scopeInfo.xsuaaConfig as any)?.xsappname ||
+          process.env.XSUAA_XSAPPNAME ||
+          'btp-sap-odata-to-mcp-server';
         const expectedAdminScope = `${xsappname}.admin`;
-        const hasAdminScope = userAuth.scopes?.includes(expectedAdminScope) || userAuth.scopes?.some(scope => scope.includes('admin'));
-        
+        const hasAdminScope =
+          userAuth.scopes?.includes(expectedAdminScope) ||
+          userAuth.scopes?.some(scope => scope.includes('admin'));
+
         // Check for other scope variations
         const scopeAnalysis = {
           totalScopes: userAuth.scopes?.length || 0,
           scopes: userAuth.scopes || [],
           expectedAdminScope,
           hasAdminScope,
-          adminScopeVariants: (userAuth.scopes || []).filter(scope => 
-            scope.includes('admin') || scope.includes('Admin') || scope.includes('ADMIN')
+          adminScopeVariants: (userAuth.scopes || []).filter(
+            scope => scope.includes('admin') || scope.includes('Admin') || scope.includes('ADMIN')
           ),
           allScopePatterns: (userAuth.scopes || []).map(scope => ({
             scope,
             hasAppPrefix: scope.includes('.'),
-            appName: scope.includes('.') ? scope.split('.')[0] : null
-          }))
+            appName: scope.includes('.') ? scope.split('.')[0] : null,
+          })),
         };
 
         res.json({
@@ -960,35 +990,42 @@ export class AuthServer {
           scopeAnalysis,
           adminAccessStatus: {
             hasAccess: hasAdminScope,
-            reason: hasAdminScope ? 'Has required admin scope' : 
-              scopeAnalysis.adminScopeVariants.length > 0 ? 
-                'Has admin-like scopes but not the expected format' : 
-                'No admin scopes found',
-            troubleshooting: hasAdminScope ? null : {
-              expectedScope: expectedAdminScope,
-              xsSecurityConfiguration: {
-                definedRoleCollections: (process.env.ROLE_COLLECTIONS || 'MCPAdministrator,MCPUser,MCPManager,MCPViewer').split(','),
-                definedRoleTemplates: (process.env.ROLE_TEMPLATES || 'MCPAdmin,MCPEditor,MCPManager,MCPViewer').split(','),
-                adminRoleCollection: process.env.ADMIN_ROLE_COLLECTION || 'MCPAdministrator',
-                adminRoleTemplate: 'MCPAdmin'
-              },
-              xsappnameCheck: `Current xsappname: ${xsappname}`,
-              suggestedActions: [
-                `Verify user is assigned to "${process.env.ADMIN_ROLE_COLLECTION || 'MCPAdministrator'}" role collection (not "mcpadmin")`,
-                'Check if XSUAA service was updated with latest xs-security.json',
-                'Confirm role collection exists and maps to MCPAdmin role template',
-                'Verify XSUAA service binding is properly configured'
-              ]
-            }
-          }
+            reason: hasAdminScope
+              ? 'Has required admin scope'
+              : scopeAnalysis.adminScopeVariants.length > 0
+                ? 'Has admin-like scopes but not the expected format'
+                : 'No admin scopes found',
+            troubleshooting: hasAdminScope
+              ? null
+              : {
+                  expectedScope: expectedAdminScope,
+                  xsSecurityConfiguration: {
+                    definedRoleCollections: (
+                      process.env.ROLE_COLLECTIONS ||
+                      'MCPAdministrator,MCPUser,MCPManager,MCPViewer'
+                    ).split(','),
+                    definedRoleTemplates: (
+                      process.env.ROLE_TEMPLATES || 'MCPAdmin,MCPEditor,MCPManager,MCPViewer'
+                    ).split(','),
+                    adminRoleCollection: process.env.ADMIN_ROLE_COLLECTION || 'MCPAdministrator',
+                    adminRoleTemplate: 'MCPAdmin',
+                  },
+                  xsappnameCheck: `Current xsappname: ${xsappname}`,
+                  suggestedActions: [
+                    `Verify user is assigned to "${process.env.ADMIN_ROLE_COLLECTION || 'MCPAdministrator'}" role collection (not "mcpadmin")`,
+                    'Check if XSUAA service was updated with latest xs-security.json',
+                    'Confirm role collection exists and maps to MCPAdmin role template',
+                    'Verify XSUAA service binding is properly configured',
+                  ],
+                },
+          },
         });
-
       } catch (error) {
         this.logger.error('Failed to analyze user scopes:', error);
         res.status(500).json({
           error: 'Internal server error',
           message: 'Failed to analyze user scopes',
-          details: error instanceof Error ? error.message : 'Unknown error'
+          details: error instanceof Error ? error.message : 'Unknown error',
         });
       }
     });
@@ -1001,7 +1038,8 @@ export class AuthServer {
         let userInfo = null;
 
         // Try session-based authentication first (for browsers)
-        const sessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+        const sessionId =
+          (req.query.session as string) || (req.headers['x-mcp-session-id'] as string);
         if (sessionId) {
           try {
             const tokenData = await this.tokenStore.get(sessionId);
@@ -1009,7 +1047,9 @@ export class AuthServer {
               isAuthenticated = true;
               hasAdminScope = tokenData.scopes?.some(scope => scope.includes('admin')) || false;
               userInfo = { user: tokenData.user, scopes: tokenData.scopes };
-              this.logger.debug(`Session auth for admin page: ${tokenData.user}, admin: ${hasAdminScope}`);
+              this.logger.debug(
+                `Session auth for admin page: ${tokenData.user}, admin: ${hasAdminScope}`
+              );
             }
           } catch (error) {
             this.logger.debug('Session auth failed:', error);
@@ -1024,7 +1064,9 @@ export class AuthServer {
               isAuthenticated = true;
               hasAdminScope = globalAuth.scopes?.some(scope => scope.includes('admin')) || false;
               userInfo = { user: globalAuth.user, scopes: globalAuth.scopes };
-              this.logger.debug(`Global auth for admin page: ${globalAuth.user}, admin: ${hasAdminScope}`);
+              this.logger.debug(
+                `Global auth for admin page: ${globalAuth.user}, admin: ${hasAdminScope}`
+              );
             }
           } catch (error) {
             this.logger.debug('Global auth failed:', error);
@@ -1039,7 +1081,7 @@ export class AuthServer {
               const token = authHeader.substring(7);
               const services = xsenv.getServices({ xsuaa: { label: 'xsuaa' } });
               const xsuaaCredentials = services.xsuaa as { xsappname: string };
-              
+
               const securityContext = await new Promise((resolve, reject) => {
                 xssec.createSecurityContext(token, xsuaaCredentials, (err: any, ctx: any) => {
                   if (err) reject(err);
@@ -1048,15 +1090,16 @@ export class AuthServer {
               });
 
               const authInfo = this.extractAuthInfo(securityContext as any);
-              
+
               // Use xsappname from XSUAA credentials for correct scope check
               const requiredScope = `${xsuaaCredentials.xsappname}.admin`;
-              
+
               isAuthenticated = true;
               hasAdminScope = authInfo.scopes.includes(requiredScope);
               userInfo = { user: authInfo.user, scopes: authInfo.scopes };
-              this.logger.debug(`JWT auth for admin page: ${authInfo.user}, admin: ${hasAdminScope}`);
-              
+              this.logger.debug(
+                `JWT auth for admin page: ${authInfo.user}, admin: ${hasAdminScope}`
+              );
             } catch (authError) {
               this.logger.debug('JWT auth failed:', authError);
             }
@@ -1085,7 +1128,6 @@ export class AuthServer {
 
         // User is authenticated and has admin scope - serve the admin dashboard
         res.sendFile(path.join(__dirname, '../public/admin.html'));
-
       } catch (error) {
         this.logger.error('Admin dashboard access failed:', error);
         res.status(500).send(`
@@ -1108,62 +1150,77 @@ export class AuthServer {
         let isAuthenticated = false;
         let hasAdminScope = false;
         let authenticatedUser = 'Unknown';
-        
+
         // Try session-based authentication first
-        const sessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+        const sessionId =
+          (req.query.session as string) || (req.headers['x-mcp-session-id'] as string);
         this.logger.debug(`Admin /admin/users endpoint - sessionId: ${sessionId}`);
         if (sessionId) {
           const tokenData = await this.tokenStore.get(sessionId);
           this.logger.debug(`Admin /admin/users endpoint - tokenData found: ${!!tokenData}`);
           if (tokenData) {
-            this.logger.debug(`Admin /admin/users endpoint - tokenData.expiresAt: ${tokenData.expiresAt}, now: ${Date.now()}, valid: ${Date.now() < tokenData.expiresAt}`);
-            this.logger.debug(`Admin /admin/users endpoint - tokenData.scopes: ${JSON.stringify(tokenData.scopes)}`);
+            this.logger.debug(
+              `Admin /admin/users endpoint - tokenData.expiresAt: ${tokenData.expiresAt}, now: ${Date.now()}, valid: ${Date.now() < tokenData.expiresAt}`
+            );
+            this.logger.debug(
+              `Admin /admin/users endpoint - tokenData.scopes: ${JSON.stringify(tokenData.scopes)}`
+            );
           }
           if (tokenData && Date.now() < tokenData.expiresAt) {
             isAuthenticated = true;
             hasAdminScope = tokenData.scopes?.some(scope => scope.includes('admin')) || false;
             authenticatedUser = tokenData.user || 'Unknown';
-            this.logger.debug(`Admin /admin/users endpoint - authenticated: ${isAuthenticated}, hasAdminScope: ${hasAdminScope}`);
+            this.logger.debug(
+              `Admin /admin/users endpoint - authenticated: ${isAuthenticated}, hasAdminScope: ${hasAdminScope}`
+            );
           }
         }
-        
+
         // Try global session if no specific session found
         if (!isAuthenticated) {
           this.logger.debug(`Admin /admin/users endpoint - trying global session`);
           const globalAuth = await this.tokenStore.get('global_user_auth');
           this.logger.debug(`Admin /admin/users endpoint - globalAuth found: ${!!globalAuth}`);
           if (globalAuth) {
-            this.logger.debug(`Admin /admin/users endpoint - globalAuth.expiresAt: ${globalAuth.expiresAt}, now: ${Date.now()}, valid: ${Date.now() < globalAuth.expiresAt}`);
-            this.logger.debug(`Admin /admin/users endpoint - globalAuth.scopes: ${JSON.stringify(globalAuth.scopes)}`);
+            this.logger.debug(
+              `Admin /admin/users endpoint - globalAuth.expiresAt: ${globalAuth.expiresAt}, now: ${Date.now()}, valid: ${Date.now() < globalAuth.expiresAt}`
+            );
+            this.logger.debug(
+              `Admin /admin/users endpoint - globalAuth.scopes: ${JSON.stringify(globalAuth.scopes)}`
+            );
           }
           if (globalAuth && Date.now() < globalAuth.expiresAt) {
             isAuthenticated = true;
             hasAdminScope = globalAuth.scopes?.some(scope => scope.includes('admin')) || false;
             authenticatedUser = globalAuth.user || 'Unknown';
-            this.logger.debug(`Admin /admin/users endpoint - global auth: authenticated: ${isAuthenticated}, hasAdminScope: ${hasAdminScope}`);
+            this.logger.debug(
+              `Admin /admin/users endpoint - global auth: authenticated: ${isAuthenticated}, hasAdminScope: ${hasAdminScope}`
+            );
           }
         }
-        
+
         if (!isAuthenticated) {
           this.logger.debug(`Admin /admin/users endpoint - authentication failed, returning 401`);
           return res.status(401).json({ error: 'Authentication required' });
         }
-        
+
         if (!hasAdminScope) {
-          this.logger.debug(`Admin /admin/users endpoint - admin scope check failed, returning 403`);
+          this.logger.debug(
+            `Admin /admin/users endpoint - admin scope check failed, returning 403`
+          );
           return res.status(403).json({ error: 'Admin access required' });
         }
 
         this.logger.debug(`Admin /admin/users endpoint - authentication successful, proceeding`);
         // Get all active sessions
         const allSessions = await this.tokenStore.getAllSessions();
-        
+
         // Group sessions by user to merge session types
         const userSessionsMap = new Map<string, any>();
-        
+
         allSessions.forEach(tokenData => {
           const userId = tokenData.user;
-          
+
           // Determine user role based on scopes
           let role = 'user';
           if (tokenData.scopes?.some(scope => scope.includes('admin'))) {
@@ -1184,8 +1241,10 @@ export class AuthServer {
           if (userSessionsMap.has(userId)) {
             // Merge with existing user entry
             const existingUser = userSessionsMap.get(userId);
-            existingUser.sessionTypes = [...new Set([...existingUser.sessionTypes, ...sessionTypes])];
-            
+            existingUser.sessionTypes = [
+              ...new Set([...existingUser.sessionTypes, ...sessionTypes]),
+            ];
+
             // Use the most recent session data
             if (tokenData.lastUsedAt > new Date(existingUser.lastActivity).getTime()) {
               existingUser.sessionId = tokenData.sessionId;
@@ -1193,7 +1252,7 @@ export class AuthServer {
               existingUser.clientInfo = {
                 userAgent: tokenData.clientInfo?.userAgent || 'Unknown',
                 ipAddress: tokenData.clientInfo?.ipAddress || 'Unknown',
-                clientId: tokenData.clientInfo?.clientId || 'Unknown'
+                clientId: tokenData.clientInfo?.clientId || 'Unknown',
               };
             }
           } else {
@@ -1209,10 +1268,10 @@ export class AuthServer {
               clientInfo: {
                 userAgent: tokenData.clientInfo?.userAgent || 'Unknown',
                 ipAddress: tokenData.clientInfo?.ipAddress || 'Unknown',
-                clientId: tokenData.clientInfo?.clientId || 'Unknown'
+                clientId: tokenData.clientInfo?.clientId || 'Unknown',
               },
               isActive: tokenData.expiresAt > Date.now(),
-              sessionTypes: sessionTypes
+              sessionTypes: sessionTypes,
             });
           }
         });
@@ -1220,11 +1279,13 @@ export class AuthServer {
         // Convert map to array and format session types
         const users = Array.from(userSessionsMap.values()).map(user => ({
           ...user,
-          sessionType: user.sessionTypes.join(' + ')
+          sessionType: user.sessionTypes.join(' + '),
         }));
 
         // Sort by authentication time (most recent first)
-        users.sort((a, b) => new Date(b.authenticatedAt).getTime() - new Date(a.authenticatedAt).getTime());
+        users.sort(
+          (a, b) => new Date(b.authenticatedAt).getTime() - new Date(a.authenticatedAt).getTime()
+        );
 
         // Get statistics
         const stats = await this.tokenStore.getStats();
@@ -1240,17 +1301,16 @@ export class AuthServer {
             adminUsers: users.filter(u => u.role === 'admin').length,
             editorUsers: users.filter(u => u.role === 'editor').length,
             viewerUsers: users.filter(u => u.role === 'viewer').length,
-            globalSessions: users.filter(u => u.sessionType === 'Global Authentication').length
+            globalSessions: users.filter(u => u.sessionType === 'Global Authentication').length,
           },
           users: users,
-          systemStats: stats
+          systemStats: stats,
         });
-
       } catch (error) {
         this.logger.error('Admin users endpoint failed:', error);
         res.status(500).json({
           error: 'Internal server error',
-          message: 'Failed to retrieve user information'
+          message: 'Failed to retrieve user information',
         });
       }
     });
@@ -1262,9 +1322,10 @@ export class AuthServer {
         let isAuthenticated = false;
         let hasAdminScope = false;
         let authenticatedUser = 'Unknown';
-        
+
         // Try session-based authentication first
-        const authSessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+        const authSessionId =
+          (req.query.session as string) || (req.headers['x-mcp-session-id'] as string);
         if (authSessionId) {
           const tokenData = await this.tokenStore.get(authSessionId);
           if (tokenData && Date.now() < tokenData.expiresAt) {
@@ -1273,7 +1334,7 @@ export class AuthServer {
             authenticatedUser = tokenData.user || 'Unknown';
           }
         }
-        
+
         // Try global session if no specific session found
         if (!isAuthenticated) {
           const globalAuth = await this.tokenStore.get('global_user_auth');
@@ -1283,11 +1344,11 @@ export class AuthServer {
             authenticatedUser = globalAuth.user || 'Unknown';
           }
         }
-        
+
         if (!isAuthenticated) {
           return res.status(401).json({ error: 'Authentication required' });
         }
-        
+
         if (!hasAdminScope) {
           return res.status(403).json({ error: 'Admin access required' });
         }
@@ -1298,35 +1359,34 @@ export class AuthServer {
         if (!tokenData) {
           return res.status(404).json({
             error: 'Session not found',
-            message: 'The specified session does not exist or has expired'
+            message: 'The specified session does not exist or has expired',
           });
         }
 
         const success = await this.tokenStore.remove(sessionId);
-        
+
         if (success) {
           this.logger.info(`Admin ${authenticatedUser} deleted session for user ${tokenData.user}`);
-          
+
           res.json({
             success: true,
             message: 'User session deleted successfully',
             user: tokenData.user,
             sessionId: sessionId,
             deletedBy: authenticatedUser,
-            deletedAt: new Date().toISOString()
+            deletedAt: new Date().toISOString(),
           });
         } else {
           res.status(500).json({
             error: 'Deletion failed',
-            message: 'Failed to delete user session'
+            message: 'Failed to delete user session',
           });
         }
-
       } catch (error) {
         this.logger.error('Admin session deletion failed:', error);
         res.status(500).json({
           error: 'Internal server error',
-          message: 'Failed to delete user session'
+          message: 'Failed to delete user session',
         });
       }
     });
@@ -1338,9 +1398,10 @@ export class AuthServer {
         let isAuthenticated = false;
         let hasAdminScope = false;
         let authenticatedUser = 'Unknown';
-        
+
         // Try session-based authentication first
-        const authSessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+        const authSessionId =
+          (req.query.session as string) || (req.headers['x-mcp-session-id'] as string);
         if (authSessionId) {
           const tokenData = await this.tokenStore.get(authSessionId);
           if (tokenData && Date.now() < tokenData.expiresAt) {
@@ -1349,7 +1410,7 @@ export class AuthServer {
             authenticatedUser = tokenData.user || 'Unknown';
           }
         }
-        
+
         // Try global session if no specific session found
         if (!isAuthenticated) {
           const globalAuth = await this.tokenStore.get('global_user_auth');
@@ -1359,11 +1420,11 @@ export class AuthServer {
             authenticatedUser = globalAuth.user || 'Unknown';
           }
         }
-        
+
         if (!isAuthenticated) {
           return res.status(401).json({ error: 'Authentication required' });
         }
-        
+
         if (!hasAdminScope) {
           return res.status(403).json({ error: 'Admin access required' });
         }
@@ -1376,7 +1437,7 @@ export class AuthServer {
         if (!role || !validRoles.includes(role)) {
           return res.status(400).json({
             error: 'Invalid role',
-            message: 'Role must be one of: admin, editor, viewer'
+            message: 'Role must be one of: admin, editor, viewer',
           });
         }
 
@@ -1385,14 +1446,16 @@ export class AuthServer {
         if (!tokenData) {
           return res.status(404).json({
             error: 'Session not found',
-            message: 'The specified session does not exist or has expired'
+            message: 'The specified session does not exist or has expired',
           });
         }
 
         // Note: In a real implementation, you would update the user role in your identity provider
         // For now, we'll return a success message as role changes require identity provider updates
-        this.logger.info(`Admin ${authenticatedUser} requested role change for ${tokenData.user} to ${role}`);
-        
+        this.logger.info(
+          `Admin ${authenticatedUser} requested role change for ${tokenData.user} to ${role}`
+        );
+
         res.json({
           success: true,
           message: `Role update request processed. Note: Role changes require identity provider configuration updates.`,
@@ -1400,14 +1463,13 @@ export class AuthServer {
           requestedRole: role,
           currentScopes: tokenData.scopes,
           updatedBy: authenticatedUser,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
         });
-
       } catch (error) {
         this.logger.error('Admin role update failed:', error);
         res.status(500).json({
           error: 'Internal server error',
-          message: 'Failed to update user role'
+          message: 'Failed to update user role',
         });
       }
     });
@@ -1419,9 +1481,10 @@ export class AuthServer {
         let isAuthenticated = false;
         let hasAdminScope = false;
         let authenticatedUser = 'Unknown';
-        
+
         // Try session-based authentication first
-        const authSessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+        const authSessionId =
+          (req.query.session as string) || (req.headers['x-mcp-session-id'] as string);
         if (authSessionId) {
           const tokenData = await this.tokenStore.get(authSessionId);
           if (tokenData && Date.now() < tokenData.expiresAt) {
@@ -1430,7 +1493,7 @@ export class AuthServer {
             authenticatedUser = tokenData.user || 'Unknown';
           }
         }
-        
+
         // Try global session if no specific session found
         if (!isAuthenticated) {
           const globalAuth = await this.tokenStore.get('global_user_auth');
@@ -1440,21 +1503,21 @@ export class AuthServer {
             authenticatedUser = globalAuth.user || 'Unknown';
           }
         }
-        
+
         if (!isAuthenticated) {
           return res.status(401).json({ error: 'Authentication required' });
         }
-        
+
         if (!hasAdminScope) {
           return res.status(403).json({ error: 'Admin access required' });
         }
 
         const { sessionId } = req.body;
-        
+
         if (!sessionId) {
           return res.status(400).json({
             error: 'Missing sessionId',
-            message: 'Session ID is required'
+            message: 'Session ID is required',
           });
         }
 
@@ -1462,35 +1525,34 @@ export class AuthServer {
         if (!tokenData) {
           return res.status(404).json({
             error: 'Session not found',
-            message: 'The specified session does not exist or has expired'
+            message: 'The specified session does not exist or has expired',
           });
         }
 
         const success = await this.tokenStore.remove(sessionId);
-        
+
         if (success) {
           this.logger.info(`Admin ${authenticatedUser} deleted session for user ${tokenData.user}`);
-          
+
           res.json({
             success: true,
             message: 'User session deleted successfully',
             user: tokenData.user,
             sessionId: sessionId,
             deletedBy: authenticatedUser,
-            deletedAt: new Date().toISOString()
+            deletedAt: new Date().toISOString(),
           });
         } else {
           res.status(500).json({
             error: 'Deletion failed',
-            message: 'Failed to delete user session'
+            message: 'Failed to delete user session',
           });
         }
-
       } catch (error) {
         this.logger.error('Admin session deletion failed:', error);
         res.status(500).json({
           error: 'Internal server error',
-          message: 'Failed to delete user session'
+          message: 'Failed to delete user session',
         });
       }
     });
@@ -1502,9 +1564,10 @@ export class AuthServer {
         let isAuthenticated = false;
         let hasAdminScope = false;
         let authenticatedUser = 'Unknown';
-        
+
         // Try session-based authentication first
-        const authSessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+        const authSessionId =
+          (req.query.session as string) || (req.headers['x-mcp-session-id'] as string);
         if (authSessionId) {
           const tokenData = await this.tokenStore.get(authSessionId);
           if (tokenData && Date.now() < tokenData.expiresAt) {
@@ -1513,7 +1576,7 @@ export class AuthServer {
             authenticatedUser = tokenData.user || 'Unknown';
           }
         }
-        
+
         // Try global session if no specific session found
         if (!isAuthenticated) {
           const globalAuth = await this.tokenStore.get('global_user_auth');
@@ -1523,20 +1586,20 @@ export class AuthServer {
             authenticatedUser = globalAuth.user || 'Unknown';
           }
         }
-        
+
         if (!isAuthenticated) {
           return res.status(401).json({ error: 'Authentication required' });
         }
-        
+
         if (!hasAdminScope) {
           return res.status(403).json({ error: 'Admin access required' });
         }
 
         // Trigger OData configuration reload
         const reloadResult = await this.reloadODataConfig();
-        
+
         this.logger.info(`Admin ${authenticatedUser} triggered OData config reload`);
-        
+
         // The actual rediscovery will be triggered by the main application
         // This endpoint serves as a trigger mechanism
         res.json({
@@ -1545,14 +1608,13 @@ export class AuthServer {
           details: reloadResult.message,
           triggeredBy: authenticatedUser,
           triggeredAt: new Date().toISOString(),
-          note: 'Service rediscovery will begin shortly. Check logs for progress.'
+          note: 'Service rediscovery will begin shortly. Check logs for progress.',
         });
-
       } catch (error) {
         this.logger.error('OData config reload failed:', error);
         res.status(500).json({
           error: 'Internal server error',
-          message: 'Failed to reload OData configuration'
+          message: 'Failed to reload OData configuration',
         });
       }
     });
@@ -1563,8 +1625,9 @@ export class AuthServer {
         // Session-based authentication check (same as reload endpoint)
         let isAuthenticated = false;
         let hasAdminScope = false;
-        
-        const authSessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+
+        const authSessionId =
+          (req.query.session as string) || (req.headers['x-mcp-session-id'] as string);
         if (authSessionId) {
           const tokenData = await this.tokenStore.get(authSessionId);
           if (tokenData && Date.now() < tokenData.expiresAt) {
@@ -1576,24 +1639,23 @@ export class AuthServer {
         if (!isAuthenticated) {
           return res.status(401).json({
             error: 'Authentication required',
-            message: 'Valid session required to access admin endpoints'
+            message: 'Valid session required to access admin endpoints',
           });
         }
 
         // Get current configuration from config and discovered services count
         const configStatus = await this.getODataConfigStatus();
-        
+
         res.json({
           success: true,
           timestamp: new Date().toISOString(),
-          configuration: configStatus
+          configuration: configStatus,
         });
-
       } catch (error) {
         this.logger.error('Failed to get OData config status:', error);
         res.status(500).json({
           error: 'Internal server error',
-          message: 'Failed to retrieve OData configuration status'
+          message: 'Failed to retrieve OData configuration status',
         });
       }
     });
@@ -1604,8 +1666,9 @@ export class AuthServer {
         // Session-based authentication check (same as other admin endpoints)
         let isAuthenticated = false;
         let hasAdminScope = false;
-        
-        const authSessionId = req.query.session as string || req.headers['x-mcp-session-id'] as string;
+
+        const authSessionId =
+          (req.query.session as string) || (req.headers['x-mcp-session-id'] as string);
         if (authSessionId) {
           const tokenData = await this.tokenStore.get(authSessionId);
           if (tokenData && Date.now() < tokenData.expiresAt) {
@@ -1617,14 +1680,14 @@ export class AuthServer {
         if (!isAuthenticated) {
           return res.status(401).json({
             error: 'Authentication required',
-            message: 'Valid session required to access admin endpoints'
+            message: 'Valid session required to access admin endpoints',
           });
         }
 
         // Get destination status from the callback if available
         // Pass the authenticated user's JWT token for Principal Propagation testing
         let userJWT = undefined;
-        
+
         // Try to get JWT from session first
         if (authSessionId) {
           const tokenData = await this.tokenStore.get(authSessionId);
@@ -1635,7 +1698,7 @@ export class AuthServer {
             this.logger.debug(`No JWT found in session ${authSessionId}, trying global session`);
           }
         }
-        
+
         // If no JWT from session, try global session
         if (!userJWT) {
           const globalAuth = await this.tokenStore.get('global_user_auth');
@@ -1643,23 +1706,24 @@ export class AuthServer {
             userJWT = globalAuth.token;
             this.logger.debug('Using JWT from global session for destination testing');
           } else {
-            this.logger.warn('No JWT found in any session - Principal Propagation testing may fail');
+            this.logger.warn(
+              'No JWT found in any session - Principal Propagation testing may fail'
+            );
           }
         }
-        
+
         const destinationStatus = await this.getDestinationStatus(userJWT);
-        
+
         res.json({
           success: true,
           timestamp: new Date().toISOString(),
-          destinations: destinationStatus
+          destinations: destinationStatus,
         });
-
       } catch (error) {
         this.logger.error('Failed to get destination status:', error);
         res.status(500).json({
           error: 'Internal server error',
-          message: 'Failed to retrieve destination status'
+          message: 'Failed to retrieve destination status',
         });
       }
     });
@@ -1680,7 +1744,6 @@ export class AuthServer {
           this.logger.error('Server error:', error);
           reject(error);
         });
-
       } catch (error) {
         this.logger.error('Failed to start auth server:', error);
         reject(error);
@@ -1689,7 +1752,7 @@ export class AuthServer {
   }
 
   async stop(): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       if (this.server) {
         this.server.close(() => {
           this.logger.info('Auth server stopped');
@@ -1705,14 +1768,14 @@ export class AuthServer {
   private extractAuthInfo(securityContext: any) {
     const userInfo = securityContext.getTokenInfo();
     const scopes = securityContext.getGrantedScopes();
-    
+
     return {
       user: userInfo.getGivenName() + ' ' + userInfo.getFamilyName() || userInfo.getLogonName(),
       email: userInfo.getEmail(),
       scopes: scopes,
       tenant: userInfo.getIdentityZone(),
       userId: userInfo.getLogonName(),
-      isAuthenticated: true
+      isAuthenticated: true,
     };
   }
 
@@ -1720,41 +1783,63 @@ export class AuthServer {
    * Trigger OData service configuration reload and rediscovery
    * This method will be set by the main application during initialization
    */
-  private reloadODataCallback?: () => Promise<{ success: boolean; servicesCount: number; message: string }>;
-  private getODataStatusCallback?: () => Promise<{ 
-    config: Record<string, unknown>; 
-    servicesCount: number; 
+  private reloadODataCallback?: () => Promise<{
+    success: boolean;
+    servicesCount: number;
+    message: string;
+  }>;
+  private getODataStatusCallback?: () => Promise<{
+    config: Record<string, unknown>;
+    servicesCount: number;
     discoveredServices: Array<{ id: string; name: string; url: string; entities: number }>;
   }>;
   private getDestinationStatusCallback?: (userJWT?: string) => Promise<{
     designTime: { name: string; available: boolean; error?: string; authType?: string };
-    runtime: { name: string; available: boolean; error?: string; authType?: string; hybrid?: boolean };
-    config: { useSingleDestination: boolean; };
+    runtime: {
+      name: string;
+      available: boolean;
+      error?: string;
+      authType?: string;
+      hybrid?: boolean;
+    };
+    config: { useSingleDestination: boolean };
   }>;
 
-  setReloadCallback(callback: () => Promise<{ success: boolean; servicesCount: number; message: string }>) {
+  setReloadCallback(
+    callback: () => Promise<{ success: boolean; servicesCount: number; message: string }>
+  ) {
     this.reloadODataCallback = callback;
   }
 
-  setStatusCallback(callback: () => Promise<{ 
-    config: Record<string, unknown>; 
-    servicesCount: number; 
-    discoveredServices: Array<{ id: string; name: string; url: string; entities: number }>;
-  }>) {
+  setStatusCallback(
+    callback: () => Promise<{
+      config: Record<string, unknown>;
+      servicesCount: number;
+      discoveredServices: Array<{ id: string; name: string; url: string; entities: number }>;
+    }>
+  ) {
     this.getODataStatusCallback = callback;
   }
 
-  setDestinationStatusCallback(callback: (userJWT?: string) => Promise<{
-    designTime: { name: string; available: boolean; error?: string; authType?: string };
-    runtime: { name: string; available: boolean; error?: string; authType?: string; hybrid?: boolean };
-    config: { useSingleDestination: boolean; };
-  }>) {
+  setDestinationStatusCallback(
+    callback: (userJWT?: string) => Promise<{
+      designTime: { name: string; available: boolean; error?: string; authType?: string };
+      runtime: {
+        name: string;
+        available: boolean;
+        error?: string;
+        authType?: string;
+        hybrid?: boolean;
+      };
+      config: { useSingleDestination: boolean };
+    }>
+  ) {
     this.getDestinationStatusCallback = callback;
   }
 
-  async getODataConfigStatus(): Promise<{ 
-    config: Record<string, unknown>; 
-    servicesCount: number; 
+  async getODataConfigStatus(): Promise<{
+    config: Record<string, unknown>;
+    servicesCount: number;
     discoveredServices: Array<{ id: string; name: string; url: string; entities: number }>;
   }> {
     if (this.getODataStatusCallback) {
@@ -1764,47 +1849,65 @@ export class AuthServer {
       return {
         config: { error: 'Status callback not configured' },
         servicesCount: 0,
-        discoveredServices: []
+        discoveredServices: [],
       };
     }
   }
 
   async getDestinationStatus(userJWT?: string): Promise<{
     designTime: { name: string; available: boolean; error?: string; authType?: string };
-    runtime: { name: string; available: boolean; error?: string; authType?: string; hybrid?: boolean };
-    config: { useSingleDestination: boolean; };
+    runtime: {
+      name: string;
+      available: boolean;
+      error?: string;
+      authType?: string;
+      hybrid?: boolean;
+    };
+    config: { useSingleDestination: boolean };
   }> {
     if (this.getDestinationStatusCallback) {
       return await this.getDestinationStatusCallback(userJWT);
     } else {
       // Fallback if callback not set
       return {
-        designTime: { name: 'Not configured', available: false, error: 'Status callback not configured' },
-        runtime: { name: 'Not configured', available: false, error: 'Status callback not configured' },
-        config: { useSingleDestination: false }
+        designTime: {
+          name: 'Not configured',
+          available: false,
+          error: 'Status callback not configured',
+        },
+        runtime: {
+          name: 'Not configured',
+          available: false,
+          error: 'Status callback not configured',
+        },
+        config: { useSingleDestination: false },
       };
     }
   }
 
-  async reloadODataConfig(): Promise<{ success: boolean; message: string; servicesCount?: number }> {
+  async reloadODataConfig(): Promise<{
+    success: boolean;
+    message: string;
+    servicesCount?: number;
+  }> {
     try {
       if (this.reloadODataCallback) {
         const result = await this.reloadODataCallback();
         return {
           success: result.success,
           message: result.message,
-          servicesCount: result.servicesCount
+          servicesCount: result.servicesCount,
         };
       } else {
         return {
           success: false,
-          message: 'OData reload callback not set - rediscovery not available'
+          message: 'OData reload callback not set - rediscovery not available',
         };
       }
     } catch (error) {
       return {
         success: false,
-        message: `Failed to reload OData config: ${error}`
+        message: `Failed to reload OData config: ${error}`,
       };
     }
   }
@@ -1820,5 +1923,4 @@ export class AuthServer {
   getApp(): express.Application {
     return this.app;
   }
-
 }

@@ -40,18 +40,26 @@
   ],
   "type": "module",
   "engines": {
-    "node": "18.x || 20.x || 22.x || 24.x",
+    "node": "18.x || 20.x || 22.x",
     "npm": ">=8.0.0"
   },
   "scripts": {
     "build": "tsc && cp -r src/public dist/",
     "build:watch": "tsc --watch",
+    "prebuild": "echo 'Quality checks available: npm run quality'",
     "start": "node dist/index.js",
     "start:http": "npm run build && node dist/index.js",
     "start:stdio": "npm run build && node dist/mcp-server.js",
     "mcp": "npm run build && node mcp-stdio.js",
     "inspect:mcp": "npm run build && npx @modelcontextprotocol/inspector node dist/mcp-server.js",
     "inspect": "npx @modelcontextprotocol/inspector",
+    "lint": "eslint src/**/*.ts --fix",
+    "lint:check": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.{ts,js,json}",
+    "format:check": "prettier --check src/**/*.{ts,js,json}",
+    "type-check": "tsc --noEmit",
+    "quality": "npm run lint:check && npm run format:check && npm run type-check",
+    "quality:fix": "npm run lint && npm run format && npm run type-check",
     "test": "node scripts/unified-test-runner.js",
     "test:jest": "jest",
     "test:jest:watch": "jest --watch",
@@ -69,7 +77,8 @@
     "test:full": "node tests/run-tests.js --suite=all --verbose",
     "build:btp": "mbt build",
     "deploy:btp": "cf deploy ./mta_archives/btp-sap-odata-to-mcp-server-optimized_1.0.1.mtar",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "prepare": "if [ \"$NODE_ENV\" != \"production\" ] && [ \"$CI\" != \"true\" ]; then husky; fi"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.1",
@@ -109,9 +118,13 @@
     "@types/sap__logging": "^6.2.3",
     "chalk": "^4.1.2",
     "eslint": "^9.34.0",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-security": "^3.0.1",
     "globals": "^16.3.0",
+    "husky": "^9.1.7",
     "jest": "^29.0.0",
     "jiti": "^2.5.1",
+    "lint-staged": "^16.2.0",
     "prettier": "^3.6.2",
     "ts-jest": "^29.4.4",
     "typescript": "^5.0.0",
@@ -121,5 +134,14 @@
     "bufferutil": "^4.0.8",
     "node-notifier": "^10.0.1",
     "utf-8-validate": "^6.0.5"
+  },
+  "lint-staged": {
+    "*.{ts,js}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
   }
 }

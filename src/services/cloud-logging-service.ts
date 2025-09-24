@@ -25,7 +25,7 @@ export class CloudLoggingService {
     this.serviceName = serviceName;
     this.version = version;
     this.localLogger = new Logger('CloudLoggingService');
-    
+
     this.initializeCloudLogging();
   }
 
@@ -49,7 +49,7 @@ export class CloudLoggingService {
       try {
         // Try to get service bindings, but don't require them
         services = xsenv.getServices({
-          logging: { label: 'application-logs' }
+          logging: { label: 'application-logs' },
         });
       } catch (e) {
         // Service lookup failed - continue with fallback
@@ -61,7 +61,7 @@ export class CloudLoggingService {
         this.sapLogger = SAPLogging.createLogger({
           level: process.env.LOG_LEVEL || 'info',
           format: 'json',
-          output: 'stdout' // Always use stdout in CF
+          output: 'stdout', // Always use stdout in CF
         });
         this.isCloudLoggingAvailable = true;
         this.localLogger.info('✅ SAP Cloud Logging service initialized');
@@ -85,14 +85,18 @@ export class CloudLoggingService {
     this.sapLogger = this.createFallbackLogger();
     this.isCloudLoggingAvailable = false;
   }
-  
+
   private createFallbackLogger(): any {
     // Create a fallback logger that mimics the SAP logger interface
     return {
-      info: (data: any) => this.localLogger.info(typeof data === 'object' ? JSON.stringify(data) : String(data)),
-      warn: (data: any) => this.localLogger.warn(typeof data === 'object' ? JSON.stringify(data) : String(data)),
-      error: (data: any) => this.localLogger.error(typeof data === 'object' ? JSON.stringify(data) : String(data)),
-      debug: (data: any) => this.localLogger.debug(typeof data === 'object' ? JSON.stringify(data) : String(data))
+      info: (data: any) =>
+        this.localLogger.info(typeof data === 'object' ? JSON.stringify(data) : String(data)),
+      warn: (data: any) =>
+        this.localLogger.warn(typeof data === 'object' ? JSON.stringify(data) : String(data)),
+      error: (data: any) =>
+        this.localLogger.error(typeof data === 'object' ? JSON.stringify(data) : String(data)),
+      debug: (data: any) =>
+        this.localLogger.debug(typeof data === 'object' ? JSON.stringify(data) : String(data)),
     };
   }
 
@@ -105,7 +109,7 @@ export class CloudLoggingService {
     context?: Record<string, unknown>
   ): Record<string, unknown> {
     const timestamp = new Date().toISOString();
-    
+
     return {
       '@timestamp': timestamp,
       level: level.toUpperCase(),
@@ -115,13 +119,15 @@ export class CloudLoggingService {
       component: 'sap-mcp-server',
       correlation_id: context?.correlationId || context?.requestId || this.generateCorrelationId(),
       // Add Cloud Foundry application info if available
-      ...(process.env.VCAP_APPLICATION ? {
-        cf_app: JSON.parse(process.env.VCAP_APPLICATION)
-      } : {}),
+      ...(process.env.VCAP_APPLICATION
+        ? {
+            cf_app: JSON.parse(process.env.VCAP_APPLICATION),
+          }
+        : {}),
       // Add custom context
       ...(context ? { context } : {}),
       // Add performance metrics if available
-      ...(context?.performance ? { performance: context.performance } : {})
+      ...(context?.performance ? { performance: context.performance } : {}),
     };
   }
 
@@ -146,7 +152,7 @@ export class CloudLoggingService {
     const structuredLog = this.createStructuredLog(level, message, {
       category,
       eventType: 'application',
-      ...context
+      ...context,
     });
 
     // Safely call the SAP logger method
@@ -179,7 +185,7 @@ export class CloudLoggingService {
       category: 'security',
       eventType,
       securityEvent: true,
-      ...context
+      ...context,
     });
 
     // Safely call the SAP logger method
@@ -196,7 +202,11 @@ export class CloudLoggingService {
    */
   logSAPIntegrationEvent(
     level: 'info' | 'warn' | 'error' | 'debug',
-    eventType: 'destination_access' | 'odata_operation' | 'service_discovery' | 'principal_propagation',
+    eventType:
+      | 'destination_access'
+      | 'odata_operation'
+      | 'service_discovery'
+      | 'principal_propagation',
     message: string,
     context?: {
       correlationId?: string;
@@ -214,7 +224,7 @@ export class CloudLoggingService {
       category: 'sap_integration',
       eventType,
       sapEvent: true,
-      ...context
+      ...context,
     });
 
     // Safely call the SAP logger method
@@ -243,14 +253,18 @@ export class CloudLoggingService {
       [key: string]: unknown;
     }
   ): void {
-    const structuredLog = this.createStructuredLog('info', `Performance metrics for ${operationType}`, {
-      category: 'performance',
-      eventType: 'metrics',
-      operationType,
-      operationName,
-      metrics,
-      performanceEvent: true
-    });
+    const structuredLog = this.createStructuredLog(
+      'info',
+      `Performance metrics for ${operationType}`,
+      {
+        category: 'performance',
+        eventType: 'metrics',
+        operationType,
+        operationName,
+        metrics,
+        performanceEvent: true,
+      }
+    );
 
     this.sapLogger.info(structuredLog);
   }
@@ -275,7 +289,7 @@ export class CloudLoggingService {
       category: 'business',
       eventType,
       businessEvent: true,
-      ...context
+      ...context,
     });
 
     this.sapLogger.info(structuredLog);
@@ -296,14 +310,14 @@ export class CloudLoggingService {
     }
   ): void {
     const level = status === 'healthy' ? 'info' : status === 'degraded' ? 'warn' : 'error';
-    
+
     const structuredLog = this.createStructuredLog(level, message, {
       category: 'health',
       eventType: 'health_check',
       component,
       status,
       healthEvent: true,
-      ...context
+      ...context,
     });
 
     // Safely call the SAP logger method
@@ -322,10 +336,10 @@ export class CloudLoggingService {
     return (req: any, res: any, next: any) => {
       const startTime = Date.now();
       const correlationId = req.headers['x-correlation-id'] || this.generateCorrelationId();
-      
+
       // Add correlation ID to request for downstream use
       req.correlationId = correlationId;
-      
+
       // Log request start
       this.logApplicationEvent('info', 'http_request', `${req.method} ${req.path}`, {
         correlationId,
@@ -333,14 +347,14 @@ export class CloudLoggingService {
         path: req.path,
         userAgent: req.headers['user-agent'],
         ipAddress: req.ip,
-        requestPhase: 'start'
+        requestPhase: 'start',
       });
 
       // Override res.end to log response
       const originalEnd = res.end;
-      res.end = function(...args: any[]) {
+      res.end = function (...args: any[]) {
         const duration = Date.now() - startTime;
-        
+
         // Log request completion
         const cloudLogging = req.app.locals.cloudLogging as CloudLoggingService;
         if (cloudLogging) {
@@ -354,7 +368,7 @@ export class CloudLoggingService {
               path: req.path,
               statusCode: res.statusCode,
               duration,
-              requestPhase: 'complete'
+              requestPhase: 'complete',
             }
           );
 
@@ -363,7 +377,7 @@ export class CloudLoggingService {
             cloudLogging.logPerformanceMetrics('http_request', `${req.method} ${req.path}`, {
               duration,
               correlationId,
-              statusCode: res.statusCode
+              statusCode: res.statusCode,
             });
           }
         }
@@ -405,7 +419,7 @@ export class CloudLoggingService {
       cloudLoggingAvailable: this.isCloudLoggingWorking(),
       serviceName: this.serviceName,
       version: this.version,
-      logLevel: process.env.LOG_LEVEL || 'info'
+      logLevel: process.env.LOG_LEVEL || 'info',
     };
   }
 
@@ -415,7 +429,11 @@ export class CloudLoggingService {
   async flush(): Promise<void> {
     try {
       // SAP Logger doesn't have explicit flush, but we can log a shutdown event
-      this.logApplicationEvent('info', 'application_shutdown', 'Application shutting down gracefully');
+      this.logApplicationEvent(
+        'info',
+        'application_shutdown',
+        'Application shutting down gracefully'
+      );
     } catch (error) {
       this.localLogger.error('Error flushing logs:', error);
     }

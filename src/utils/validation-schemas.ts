@@ -7,26 +7,61 @@ import { VALIDATION_LIMITS } from '../constants/timeouts.js';
  */
 
 // Common validation patterns
-const safeString = z.string().min(1).max(VALIDATION_LIMITS.MAX_STRING_LENGTH).regex(/^[a-zA-Z0-9_\-.\s\(\)\/\$@\[\]]*$/, 'Invalid characters detected');
-const entitySetName = z.string().min(1).max(100).regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Invalid entity set name');
-const serviceName = z.string().min(1).max(200).regex(/^[a-zA-Z0-9_\-\.\/]*$/, 'Invalid service name');
+// Removed unused safeString schema
+const entitySetName = z
+  .string()
+  .min(1)
+  .max(100)
+  .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Invalid entity set name');
+const serviceName = z
+  .string()
+  .min(1)
+  .max(200)
+  .regex(/^[a-zA-Z0-9_\-./]*$/, 'Invalid service name');
 const sessionId = z.string().uuid('Invalid session ID format');
-const safeUrl = z.string().url().max(2000);
-const keyValue = z.string().min(1).max(500).regex(/^[a-zA-Z0-9_\-'.\s]*$/, 'Invalid key value');
+// Removed unused safeUrl schema
+const keyValue = z
+  .string()
+  .min(1)
+  .max(500)
+  .regex(/^[a-zA-Z0-9_\-'.\s]*$/, 'Invalid key value');
 
 // OData specific patterns
-const odataFilter = z.string().max(2000).regex(/^[a-zA-Z0-9_\s\(\)\'\-=<>!and or eq ne gt lt ge le contains startswith endswith,]*$/, 'Invalid OData filter');
-const odataSelect = z.string().max(VALIDATION_LIMITS.MAX_STRING_LENGTH).regex(/^[a-zA-Z0-9_,\s]*$/, 'Invalid OData select');
-const odataExpand = z.string().max(VALIDATION_LIMITS.MAX_STRING_LENGTH).regex(/^[a-zA-Z0-9_,\s\/]*$/, 'Invalid OData expand');
-const odataOrderBy = z.string().max(500).regex(/^[a-zA-Z0-9_,\s]+(?:\s+(asc|desc))?(?:,\s*[a-zA-Z0-9_]+(?:\s+(asc|desc))?)*$/, 'Invalid OData orderBy');
+const odataFilter = z
+  .string()
+  .max(2000)
+  .regex(
+    /^[a-zA-Z0-9_\s()'\-=<>!and or eq ne gt lt ge le contains startswith endswith,]*$/,
+    'Invalid OData filter'
+  );
+const odataSelect = z
+  .string()
+  .max(VALIDATION_LIMITS.MAX_STRING_LENGTH)
+  .regex(/^[a-zA-Z0-9_,\s]*$/, 'Invalid OData select');
+const odataExpand = z
+  .string()
+  .max(VALIDATION_LIMITS.MAX_STRING_LENGTH)
+  .regex(/^[a-zA-Z0-9_,\s/]*$/, 'Invalid OData expand');
+const odataOrderBy = z
+  .string()
+  .max(500)
+  .regex(
+    /^[a-zA-Z0-9_,\s]+(?:\s+(asc|desc))?(?:,\s*[a-zA-Z0-9_]+(?:\s+(asc|desc))?)*$/,
+    'Invalid OData orderBy'
+  );
 
 /**
  * Schema for service discovery operations
  */
 export const ServiceDiscoverySchema = z.object({
-  pattern: z.string().min(1).max(200).regex(/^[a-zA-Z0-9_\-\*\?\.\[\]]*$/, 'Invalid pattern').optional(),
+  pattern: z
+    .string()
+    .min(1)
+    .max(200)
+    .regex(/^[a-zA-Z0-9_\-*?.[\]]*$/, 'Invalid pattern')
+    .optional(),
   maxResults: z.number().int().min(1).max(100).optional(),
-  includeMetadata: z.boolean().optional()
+  includeMetadata: z.boolean().optional(),
 });
 
 /**
@@ -34,9 +69,14 @@ export const ServiceDiscoverySchema = z.object({
  */
 export const EntityDiscoverySchema = z.object({
   serviceId: serviceName,
-  entityPattern: z.string().min(1).max(200).regex(/^[a-zA-Z0-9_\-\*\?\.\[\]]*$/, 'Invalid entity pattern').optional(),
+  entityPattern: z
+    .string()
+    .min(1)
+    .max(200)
+    .regex(/^[a-zA-Z0-9_\-*?.[\]]*$/, 'Invalid entity pattern')
+    .optional(),
   includeProperties: z.boolean().optional(),
-  includeNavigations: z.boolean().optional()
+  includeNavigations: z.boolean().optional(),
 });
 
 /**
@@ -46,7 +86,7 @@ export const EntitySchemaSchema = z.object({
   serviceId: serviceName,
   entityName: entitySetName,
   includeNavigations: z.boolean().optional(),
-  includeConstraints: z.boolean().optional()
+  includeConstraints: z.boolean().optional(),
 });
 
 /**
@@ -62,7 +102,7 @@ export const EntityReadSchema = z.object({
   $orderby: odataOrderBy.optional(),
   $top: z.number().int().min(1).max(VALIDATION_LIMITS.MAX_STRING_LENGTH).optional(),
   $skip: z.number().int().min(0).max(10000).optional(),
-  session_id: sessionId.optional()
+  session_id: sessionId.optional(),
 });
 
 /**
@@ -71,11 +111,10 @@ export const EntityReadSchema = z.object({
 export const EntityCreateSchema = z.object({
   serviceId: serviceName,
   entitySet: entitySetName,
-  data: z.record(z.string().min(1).max(100), z.unknown()).refine(
-    (obj) => Object.keys(obj).length <= 50,
-    'Too many properties in entity data'
-  ),
-  session_id: sessionId.optional()
+  data: z
+    .record(z.string().min(1).max(100), z.unknown())
+    .refine(obj => Object.keys(obj).length <= 50, 'Too many properties in entity data'),
+  session_id: sessionId.optional(),
 });
 
 /**
@@ -85,11 +124,10 @@ export const EntityUpdateSchema = z.object({
   serviceId: serviceName,
   entitySet: entitySetName,
   key: keyValue,
-  data: z.record(z.string().min(1).max(100), z.unknown()).refine(
-    (obj) => Object.keys(obj).length <= 50,
-    'Too many properties in entity data'
-  ),
-  session_id: sessionId.optional()
+  data: z
+    .record(z.string().min(1).max(100), z.unknown())
+    .refine(obj => Object.keys(obj).length <= 50, 'Too many properties in entity data'),
+  session_id: sessionId.optional(),
 });
 
 /**
@@ -99,7 +137,7 @@ export const EntityDeleteSchema = z.object({
   serviceId: serviceName,
   entitySet: entitySetName,
   key: keyValue,
-  session_id: sessionId.optional()
+  session_id: sessionId.optional(),
 });
 
 /**
@@ -111,15 +149,17 @@ export const EntityOperationSchema = z.object({
   operation: z.enum(['read', 'read-single', 'create', 'update', 'delete']),
   key: keyValue.optional(),
   data: z.record(z.string().min(1).max(100), z.unknown()).optional(),
-  queryOptions: z.object({
-    $filter: odataFilter.optional(),
-    $select: odataSelect.optional(),
-    $expand: odataExpand.optional(),
-    $orderby: odataOrderBy.optional(),
-    $top: z.number().int().min(1).max(VALIDATION_LIMITS.MAX_STRING_LENGTH).optional(),
-    $skip: z.number().int().min(0).max(10000).optional()
-  }).optional(),
-  session_id: sessionId.optional()
+  queryOptions: z
+    .object({
+      $filter: odataFilter.optional(),
+      $select: odataSelect.optional(),
+      $expand: odataExpand.optional(),
+      $orderby: odataOrderBy.optional(),
+      $top: z.number().int().min(1).max(VALIDATION_LIMITS.MAX_STRING_LENGTH).optional(),
+      $skip: z.number().int().min(0).max(10000).optional(),
+    })
+    .optional(),
+  session_id: sessionId.optional(),
 });
 
 /**
@@ -127,7 +167,7 @@ export const EntityOperationSchema = z.object({
  */
 export const HealthCheckSchema = z.object({
   detailed: z.boolean().optional(),
-  includeDestinations: z.boolean().optional()
+  includeDestinations: z.boolean().optional(),
 });
 
 /**
@@ -135,7 +175,7 @@ export const HealthCheckSchema = z.object({
  */
 export const SystemInfoSchema = z.object({
   includeConfig: z.boolean().optional(),
-  includeDiagnostics: z.boolean().optional()
+  includeDiagnostics: z.boolean().optional(),
 });
 
 /**
@@ -146,17 +186,17 @@ export const ValidationSchemas = {
   'search-sap-services': ServiceDiscoverySchema,
   'discover-service-entities': EntityDiscoverySchema,
   'get-entity-schema': EntitySchemaSchema,
-  
+
   // CRUD operation tools
   'execute-entity-operation': EntityOperationSchema,
   'sap-odata-read': EntityReadSchema,
   'sap-odata-create': EntityCreateSchema,
   'sap-odata-update': EntityUpdateSchema,
   'sap-odata-delete': EntityDeleteSchema,
-  
+
   // System tools
   'sap-health-check': HealthCheckSchema,
-  'sap-system-info': SystemInfoSchema
+  'sap-system-info': SystemInfoSchema,
 } as const;
 
 /**
@@ -184,7 +224,7 @@ export function validateInput<T>(
     const result = schema.parse(input);
     return {
       success: true,
-      data: result
+      data: result,
     };
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -194,17 +234,17 @@ export function validateInput<T>(
         error: {
           code: 'VALIDATION_ERROR',
           message: `Invalid input${context ? ` for ${context}` : ''}: ${firstIssue?.message || 'Validation failed'}`,
-          details: error
-        }
+          details: error,
+        },
       };
     }
-    
+
     return {
       success: false,
       error: {
         code: 'VALIDATION_ERROR',
-        message: `Validation failed${context ? ` for ${context}` : ''}: ${error instanceof Error ? error.message : 'Unknown error'}`
-      }
+        message: `Validation failed${context ? ` for ${context}` : ''}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      },
     };
   }
 }
@@ -212,17 +252,14 @@ export function validateInput<T>(
 /**
  * Validate MCP tool input
  */
-export function validateMCPToolInput(
-  toolName: string,
-  input: unknown
-): ValidationResult {
+export function validateMCPToolInput(toolName: string, input: unknown): ValidationResult {
   const schema = ValidationSchemas[toolName as keyof typeof ValidationSchemas];
-  
+
   if (!schema) {
     // For tools without specific validation, perform basic sanitization
     return validateBasicInput(input, toolName);
   }
-  
+
   return validateInput(input, schema as z.ZodSchema, toolName);
 }
 
@@ -233,12 +270,12 @@ function validateBasicInput(input: unknown, context?: string): ValidationResult 
   if (input === null || input === undefined) {
     return { success: true, data: input };
   }
-  
+
   if (typeof input === 'object') {
     try {
       // Check for common injection patterns
       const jsonStr = JSON.stringify(input);
-      
+
       // Check for dangerous patterns
       const dangerousPatterns = [
         /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
@@ -253,51 +290,55 @@ function validateBasicInput(input: unknown, context?: string): ValidationResult 
         /system\s*\(/gi,
         /\|\s*nc\s+/gi,
         /\|\s*sh\s*$/gi,
-        /&&\s*\w+/g
+        /&&\s*\w+/g,
       ];
-      
+
       for (const pattern of dangerousPatterns) {
         if (pattern.test(jsonStr)) {
           return {
             success: false,
             error: {
               code: 'SECURITY_VIOLATION',
-              message: `Potentially malicious input detected${context ? ` in ${context}` : ''}`
-            }
+              message: `Potentially malicious input detected${context ? ` in ${context}` : ''}`,
+            },
           };
         }
       }
-      
+
       return { success: true, data: input };
-    } catch (error) {
+    } catch (_error) {
       return {
         success: false,
         error: {
           code: 'INVALID_INPUT',
-          message: `Invalid input format${context ? ` for ${context}` : ''}`
-        }
+          message: `Invalid input format${context ? ` for ${context}` : ''}`,
+        },
       };
     }
   }
-  
+
   return { success: true, data: input };
 }
 
 /**
  * Sanitize string input to prevent XSS and injection attacks
  */
-export function sanitizeString(input: string, maxLength = VALIDATION_LIMITS.DEFAULT_SANITIZE_LENGTH): string {
+export function sanitizeString(
+  input: string,
+  maxLength = VALIDATION_LIMITS.DEFAULT_SANITIZE_LENGTH
+): string {
   return input
     .slice(0, maxLength) // Truncate if too long
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove scripts
     .replace(/javascript:/gi, '') // Remove javascript URLs
     .replace(/on\w+\s*=/gi, '') // Remove event handlers
-    .replace(/[<>'"]/g, (char) => { // Escape HTML entities
+    .replace(/[<>'"]/g, char => {
+      // Escape HTML entities
       const entities: Record<string, string> = {
         '<': '&lt;',
         '>': '&gt;',
         '"': '&quot;',
-        "'": '&#x27;'
+        "'": '&#x27;',
       };
       return entities[char] || char;
     });

@@ -28,11 +28,11 @@ export const authMiddleware = async (
   next: NextFunction
 ): Promise<void | Response> => {
   const jwtValidator = new JWTValidator(logger);
-  
+
   try {
     // Get JWT token from Authorization header
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       // For development/testing, allow requests without auth to /health and /docs
       const publicEndpoints = ['/health', '/docs', '/mcp'];
@@ -40,12 +40,12 @@ export const authMiddleware = async (
         logger.debug(`Allowing unauthenticated access to public endpoint: ${req.path}`);
         return next();
       }
-      
+
       logger.warn('Missing or invalid Authorization header');
       return res.status(401).json({
         error: 'Unauthorized',
         message: 'Missing or invalid Authorization header',
-        code: 'AUTH_HEADER_MISSING'
+        code: 'AUTH_HEADER_MISSING',
       });
     }
 
@@ -53,20 +53,20 @@ export const authMiddleware = async (
 
     // Use secure JWT validation
     const validationResult = await jwtValidator.validateJWT(token);
-    
+
     if (!validationResult.valid) {
       logger.warn('JWT validation failed:', validationResult.error);
       return res.status(401).json({
         error: 'Unauthorized',
         message: 'Invalid or expired JWT token',
-        code: 'INVALID_TOKEN'
+        code: 'INVALID_TOKEN',
       });
     }
 
     // Extract user information from validated token
     const userInfo = validationResult.userInfo!;
     const scopes = validationResult.payload?.scopes || [];
-    
+
     // Attach authentication info to request
     req.authInfo = {
       user: userInfo.name || userInfo.sub,
@@ -74,28 +74,27 @@ export const authMiddleware = async (
       scopes: scopes,
       tenant: validationResult.payload?.tenant || 'default',
       userId: userInfo.sub,
-      isAuthenticated: true
+      isAuthenticated: true,
     };
-    
+
     // Store the validation result for potential use downstream
     req.securityContext = validationResult.payload;
 
     logger.debug('User authenticated successfully', {
       user: req.authInfo.user,
       scopes: req.authInfo.scopes,
-      tenant: req.authInfo.tenant
+      tenant: req.authInfo.tenant,
     });
 
     next();
-
   } catch (error) {
     // Use secure error handler to prevent information leakage
     const errorHandler = new SecureErrorHandler(logger);
     const secureError = errorHandler.sanitizeError(error, {
       operation: 'authentication',
-      requestId: req.headers['x-request-id'] as string
+      requestId: req.headers['x-request-id'] as string,
     });
-    
+
     return res.status(401).json(secureError);
   }
 };
@@ -105,24 +104,21 @@ export const authMiddleware = async (
  * @param requiredScopes Array of required scopes (at least one must be present)
  * @param requireAll If true, all scopes must be present (default: false)
  */
-export const requireScope = (
-  requiredScopes: string | string[],
-  requireAll: boolean = false
-) => {
+export const requireScope = (requiredScopes: string | string[], requireAll: boolean = false) => {
   const scopes = Array.isArray(requiredScopes) ? requiredScopes : [requiredScopes];
-  
+
   return (req: AuthenticatedRequest, res: Response, next: NextFunction): void | Response => {
     if (!req.authInfo?.isAuthenticated) {
       logger.warn('Authorization check failed: User not authenticated');
       return res.status(401).json({
         error: 'Unauthorized',
         message: 'User not authenticated',
-        code: 'NOT_AUTHENTICATED'
+        code: 'NOT_AUTHENTICATED',
       });
     }
 
     const userScopes = req.authInfo.scopes || [];
-    
+
     // Get xsappname from XSUAA service binding for correct scope prefix
     let xsappname = process.env.XSUAA_XSAPPNAME || 'btp-sap-odata-to-mcp-server'; // Default fallback for local dev
     try {
@@ -134,36 +130,42 @@ export const requireScope = (
         logger.warn('XSUAA service not found or xsappname missing, using fallback name.');
       }
     } catch (error) {
-      logger.warn('Could not determine xsappname from service bindings, using fallback.', { error: error instanceof Error ? error.message : String(error) });
+      logger.warn('Could not determine xsappname from service bindings, using fallback.', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
-    
+
     // Additional scope validation: also check for scopes that already contain the full app identifier
     // This handles cases where scopes are already in the format: {full-xsappname}.{scope}
-    const additionalScopeChecks = scopes.map(scope => {
-      // If scope already contains a dot, it might be a full scope name
-      if (scope.includes('.')) {
-        return scope;
-      }
-      // Also check for scopes that might match user scopes directly (for compatibility)
-      return userScopes.find(userScope => userScope.endsWith(`.${scope}`));
-    }).filter((scope): scope is string => Boolean(scope));
-    
+    const additionalScopeChecks = scopes
+      .map(scope => {
+        // If scope already contains a dot, it might be a full scope name
+        if (scope.includes('.')) {
+          return scope;
+        }
+        // Also check for scopes that might match user scopes directly (for compatibility)
+        return userScopes.find(userScope => userScope.endsWith(`.${scope}`));
+      })
+      .filter((scope): scope is string => Boolean(scope));
+
     const normalizedRequiredScopes = scopes.map(scope => {
       return scope.includes('.') ? scope : `${xsappname}.${scope}`;
     });
 
     let hasAccess = false;
-    
+
     if (requireAll) {
       // All scopes must be present
-      hasAccess = normalizedRequiredScopes.every(scope => userScopes.includes(scope)) ||
-                  additionalScopeChecks.every(scope => userScopes.includes(scope));
+      hasAccess =
+        normalizedRequiredScopes.every(scope => userScopes.includes(scope)) ||
+        additionalScopeChecks.every(scope => userScopes.includes(scope));
     } else {
       // At least one scope must be present - check both normalized scopes and additional scope patterns
-      hasAccess = normalizedRequiredScopes.some(scope => userScopes.includes(scope)) ||
-                  additionalScopeChecks.some(scope => userScopes.includes(scope)) ||
-                  // Also check if any user scope ends with the required scope (for flexible matching)
-                  scopes.some(scope => userScopes.some(userScope => userScope.endsWith(`.${scope}`)));
+      hasAccess =
+        normalizedRequiredScopes.some(scope => userScopes.includes(scope)) ||
+        additionalScopeChecks.some(scope => userScopes.includes(scope)) ||
+        // Also check if any user scope ends with the required scope (for flexible matching)
+        scopes.some(scope => userScopes.some(userScope => userScope.endsWith(`.${scope}`)));
     }
 
     if (!hasAccess) {
@@ -174,15 +176,15 @@ export const requireScope = (
         additionalScopeChecks: additionalScopeChecks,
         xsappname: xsappname,
         originalScopes: scopes,
-        requireAll
+        requireAll,
       });
-      
+
       return res.status(403).json({
         error: 'Forbidden',
         message: 'Insufficient permissions',
         code: 'INSUFFICIENT_PERMISSIONS',
         requiredScopes: normalizedRequiredScopes,
-        userScopes: userScopes
+        userScopes: userScopes,
       });
     }
 
@@ -191,7 +193,7 @@ export const requireScope = (
       requiredScopes: normalizedRequiredScopes,
       additionalScopeChecks: additionalScopeChecks,
       userScopes: userScopes,
-      xsappname: xsappname
+      xsappname: xsappname,
     });
 
     next();
@@ -217,7 +219,7 @@ export const optionalAuth = async (
 ): Promise<void> => {
   // Check if there's an Authorization header
   const authHeader = req.headers.authorization;
-  
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     // No auth header - continue as anonymous
     logger.debug('No authentication header, continuing as anonymous user');
@@ -226,7 +228,7 @@ export const optionalAuth = async (
       scopes: [],
       tenant: 'default',
       userId: 'anonymous',
-      isAuthenticated: false
+      isAuthenticated: false,
     };
     return next();
   }
@@ -236,17 +238,17 @@ export const optionalAuth = async (
     let authFailed = false;
     const originalJson = res.json;
     const originalStatus = res.status;
-    
+
     // Override response methods to detect auth failures
-    res.json = function(body: any) {
+    res.json = function (body: any) {
       if (body.error && (body.code === 'AUTH_HEADER_MISSING' || body.code === 'AUTH_FAILED')) {
         authFailed = true;
         return res; // Don't actually send the response
       }
       return originalJson.call(this, body);
     };
-    
-    res.status = function(code: number) {
+
+    res.status = function (code: number) {
       if (code === 401) {
         authFailed = true;
         return res; // Don't actually send the response
@@ -254,11 +256,11 @@ export const optionalAuth = async (
       return originalStatus.call(this, code);
     };
 
-    await authMiddleware(req, res, (err) => {
+    await authMiddleware(req, res, err => {
       // Restore original methods
       res.json = originalJson;
       res.status = originalStatus;
-      
+
       if (authFailed || err) {
         // Authentication failed - continue as anonymous
         logger.debug('Authentication failed, continuing as anonymous user');
@@ -267,7 +269,7 @@ export const optionalAuth = async (
           scopes: [],
           tenant: 'default',
           userId: 'anonymous',
-          isAuthenticated: false
+          isAuthenticated: false,
         };
         return next();
       } else {
@@ -283,7 +285,7 @@ export const optionalAuth = async (
       scopes: [],
       tenant: 'default',
       userId: 'anonymous',
-      isAuthenticated: false
+      isAuthenticated: false,
     };
     next();
   }

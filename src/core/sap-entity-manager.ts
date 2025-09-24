@@ -30,36 +30,36 @@ export class SAPEntityManager {
             name: 'ID',
             type: 'Edm.String',
             nullable: false,
-            maxLength: '10'
+            maxLength: '10',
           },
           {
             name: 'Name',
             type: 'Edm.String',
             nullable: true,
-            maxLength: '255'
+            maxLength: '255',
           },
           {
             name: 'Description',
             type: 'Edm.String',
             nullable: true,
-            maxLength: '1000'
+            maxLength: '1000',
           },
           {
             name: 'CreatedAt',
             type: 'Edm.DateTimeOffset',
-            nullable: true
+            nullable: true,
           },
           {
             name: 'UpdatedAt',
             type: 'Edm.DateTimeOffset',
-            nullable: true
-          }
+            nullable: true,
+          },
         ],
         navigationProperties: [],
         creatable: true,
         updatable: true,
         deletable: true,
-        addressable: true
+        addressable: true,
       };
 
       return mockMetadata;
@@ -98,19 +98,19 @@ export class SAPEntityManager {
                 properties: [
                   { name: 'CustomerID', type: 'Edm.String', nullable: false, maxLength: '10' },
                   { name: 'CompanyName', type: 'Edm.String', nullable: false, maxLength: '255' },
-                  { name: 'ContactPerson', type: 'Edm.String', nullable: true, maxLength: '100' }
+                  { name: 'ContactPerson', type: 'Edm.String', nullable: true, maxLength: '100' },
                 ],
                 navigationProperties: [],
                 creatable: true,
                 updatable: true,
                 deletable: true,
-                addressable: true
-              }
+                addressable: true,
+              },
             ],
             entitySets: [{ CustomerSet: 'Customer' }],
             version: '1.0',
-            namespace: 'SAP.Customer'
-          }
+            namespace: 'SAP.Customer',
+          },
         },
         {
           id: 'SALES_ORDER_SERVICE',
@@ -132,20 +132,20 @@ export class SAPEntityManager {
                   { name: 'OrderID', type: 'Edm.String', nullable: false, maxLength: '10' },
                   { name: 'CustomerID', type: 'Edm.String', nullable: false, maxLength: '10' },
                   { name: 'OrderDate', type: 'Edm.DateTimeOffset', nullable: false },
-                  { name: 'TotalAmount', type: 'Edm.Decimal', nullable: false }
+                  { name: 'TotalAmount', type: 'Edm.Decimal', nullable: false },
                 ],
                 navigationProperties: [],
                 creatable: true,
                 updatable: true,
                 deletable: false,
-                addressable: true
-              }
+                addressable: true,
+              },
             ],
             entitySets: [{ SalesOrderSet: 'SalesOrder' }],
             version: '1.0',
-            namespace: 'SAP.Sales'
-          }
-        }
+            namespace: 'SAP.Sales',
+          },
+        },
       ];
 
       return mockServices;
@@ -158,7 +158,10 @@ export class SAPEntityManager {
   /**
    * Validate entity fields against schema
    */
-  validateEntityFields(entityType: string, fields: Record<string, any>): { valid: boolean; errors: string[] } {
+  validateEntityFields(
+    entityType: string,
+    fields: Record<string, any>
+  ): { valid: boolean; errors: string[] } {
     try {
       const errors: string[] = [];
 
@@ -175,13 +178,13 @@ export class SAPEntityManager {
 
       return {
         valid: errors.length === 0,
-        errors
+        errors,
       };
     } catch (error) {
       this.logger.error(`Error validating fields for ${entityType}:`, error);
       return {
         valid: false,
-        errors: ['Validation error occurred']
+        errors: ['Validation error occurred'],
       };
     }
   }

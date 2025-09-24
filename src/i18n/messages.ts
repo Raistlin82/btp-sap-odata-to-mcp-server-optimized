@@ -7,7 +7,8 @@ export const Messages = {
   // Authentication Messages
   auth: {
     errors: {
-      notConfigured: 'IAS authentication not configured. Please configure IAS environment variables.',
+      notConfigured:
+        'IAS authentication not configured. Please configure IAS environment variables.',
       tokenExchangeFailed: 'Token exchange failed',
       authenticationFailed: 'Authentication failed',
       tokenRefreshFailed: 'Token refresh failed',
@@ -19,13 +20,16 @@ export const Messages = {
       introspectionFailed: 'Token introspection failed',
       xsuaaBindingNotFound: 'No XSUAA service binding found, skipping token exchange',
       securityContextCreationFailed: 'XSUAA security context creation failed',
-      noApplicationScopes: 'XSUAA context created but no application scopes found'
+      noApplicationScopes: 'XSUAA context created but no application scopes found',
     },
     warnings: {
-      deprecatedPasswordFlow: 'Using deprecated password flow. Consider using Authorization Code flow instead.',
-      missingConfiguration: 'IAS configuration missing. Authentication will be disabled. Please set SAP_IAS_URL, SAP_IAS_CLIENT_ID, and SAP_IAS_CLIENT_SECRET environment variables to enable authentication.',
+      deprecatedPasswordFlow:
+        'Using deprecated password flow. Consider using Authorization Code flow instead.',
+      missingConfiguration:
+        'IAS configuration missing. Authentication will be disabled. Please set SAP_IAS_URL, SAP_IAS_CLIENT_ID, and SAP_IAS_CLIENT_SECRET environment variables to enable authentication.',
       tokenNotActive: 'Token is not active',
-      securityWarning: 'SECURITY WARNING: decodeJWT() called - this method is deprecated and insecure'
+      securityWarning:
+        'SECURITY WARNING: decodeJWT() called - this method is deprecated and insecure',
     },
     info: {
       userAuthenticated: 'User authenticated successfully',
@@ -36,7 +40,7 @@ export const Messages = {
       sessionInvalidated: 'Session invalidated',
       xsuaaServiceFound: 'Found XSUAA service binding',
       securityContextCreated: 'XSUAA security context created successfully',
-      applicationScopesFound: 'Returning XSUAA token with application scopes'
+      applicationScopesFound: 'Returning XSUAA token with application scopes',
     },
     debug: {
       exchangingCode: 'Exchanging authorization code for tokens',
@@ -45,8 +49,8 @@ export const Messages = {
       gettingClientToken: 'Getting client credentials token from IAS',
       retrievedUserInfo: 'Retrieved user info',
       lookingForXsuaa: 'Looking for XSUAA service binding',
-      creatingSecurityContext: 'Creating XSUAA security context'
-    }
+      creatingSecurityContext: 'Creating XSUAA security context',
+    },
   },
 
   // Session Management Messages
@@ -57,20 +61,20 @@ export const Messages = {
       invalidationFailed: 'Failed to invalidate session',
       cleanupFailed: 'Session cleanup failed',
       lockTimeoutExceeded: 'Session lock timeout exceeded',
-      concurrentAccessDenied: 'Concurrent session access denied'
+      concurrentAccessDenied: 'Concurrent session access denied',
     },
     warnings: {
       multipleActiveSessions: 'Multiple active sessions detected for user',
       sessionNearExpiry: 'Session is near expiry',
-      suspiciousActivity: 'Suspicious activity detected in session'
+      suspiciousActivity: 'Suspicious activity detected in session',
     },
     info: {
       created: 'Session created',
       invalidated: 'Session invalidated',
       cleaned: 'Session cleaned',
       extended: 'Session extended',
-      userSessionMapped: 'User session mapped to MCP session'
-    }
+      userSessionMapped: 'User session mapped to MCP session',
+    },
   },
 
   // Service Discovery Messages
@@ -80,18 +84,18 @@ export const Messages = {
       catalogRetrievalFailed: 'Failed to retrieve service catalog',
       metadataParsingFailed: 'Failed to parse service metadata',
       endpointUnreachable: 'Service endpoint unreachable',
-      invalidServiceDefinition: 'Invalid service definition'
+      invalidServiceDefinition: 'Invalid service definition',
     },
     warnings: {
       noServicesFound: 'No services found matching criteria',
       deprecatedVersion: 'Service version is deprecated',
-      slowResponse: 'Service response time exceeded threshold'
+      slowResponse: 'Service response time exceeded threshold',
     },
     info: {
       servicesDiscovered: 'Services discovered',
       catalogUpdated: 'Service catalog updated',
-      endpointRegistered: 'Service endpoint registered'
-    }
+      endpointRegistered: 'Service endpoint registered',
+    },
   },
 
   // Destination Management Messages
@@ -100,17 +104,17 @@ export const Messages = {
       notFound: 'Destination not found',
       configurationInvalid: 'Invalid destination configuration',
       authenticationFailed: 'Destination authentication failed',
-      connectionFailed: 'Failed to connect to destination'
+      connectionFailed: 'Failed to connect to destination',
     },
     warnings: {
       fallbackUsed: 'Using fallback destination',
-      certificateExpiring: 'Destination certificate is expiring soon'
+      certificateExpiring: 'Destination certificate is expiring soon',
     },
     info: {
       connected: 'Connected to destination',
       authenticated: 'Destination authenticated successfully',
-      cached: 'Destination configuration cached'
-    }
+      cached: 'Destination configuration cached',
+    },
   },
 
   // Tool Execution Messages
@@ -119,17 +123,17 @@ export const Messages = {
       executionFailed: 'Tool execution failed',
       invalidParameters: 'Invalid tool parameters',
       timeout: 'Tool execution timeout',
-      notFound: 'Tool not found'
+      notFound: 'Tool not found',
     },
     warnings: {
       deprecatedTool: 'This tool is deprecated',
-      longRunning: 'Tool execution is taking longer than expected'
+      longRunning: 'Tool execution is taking longer than expected',
     },
     info: {
       executing: 'Executing tool',
       completed: 'Tool execution completed',
-      cancelled: 'Tool execution cancelled'
-    }
+      cancelled: 'Tool execution cancelled',
+    },
   },
 
   // HTTP/API Messages
@@ -143,17 +147,17 @@ export const Messages = {
       conflict: 'Resource conflict',
       internalError: 'Internal server error',
       serviceUnavailable: 'Service unavailable',
-      gatewayTimeout: 'Gateway timeout'
+      gatewayTimeout: 'Gateway timeout',
     },
     warnings: {
       rateLimitNearing: 'Approaching rate limit',
-      deprecatedEndpoint: 'This endpoint is deprecated'
+      deprecatedEndpoint: 'This endpoint is deprecated',
     },
     info: {
       requestReceived: 'Request received',
       responsesSent: 'Response sent',
-      rateLimitReset: 'Rate limit reset'
-    }
+      rateLimitReset: 'Rate limit reset',
+    },
   },
 
   // Configuration Messages
@@ -161,35 +165,35 @@ export const Messages = {
     errors: {
       loadFailed: 'Failed to load configuration',
       validationFailed: 'Configuration validation failed',
-      requiredMissing: 'Required configuration missing'
+      requiredMissing: 'Required configuration missing',
     },
     warnings: {
       usingDefaults: 'Using default configuration',
-      deprecatedOption: 'Configuration option is deprecated'
+      deprecatedOption: 'Configuration option is deprecated',
     },
     info: {
       loaded: 'Configuration loaded',
       updated: 'Configuration updated',
-      validated: 'Configuration validated'
-    }
+      validated: 'Configuration validated',
+    },
   },
 
   // Health Check Messages
   health: {
     errors: {
       checkFailed: 'Health check failed',
-      dependencyUnhealthy: 'Dependency is unhealthy'
+      dependencyUnhealthy: 'Dependency is unhealthy',
     },
     warnings: {
       degradedPerformance: 'System performance is degraded',
       highMemoryUsage: 'High memory usage detected',
-      highCpuUsage: 'High CPU usage detected'
+      highCpuUsage: 'High CPU usage detected',
     },
     info: {
       healthy: 'System is healthy',
       ready: 'System is ready',
-      live: 'System is live'
-    }
+      live: 'System is live',
+    },
   },
 
   // MCP Protocol Messages
@@ -198,18 +202,18 @@ export const Messages = {
       protocolViolation: 'MCP protocol violation',
       unsupportedVersion: 'Unsupported MCP version',
       initializationFailed: 'MCP initialization failed',
-      connectionLost: 'MCP connection lost'
+      connectionLost: 'MCP connection lost',
     },
     warnings: {
       versionMismatch: 'MCP version mismatch detected',
-      featureNotSupported: 'MCP feature not supported'
+      featureNotSupported: 'MCP feature not supported',
     },
     info: {
       initialized: 'MCP server initialized',
       clientConnected: 'MCP client connected',
       clientDisconnected: 'MCP client disconnected',
-      requestProcessed: 'MCP request processed'
-    }
+      requestProcessed: 'MCP request processed',
+    },
   },
 
   // Generic System Messages
@@ -217,18 +221,18 @@ export const Messages = {
     errors: {
       startupFailed: 'System startup failed',
       shutdownFailed: 'System shutdown failed',
-      resourceExhausted: 'System resources exhausted'
+      resourceExhausted: 'System resources exhausted',
     },
     warnings: {
       highLoad: 'System under high load',
-      maintenanceNeeded: 'System maintenance needed'
+      maintenanceNeeded: 'System maintenance needed',
     },
     info: {
       started: 'System started',
       stopping: 'System stopping',
-      reloading: 'System reloading configuration'
-    }
-  }
+      reloading: 'System reloading configuration',
+    },
+  },
 };
 
 /**
